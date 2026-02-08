@@ -45,6 +45,8 @@ drizzle/meta/
 # Temp
 *.tmp
 *.bak
+*.zip
+nul
 
 # Secrets
 *.pem

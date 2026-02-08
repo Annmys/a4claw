@@ -7,4 +7,5 @@ export interface AgentDefinition {
   tools: string[];
   maxTokens: number;
   temperature: number;
+  maxToolIterations?: number;
 }

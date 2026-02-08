@@ -110,6 +110,7 @@ export class SocialTool extends BaseTool {
 
         case 'schedule': {
           if (!platform || !text) return { success: false, output: '', error: 'platform and text required' };
+          if (!scheduledAt) return { success: false, output: '', error: 'scheduledAt (ISO datetime) required for scheduling' };
           const body = {
             post: {
               accountId: this.getAccountId(platform),
@@ -119,8 +120,8 @@ export class SocialTool extends BaseTool {
                 platform,
               },
               target: this.buildTarget(platform, options),
-              scheduledAt,
             },
+            scheduledTime: scheduledAt, // Blotato API uses scheduledTime at top level
           };
           const res = await this.post('/posts', body);
           return { success: true, output: `Post scheduled for ${scheduledAt}!\nPlatform: ${platform}\nPost ID: ${res.postSubmissionId}` };
@@ -177,10 +178,12 @@ export class SocialTool extends BaseTool {
         target.madeForKids = options?.madeForKids ?? false;
         target.isAiGenerated = options?.isAiGenerated ?? true;
         break;
-      case 'facebook':
-        if (options?.facebookPageId) target.facebookPageId = options.facebookPageId;
+      case 'facebook': {
+        const pageId = options?.facebookPageId || options?.pageId || (config as any).BLOTATO_FACEBOOK_PAGE_ID;
+        if (pageId) target.pageId = pageId;
         if (options?.linkUrl) target.linkUrl = options.linkUrl;
         break;
+      }
       case 'linkedin':
         if (options?.linkedinPageId) target.linkedinPageId = options.linkedinPageId;
         break;

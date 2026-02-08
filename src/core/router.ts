@@ -35,6 +35,13 @@ export enum Intent {
   CONTENT_CREATE = 'content_create',
   SOCIAL_PUBLISH = 'social_publish',
   ORCHESTRATE = 'orchestrate',
+  REMEMBER = 'remember',
+  AUTONOMOUS_TASK = 'autonomous_task',
+  SELF_DIAGNOSE = 'self_diagnose',
+  WORKFLOW = 'workflow',
+  ANALYTICS = 'analytics',
+  DEVICE_CONTROL = 'device_control',
+  DEVICE_CONFIG = 'device_config',
 }
 
 export interface RoutingResult {
@@ -79,6 +86,13 @@ Available intents:
 - content_create: Generate AI content — video, image, music, UGC, create content, צור וידאו, תיצור תמונה, generate video, make content, AI art, AI video
 - social_publish: Publish to social media — פרסם, תפרסם, publish to, post on, share to, cross-post, schedule post, תזמן פוסט, רשתות חברתיות, tiktok, instagram, youtube
 - orchestrate: Coordinate between ClawdAgent and OpenClaw, manage OpenClaw, Facebook via OpenClaw, WhatsApp via OpenClaw, check OpenClaw status, sync data between systems, content pipeline (create + publish everywhere), affiliate management — openclaw, תשלח ל-openclaw, מה קורה ב-openclaw, תפעיל את openclaw, פייסבוק, whatsapp, ווטסאפ, affiliate, תנהל, תתאם, סינרגיה, תפרסם בכל מקום, צור ופרסם
+- remember: Save or recall facts/preferences — remember that, תזכור ש, מה אתה זוכר, תשכח את, what do you know about me, save this
+- autonomous_task: Run a complex multi-step goal autonomously — תעשה באופן אוטונומי, run autonomously, execute goal, auto-run, תריץ לבד, do this yourself
+- self_diagnose: Check system health, self-repair, diagnose issues — תבדוק את עצמך, מה המצב שלך, self check, diagnose, תתקן את עצמך
+- workflow: Create or manage automated workflows/chains — תהליך, workflow, automation, שרשרת, כל בוקר תעשה X, automate this
+- analytics: Usage stats, cost reports, API key status — סטטיסטיקות, analytics, כמה עולה, cost, דו"ח, כמה עלה, budget, תבדוק API keys
+- device_control: Control Android phone/tablet — tap, swipe, type, open app, screenshot, ADB command, Appium, send WhatsApp from phone, post TikTok from phone — תשלוט בטלפון, תלחץ על, תפתח אפליקציה, צילום מסך טלפון, תשלח ווטסאפ מהטלפון
+- device_config: Configure device connection, list devices, device info — חבר טלפון, הגדרות מכשיר, מה המכשירים
 
 Hebrew examples:
 - "מה מצב השרת" → server_status
@@ -100,11 +114,21 @@ Hebrew examples:
 - "תפרסם בכל מקום" → orchestrate
 - "מה המצב של שני המערכות?" → orchestrate
 - "תתאם בין ClawdAgent ל-OpenClaw" → orchestrate
+- "תזכור שאני אוהב פייתון" → remember
+- "מה אתה יודע עליי" → remember
+- "תעשה את זה לבד" → autonomous_task
+- "תבדוק את עצמך" → self_diagnose
+- "כמה עלה לי היום" → analytics
+- "תבדוק API keys" → analytics
+- "תיצור תהליך אוטומטי" → workflow
+- "תלחץ על הטלפון" → device_control
+- "תשלח ווטסאפ מהטלפון" → device_control
+- "מה המכשירים המחוברים" → device_config
 
 Respond ONLY with valid JSON (no markdown, no text before/after):
 {"intent":"<intent_name>","confidence":<0.0-1.0>,"agent":"<best_agent>","params":{"key":"value"}}
 
-Agent options: server-manager, code-assistant, researcher, task-planner, general, desktop-controller, project-builder, web-agent, content-creator, orchestrator`;
+Agent options: server-manager, code-assistant, researcher, task-planner, general, desktop-controller, project-builder, web-agent, content-creator, orchestrator, device-controller`;
 
 export class IntentRouter {
   private ai: AIClient;
@@ -136,8 +160,94 @@ export class IntentRouter {
         extractedParams: parsed.params ?? {},
       };
     } catch (error: any) {
-      logger.warn('Intent classification failed, defaulting to general_chat', { error: error?.message ?? String(error) });
+      logger.warn('AI classification failed, trying keyword fallback', { error: error?.message ?? String(error) });
+      // Keyword-based fallback — catches common patterns when AI router fails
+      const fallback = this.keywordClassify(message);
+      if (fallback) {
+        logger.info('Keyword fallback matched', { intent: fallback.intent, agent: fallback.agentId });
+        return fallback;
+      }
       return { intent: Intent.GENERAL_CHAT, confidence: 0.5, agentId: 'general', extractedParams: {} };
     }
+  }
+
+  /**
+   * Keyword-based intent classifier — used as fallback when AI classification fails.
+   * Catches the most common Hebrew + English patterns.
+   */
+  private keywordClassify(message: string): RoutingResult | null {
+    const m = message.toLowerCase();
+
+    // Content creation (images, videos, music)
+    if (/תיצור|צור.*תמונ|תעשה.*תמונ|generate.*image|create.*image|make.*image|תיצור.*וידאו|צור.*וידאו|generate.*video|create.*video|make.*video|תעשה.*וידאו|צור.*שיר|generate.*music|AI art/i.test(message)) {
+      return { intent: Intent.CONTENT_CREATE, confidence: 0.85, agentId: 'content-creator', extractedParams: {} };
+    }
+
+    // Social media publish
+    if (/תפרסם|פרסם|publish|post.*to|share.*to|cross.?post|תזמן.*פוסט|schedule.*post/i.test(message)) {
+      return { intent: Intent.SOCIAL_PUBLISH, confidence: 0.85, agentId: 'content-creator', extractedParams: {} };
+    }
+
+    // Server management
+    if (/שרת|server|deploy|docker|ssh|uptime|מצב.*שרת|תתקן.*שרת/i.test(message)) {
+      return { intent: Intent.SERVER_STATUS, confidence: 0.7, agentId: 'server-manager', extractedParams: {} };
+    }
+
+    // Web search
+    if (/חפש|תחפש|search|חיפוש|google|find.*info/i.test(message)) {
+      return { intent: Intent.WEB_SEARCH, confidence: 0.8, agentId: 'researcher', extractedParams: {} };
+    }
+
+    // Tasks
+    if (/משימ|task|todo|תוסיף.*משימ|create.*task/i.test(message)) {
+      return { intent: Intent.TASK_CREATE, confidence: 0.8, agentId: 'task-planner', extractedParams: {} };
+    }
+
+    // Reminder
+    if (/תזכיר|remind|תזכורת|בעוד.*דקות|in.*minutes/i.test(message)) {
+      return { intent: Intent.REMINDER_SET, confidence: 0.85, agentId: 'task-planner', extractedParams: {} };
+    }
+
+    // Memory
+    if (/תזכור.*ש|remember.*that|מה.*זוכר|what.*know.*about.*me|תשכח/i.test(message)) {
+      return { intent: Intent.REMEMBER, confidence: 0.85, agentId: 'general', extractedParams: {} };
+    }
+
+    // Analytics / costs
+    if (/כמה.*על|cost|budget|סטטיסטיק|analytics|API.*key/i.test(message)) {
+      return { intent: Intent.ANALYTICS, confidence: 0.8, agentId: 'general', extractedParams: {} };
+    }
+
+    // Help
+    if (/מה.*יכול|what.*can.*you|עזרה|help/i.test(message)) {
+      return { intent: Intent.HELP, confidence: 0.8, agentId: 'general', extractedParams: {} };
+    }
+
+    // Device control
+    if (/טלפון|phone.*tap|phone.*swipe|adb|appium|תלחץ.*טלפון|תשלוט.*מכשיר/i.test(message)) {
+      return { intent: Intent.DEVICE_CONTROL, confidence: 0.8, agentId: 'device-controller', extractedParams: {} };
+    }
+
+    // Orchestrate / OpenClaw
+    if (/openclaw|אופנקלאו|תתאם|coordinate|סינרגיה/i.test(message)) {
+      return { intent: Intent.ORCHESTRATE, confidence: 0.8, agentId: 'orchestrator', extractedParams: {} };
+    }
+
+    // Code
+    if (/תכתוב.*קוד|write.*code|fix.*bug|תתקן.*באג|code.*review|PR|pull.*request/i.test(message)) {
+      return { intent: Intent.CODE_WRITE, confidence: 0.7, agentId: 'code-assistant', extractedParams: {} };
+    }
+
+    // Email
+    if (/מייל|email|שלח.*מייל|inbox|send.*email/i.test(message)) {
+      return { intent: Intent.EMAIL, confidence: 0.8, agentId: 'general', extractedParams: {} };
+    }
+
+    // Web action
+    if (/תירשם|sign.*up|fill.*form|scrape|מלא.*טופס|פתח.*אתר/i.test(message)) {
+      return { intent: Intent.WEB_ACTION, confidence: 0.8, agentId: 'web-agent', extractedParams: {} };
+    }
+
+    return null; // No keyword match — will default to general_chat
   }
 }

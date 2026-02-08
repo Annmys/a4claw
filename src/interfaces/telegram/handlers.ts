@@ -5,6 +5,22 @@ import logger from '../../utils/logger.js';
 import { getOpenClawMessageContext, getOpenClawExecutor } from '../web/routes/webhook.js';
 
 export function setupHandlers(bot: Bot, engine: Engine) {
+  // Admin-only guard — if TELEGRAM_ADMIN_IDS is set, only those users can interact
+  const adminIds = config.TELEGRAM_ADMIN_IDS;
+  if (adminIds.length > 0) {
+    bot.use(async (ctx, next) => {
+      const userId = ctx.from?.id;
+      if (!userId || !adminIds.includes(userId)) {
+        if (ctx.message) {
+          await ctx.reply('This bot is private.').catch(() => {});
+          logger.warn('Unauthorized Telegram access', { userId, username: ctx.from?.username });
+        }
+        return;
+      }
+      await next();
+    });
+  }
+
   bot.command('start', async (ctx) => {
     const name = ctx.from?.first_name ?? 'there';
     await ctx.reply(
@@ -91,7 +107,24 @@ export function setupHandlers(bot: Bot, engine: Engine) {
       replyTo: ctx.message.reply_to_message?.text,
     };
 
-    const response = await engine.process(incoming);
+    // Timeout: 120s for response — content creation with kie.ai polling can take 60-90s
+    const RESPONSE_TIMEOUT = 120000;
+    let response: Awaited<ReturnType<typeof engine.process>>;
+    try {
+      response = await Promise.race([
+        engine.process(incoming),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('RESPONSE_TIMEOUT')), RESPONSE_TIMEOUT)
+        ),
+      ]);
+    } catch (err: any) {
+      if (err.message === 'RESPONSE_TIMEOUT') {
+        logger.warn('Engine response timed out', { userId: incoming.userId, text: incoming.text.slice(0, 50) });
+        await ctx.reply('⏱ Sorry, the request took too long. Please try again with a simpler message.').catch(() => {});
+        return;
+      }
+      throw err;
+    }
 
     // Guard against empty responses
     if (!response.text || response.text.trim().length === 0) {
@@ -145,24 +178,13 @@ export function setupHandlers(bot: Bot, engine: Engine) {
     }
   });
 
-  // Photo/document messages → AI vision analysis
-  bot.on(['message:photo', 'message:document'], async (ctx) => {
+  // Photo messages → AI vision analysis
+  bot.on('message:photo', async (ctx) => {
     await ctx.replyWithChatAction('typing');
 
     try {
-      const photo = ctx.message?.photo;
-      const document = ctx.message?.document;
-
-      let file;
-      if (photo) {
-        file = await ctx.api.getFile(photo[photo.length - 1].file_id);
-      } else if (document && document.mime_type?.startsWith('image/')) {
-        file = await ctx.api.getFile(document.file_id);
-      } else {
-        await ctx.reply('I can only analyze image files right now.');
-        return;
-      }
-
+      const photo = ctx.message.photo;
+      const file = await ctx.api.getFile(photo[photo.length - 1].file_id);
       const fileUrl = `https://api.telegram.org/file/bot${config.TELEGRAM_BOT_TOKEN}/${file.file_path}`;
       const response = await fetch(fileUrl);
       const imageBuffer = Buffer.from(await response.arrayBuffer());
@@ -176,6 +198,91 @@ export function setupHandlers(bot: Bot, engine: Engine) {
     } catch (err: any) {
       logger.error('Image analysis failed', { error: err.message });
       await ctx.reply('Image analysis failed: ' + err.message);
+    }
+  });
+
+  // Document messages → image vision OR text/PDF extraction
+  bot.on('message:document', async (ctx) => {
+    await ctx.replyWithChatAction('typing');
+
+    try {
+      const document = ctx.message.document;
+      if (!document) return;
+
+      const mime = document.mime_type ?? '';
+      const fileName = document.file_name ?? 'file';
+      const file = await ctx.api.getFile(document.file_id);
+      const fileUrl = `https://api.telegram.org/file/bot${config.TELEGRAM_BOT_TOKEN}/${file.file_path}`;
+      const response = await fetch(fileUrl);
+      const buffer = Buffer.from(await response.arrayBuffer());
+
+      const caption = ctx.message?.caption ?? '';
+
+      // Image documents → vision analysis
+      if (mime.startsWith('image/')) {
+        const { analyzeImage } = await import('../../actions/vision/analyze.js');
+        const analysis = await analyzeImage(buffer, caption || 'Describe this image in detail. If there is text, read it.');
+        await ctx.reply(analysis, { parse_mode: 'Markdown' }).catch(() => ctx.reply(analysis));
+        return;
+      }
+
+      // PDF documents → extract text and process through engine
+      if (mime === 'application/pdf' || fileName.endsWith('.pdf')) {
+        try {
+          const pdfModule = await import('pdf-parse');
+          const pdfParse = (pdfModule as any).default ?? pdfModule;
+          const pdfData = await pdfParse(buffer);
+          const text = pdfData.text.trim();
+
+          if (!text) {
+            await ctx.reply('Could not extract text from this PDF. It may be image-based.');
+            return;
+          }
+
+          const incoming: IncomingMessage = {
+            platform: 'telegram',
+            userId: String(ctx.from.id),
+            userName: ctx.from.first_name + (ctx.from.last_name ? ` ${ctx.from.last_name}` : ''),
+            chatId: String(ctx.chat.id),
+            text: caption
+              ? `${caption}\n\n--- Document: ${fileName} ---\n${text.slice(0, 8000)}`
+              : `I received a PDF document "${fileName}". Here is its content:\n\n${text.slice(0, 8000)}${text.length > 8000 ? '\n\n[...truncated]' : ''}`,
+            metadata: { originalType: 'document', fileName, mimeType: mime },
+          };
+
+          const result = await engine.process(incoming);
+          await ctx.reply(result.text, { parse_mode: 'Markdown' }).catch(() => ctx.reply(result.text));
+        } catch (pdfErr: any) {
+          logger.error('PDF parsing failed', { error: pdfErr.message });
+          await ctx.reply('Failed to parse PDF: ' + pdfErr.message);
+        }
+        return;
+      }
+
+      // Text-based documents → read as text and process through engine
+      if (mime.startsWith('text/') || /\.(txt|md|json|csv|xml|html|yaml|yml|log|ts|js|py|sh|sql)$/i.test(fileName)) {
+        const text = buffer.toString('utf-8');
+        const incoming: IncomingMessage = {
+          platform: 'telegram',
+          userId: String(ctx.from.id),
+          userName: ctx.from.first_name + (ctx.from.last_name ? ` ${ctx.from.last_name}` : ''),
+          chatId: String(ctx.chat.id),
+          text: caption
+            ? `${caption}\n\n--- File: ${fileName} ---\n${text.slice(0, 8000)}`
+            : `I received a text file "${fileName}". Here is its content:\n\n${text.slice(0, 8000)}${text.length > 8000 ? '\n\n[...truncated]' : ''}`,
+          metadata: { originalType: 'document', fileName, mimeType: mime },
+        };
+
+        const result = await engine.process(incoming);
+        await ctx.reply(result.text, { parse_mode: 'Markdown' }).catch(() => ctx.reply(result.text));
+        return;
+      }
+
+      // Unsupported document type
+      await ctx.reply(`I received "${fileName}" (${mime}). I can process images, PDFs, and text files. This file type is not supported yet.`);
+    } catch (err: any) {
+      logger.error('Document processing failed', { error: err.message });
+      await ctx.reply('Document processing failed: ' + err.message);
     }
   });
 }

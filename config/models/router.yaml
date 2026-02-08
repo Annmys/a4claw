@@ -1,0 +1,38 @@
+# Model Router Configuration
+# Controls which AI models are used based on task complexity
+
+complexity_rules:
+  - complexity: trivial
+    preferred_tier: free
+    fallback_tier: cheap
+    budget_threshold: 0
+
+  - complexity: simple
+    preferred_tier: free
+    fallback_tier: cheap
+    budget_threshold: 0.10
+
+  - complexity: medium
+    preferred_tier: cheap
+    fallback_tier: free
+    budget_threshold: 0.50
+
+  - complexity: complex
+    preferred_tier: mid
+    fallback_tier: cheap
+    budget_threshold: 1.00
+
+  - complexity: critical
+    preferred_tier: ultra
+    fallback_tier: mid
+    budget_threshold: 5.00
+
+# Override specific intents to always use a specific model
+model_overrides: {}
+  # code_review: "claude-sonnet-4-20250514"
+  # security_audit: "claude-opus-4-20250514"
+
+cost_limits:
+  max_per_request: 0.50
+  daily_budget: 2
+  monthly_budget: 50

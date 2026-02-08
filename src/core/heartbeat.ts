@@ -28,6 +28,7 @@ export class Heartbeat {
   private timer: ReturnType<typeof setInterval> | null = null;
   private alertSender: AlertSender | null = null;
   private running = false;
+  private ticking = false; // prevent overlapping ticks
 
   // Subsystems
   private meta: MetaAgent | null = null;
@@ -96,8 +97,9 @@ export class Heartbeat {
     this.registerCheck('server-health', 10 * 60_000, () => this.checkServerHealth());
     this.registerCheck('goal-pursuit', 5 * 60_000, () => this.pursueGoals());
     this.registerCheck('auto-upgrade', 24 * 60 * 60_000, () => this.checkUpgrades());
-    this.registerCheck('openclaw-health', 30 * 60_000, () => this.checkOpenClawHealth());
-    this.registerCheck('openclaw-chat-poll', 5 * 60_000, () => this.pollOpenClawChat());
+    // Skip initial tick for OpenClaw checks — they're heavy (SSH calls) and conflict with early message processing
+    this.registerCheck('openclaw-health', 30 * 60_000, () => this.checkOpenClawHealth(), true);
+    this.registerCheck('openclaw-chat-poll', 5 * 60_000, () => this.pollOpenClawChat(), true);
     this.registerCheck('daily-summary', 5 * 60_000, () => this.checkDailySummary());
 
     this.timer = setInterval(() => this.tick(), tickIntervalMs);
@@ -116,24 +118,31 @@ export class Heartbeat {
     logger.info('Heartbeat stopped');
   }
 
-  registerCheck(name: string, intervalMs: number, fn: () => Promise<HeartbeatAlert[]>) {
-    this.checks.push({ name, intervalMs, lastRun: 0, fn });
+  registerCheck(name: string, intervalMs: number, fn: () => Promise<HeartbeatAlert[]>, skipInitialTick = false) {
+    // If skipInitialTick, pretend the check just ran so it waits a full interval before first execution
+    this.checks.push({ name, intervalMs, lastRun: skipInitialTick ? Date.now() : 0, fn });
   }
 
   private async tick() {
-    const now = Date.now();
-    for (const check of this.checks) {
-      if (now - check.lastRun >= check.intervalMs) {
-        check.lastRun = now;
-        try {
-          const alerts = await check.fn();
-          for (const alert of alerts) {
-            await this.sendAlert(alert);
+    if (this.ticking) return; // skip if previous tick is still running
+    this.ticking = true;
+    try {
+      const now = Date.now();
+      for (const check of this.checks) {
+        if (now - check.lastRun >= check.intervalMs) {
+          check.lastRun = now;
+          try {
+            const alerts = await check.fn();
+            for (const alert of alerts) {
+              await this.sendAlert(alert);
+            }
+          } catch (err: any) {
+            logger.warn(`Heartbeat check "${check.name}" failed`, { error: err.message });
           }
-        } catch (err: any) {
-          logger.warn(`Heartbeat check "${check.name}" failed`, { error: err.message });
         }
       }
+    } finally {
+      this.ticking = false;
     }
   }
 

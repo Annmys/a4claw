@@ -5,6 +5,7 @@ import { withRetry } from '../utils/retry.js';
 import { ExternalServiceError } from '../utils/errors.js';
 import { sanitizeUnicode } from '../utils/helpers.js';
 import { convertMessagesToOpenAI } from './model-router.js';
+import { ClaudeCodeProvider } from '../providers/claude-code-provider.js';
 
 export interface Message {
   role: 'user' | 'assistant';
@@ -24,7 +25,8 @@ export interface AIRequest {
   maxTokens?: number;
   temperature?: number;
   model?: string;
-  provider?: 'anthropic' | 'openai' | 'ollama' | 'openrouter';
+  provider?: 'anthropic' | 'openai' | 'ollama' | 'openrouter' | 'claude-code';
+  maxToolIterations?: number;
 }
 
 export interface AIResponse {
@@ -258,31 +260,106 @@ class OpenRouterProvider implements ProviderClient {
   }
 }
 
+// ── Claude Code CLI Provider (FREE via Max subscription) ────────────
+class ClaudeCodeProviderAdapter implements ProviderClient {
+  name = 'claude-code';
+  available = false;
+  private provider: ClaudeCodeProvider;
+  private savingsUsd = 0; // Track estimated savings vs API
+
+  constructor() {
+    const cliPath = (config as any).CLAUDE_CODE_PATH ?? 'claude';
+    this.provider = new ClaudeCodeProvider(cliPath);
+    this.available = (config as any).CLAUDE_CODE_ENABLED ?? false;
+  }
+
+  async init(): Promise<void> {
+    if (!this.available) return;
+    const ok = await this.provider.checkAvailability();
+    this.available = ok;
+    if (ok) {
+      logger.info('Claude Code CLI provider ready (FREE — Max subscription)');
+    } else {
+      logger.warn('Claude Code CLI not available, falling back to API providers');
+    }
+  }
+
+  async chat(request: AIRequest): Promise<AIResponse> {
+    const response = await this.provider.chat({
+      system: request.systemPrompt,
+      message: typeof request.messages[request.messages.length - 1]?.content === 'string'
+        ? request.messages[request.messages.length - 1].content as string
+        : request.messages.map(m => typeof m.content === 'string' ? m.content : JSON.stringify(m.content)).join('\n'),
+      maxTokens: request.maxTokens,
+      model: request.model,
+    });
+
+    // Estimate savings: average API cost for similar request
+    const estimatedApiCost = ((response.usage?.input_tokens ?? 500) * 0.003 + (response.usage?.output_tokens ?? 200) * 0.015) / 1000;
+    this.savingsUsd += estimatedApiCost;
+
+    return {
+      content: response.text,
+      usage: {
+        inputTokens: response.usage?.input_tokens ?? 0,
+        outputTokens: response.usage?.output_tokens ?? 0,
+      },
+      stopReason: 'end_turn',
+      provider: 'claude-code',
+      modelUsed: response.model,
+    };
+  }
+
+  getProvider(): ClaudeCodeProvider { return this.provider; }
+  getSavings(): number { return this.savingsUsd; }
+  markUnavailable(): void { this.available = false; }
+}
+
 // ── Unified AI Client ───────────────────────────────────────────────
 export class AIClient {
   private providers: Map<string, ProviderClient> = new Map();
   private fallbackOrder: string[];
   private totalTokensUsed = { input: 0, output: 0 };
+  private claudeCodeAdapter?: ClaudeCodeProviderAdapter;
 
   constructor() {
     const anthropic = new AnthropicProvider();
     const openai = new OpenAIProvider();
     const ollama = new OllamaProvider();
     const openrouter = new OpenRouterProvider();
+    const claudeCode = new ClaudeCodeProviderAdapter();
 
+    this.claudeCodeAdapter = claudeCode;
+
+    if (claudeCode.available) this.providers.set('claude-code', claudeCode);
     if (anthropic.available) this.providers.set('anthropic', anthropic);
     if (openrouter.available) this.providers.set('openrouter', openrouter);
     if (openai.available) this.providers.set('openai', openai);
     if (ollama.available) this.providers.set('ollama', ollama);
 
-    // Fallback order: anthropic → openrouter → openai → ollama
-    this.fallbackOrder = ['anthropic', 'openrouter', 'openai', 'ollama'];
+    // Fallback order: claude-code (free) → anthropic → openrouter → openai → ollama
+    this.fallbackOrder = ['claude-code', 'anthropic', 'openrouter', 'openai', 'ollama'];
 
     logger.info('AI Client initialized', {
       providers: Array.from(this.providers.keys()),
       primary: this.fallbackOrder.find(p => this.providers.has(p)) ?? 'none',
     });
   }
+
+  /** Initialize async providers (Claude Code CLI availability check) */
+  async initClaudeCode(): Promise<void> {
+    if (this.claudeCodeAdapter) {
+      await this.claudeCodeAdapter.init();
+      if (this.claudeCodeAdapter.available) {
+        this.providers.set('claude-code', this.claudeCodeAdapter);
+      } else {
+        this.providers.delete('claude-code');
+      }
+    }
+  }
+
+  /** Get the Claude Code provider adapter (for status/savings) */
+  getClaudeCodeAdapter(): ClaudeCodeProviderAdapter | undefined { return this.claudeCodeAdapter; }
 
   async chat(request: AIRequest): Promise<AIResponse> {
     // Sanitize all text to strip lone surrogates (Hebrew + emoji from Telegram)
@@ -316,12 +393,16 @@ export class AIClient {
         const provider = this.providers.get(providerName);
         if (!provider) continue;
 
-        // If model is OpenRouter-specific (contains '/') and we're falling back to Anthropic,
-        // swap to the default Anthropic model instead of sending an unknown model name
+        // Model swapping: Claude Code CLI doesn't need model names from other providers,
+        // and Anthropic doesn't understand OpenRouter model IDs
         let requestForProvider = sanitizedRequest;
         const modelStr = sanitizedRequest.model ?? '';
         if (providerName === 'anthropic' && modelStr.includes('/')) {
           requestForProvider = { ...sanitizedRequest, model: config.AI_MODEL };
+        }
+        // Claude Code CLI: strip provider-specific model names, let CLI use its default
+        if (providerName === 'claude-code' && modelStr.includes('/')) {
+          requestForProvider = { ...sanitizedRequest, model: undefined };
         }
 
         try {
@@ -354,7 +435,7 @@ export class AIClient {
     const messages: Message[] = [...request.messages];
     let lastResponse: AIResponse | null = null;
     let iterations = 0;
-    const MAX_TOOL_ITERATIONS = 15;
+    const MAX_TOOL_ITERATIONS = request.maxToolIterations ?? 8;
     const toolsUsed: string[] = [];
 
     while (iterations < MAX_TOOL_ITERATIONS) {

@@ -8,6 +8,14 @@ import { BrowserTool } from '../agents/tools/browser-tool.js';
 import { KieTool } from '../agents/tools/kie-tool.js';
 import { SocialTool } from '../agents/tools/social-tool.js';
 import { OpenClawTool } from '../agents/tools/openclaw-tool.js';
+import { CronTool } from '../agents/tools/cron-tool.js';
+import { MemoryTool } from '../agents/tools/memory-tool.js';
+import { AutoTool } from '../agents/tools/auto-tool.js';
+import { EmailTool } from '../agents/tools/email-tool.js';
+import { WorkflowTool } from '../agents/tools/workflow-tool.js';
+import { AnalyticsTool } from '../agents/tools/analytics-tool.js';
+import { ClaudeCodeTool } from '../agents/tools/claude-code-tool.js';
+import { DeviceTool } from '../agents/tools/device-tool.js';
 import { BaseTool, ToolResult } from '../agents/tools/base-tool.js';
 import logger from '../utils/logger.js';
 
@@ -27,6 +35,14 @@ export function initTools(): void {
   toolInstances.set('kie', new KieTool());
   toolInstances.set('social', new SocialTool());
   toolInstances.set('openclaw', new OpenClawTool());
+  toolInstances.set('cron', new CronTool());
+  toolInstances.set('memory', new MemoryTool());
+  toolInstances.set('auto', new AutoTool());
+  toolInstances.set('email', new EmailTool());
+  toolInstances.set('workflow', new WorkflowTool());
+  toolInstances.set('analytics', new AnalyticsTool());
+  toolInstances.set('claude-code', new ClaudeCodeTool());
+  toolInstances.set('device', new DeviceTool());
   initialized = true;
   logger.info('Tool executor initialized', { tools: Array.from(toolInstances.keys()) });
 }
@@ -150,22 +166,37 @@ export function getToolDefinitions(allowedTools: string[]): any[] {
   if (allowedTools.includes('kie')) {
     definitions.push({
       name: 'kie',
-      description: 'AI Content Generation via Kie.ai. Generate videos (Kling, Veo3, Runway, Wan), images (4o, Midjourney, Flux, Grok), and music (Suno). Actions: video_kling, video_veo3, video_runway, video_wan, image_4o, image_midjourney, image_flux, image_grok, music_suno, status(taskId), list_models.',
+      description: 'AI Content Generation via Kie.ai — 60+ models. VIDEO: video_kling, video_kling_turbo, video_kling_avatar, video_veo3, video_runway, video_wan, video_seedance, video_bytedance, video_hailuo, video_sora, video_sora_pro, video_sora_chars, video_grok, video_luma, video_infinitalk. IMAGE: image_4o, image_gpt15, image_midjourney, image_flux, image_flux2, image_grok, image_seedream, image_imagen4, image_qwen, image_ideogram, image_zimage. ENHANCE: upscale_image, upscale_video, remove_bg, remove_watermark. MUSIC: music_suno. AUDIO: audio_tts, audio_dialogue, audio_sfx, audio_stt, audio_isolate. UTILITY: status, credits, download_url, file_upload, generate, list_models. All async — returns taskId, poll with status.',
       input_schema: {
         type: 'object' as const,
         properties: {
-          action: { type: 'string' as const, enum: ['video_kling', 'video_veo3', 'video_runway', 'video_wan', 'image_4o', 'image_midjourney', 'image_flux', 'image_grok', 'music_suno', 'status', 'list_models'], description: 'Generation action' },
+          action: { type: 'string' as const, description: 'Action name (see description for full list). Use list_models for details.' },
           prompt: { type: 'string' as const, description: 'Creative prompt for generation' },
-          imageUrl: { type: 'string' as const, description: 'Input image URL (for image-to-video or image-to-image)' },
+          text: { type: 'string' as const, description: 'Text input (for TTS, SFX, dialogue)' },
+          imageUrl: { type: 'string' as const, description: 'Input image URL (for image-to-video, img2img, Luma Modify)' },
+          videoUrl: { type: 'string' as const, description: 'Input video URL (for video-to-video, Luma Modify)' },
           imageUrls: { type: 'array' as const, items: { type: 'string' as const }, description: 'Multiple image URLs (for Veo3 transitions)' },
-          model: { type: 'string' as const, description: 'Model variant (e.g. kling2.1, kling2.1_pro, veo3_fast, veo3)' },
-          duration: { type: 'number' as const, description: 'Video duration in seconds (5 or 10)' },
-          aspectRatio: { type: 'string' as const, description: 'Aspect ratio: 16:9, 9:16, 1:1' },
-          size: { type: 'string' as const, description: 'Image size: 1:1, 3:2, 2:3' },
-          nVariants: { type: 'number' as const, description: 'Number of image variants (1-4)' },
-          style: { type: 'string' as const, description: 'Music style (for Suno)' },
+          model: { type: 'string' as const, description: 'Model variant or direct model ID for generate action' },
+          duration: { type: 'number' as const, description: 'Duration in seconds' },
+          aspectRatio: { type: 'string' as const, description: 'Aspect ratio: 16:9, 9:16, 1:1, etc.' },
+          aspect_ratio: { type: 'string' as const, description: 'Aspect ratio (snake_case variant for createTask models)' },
+          size: { type: 'string' as const, description: 'Image size for GPT-4o: 1:1, 3:2, 2:3' },
           resolution: { type: 'string' as const, description: 'Video resolution: 720p, 1080p' },
+          style: { type: 'string' as const, description: 'Music style (Suno custom mode)' },
+          title: { type: 'string' as const, description: 'Song title (Suno custom mode)' },
+          voice: { type: 'string' as const, description: 'TTS voice name (default: Rachel)' },
+          dialogue: { type: 'array' as const, description: 'Dialogue items for audio_dialogue [{text, voice}]' },
+          image_url: { type: 'string' as const, description: 'Image URL (createTask format)' },
+          image_urls: { type: 'string' as const, description: 'Image URLs (createTask format)' },
+          audio_url: { type: 'string' as const, description: 'Audio URL (for STT, Infinitalk)' },
+          video_urls: { type: 'array' as const, items: { type: 'string' as const }, description: 'Video URLs (for Wan video-to-video)' },
+          upscale_factor: { type: 'number' as const, description: 'Upscale factor: 2, 4, or 8' },
+          image: { type: 'string' as const, description: 'Image URL for remove_bg / upscale_image (Recraft format)' },
           taskId: { type: 'string' as const, description: 'Task ID (for status check)' },
+          sourceAction: { type: 'string' as const, description: 'Original action (for correct status polling)' },
+          url: { type: 'string' as const, description: 'URL for download_url action' },
+          fileUrl: { type: 'string' as const, description: 'Remote file URL for file_upload' },
+          method: { type: 'string' as const, description: 'Upload method: url or base64' },
         },
         required: ['action'],
       },
@@ -224,6 +255,175 @@ export function getToolDefinitions(allowedTools: string[]): any[] {
     });
   }
 
+  if (allowedTools.includes('cron') || allowedTools.includes('scheduler')) {
+    definitions.push({
+      name: 'cron',
+      description: 'Manage scheduled/recurring tasks (cron jobs). Create, list, remove, enable, or disable recurring automated tasks. Supports natural language schedules (e.g. "every morning", "every 5 min", "כל בוקר") and cron expressions.',
+      input_schema: {
+        type: 'object' as const,
+        properties: {
+          action: { type: 'string' as const, enum: ['list', 'add', 'remove', 'enable', 'disable'], description: 'Cron action' },
+          userId: { type: 'string' as const, description: 'User ID' },
+          name: { type: 'string' as const, description: 'Task name (for add)' },
+          schedule: { type: 'string' as const, description: 'Schedule: natural language or cron expression (for add)' },
+          message: { type: 'string' as const, description: 'Message to send when task runs (for add)' },
+          taskAction: { type: 'string' as const, description: 'Action type: send_message, news_summary (for add)' },
+          taskId: { type: 'string' as const, description: 'Task ID (for remove/enable/disable)' },
+          platform: { type: 'string' as const, description: 'Platform for notifications: telegram, discord, web' },
+        },
+        required: ['action'],
+      },
+    });
+  }
+
+  if (allowedTools.includes('memory')) {
+    definitions.push({
+      name: 'memory',
+      description: 'Persistent memory — remember, recall, forget facts about users. Actions: remember(userId, key, value, category?), recall(userId, query?, category?), forget(userId, key), forget_all(userId), stats(userId).',
+      input_schema: {
+        type: 'object' as const,
+        properties: {
+          action: { type: 'string' as const, enum: ['remember', 'recall', 'forget', 'forget_all', 'stats'], description: 'Memory action' },
+          userId: { type: 'string' as const, description: 'User ID' },
+          key: { type: 'string' as const, description: 'Fact key (for remember/forget)' },
+          value: { type: 'string' as const, description: 'Fact value (for remember)' },
+          category: { type: 'string' as const, description: 'Category: personal, project, preference, technology, goal, contact' },
+          query: { type: 'string' as const, description: 'Search query (for recall)' },
+        },
+        required: ['action', 'userId'],
+      },
+    });
+  }
+
+  if (allowedTools.includes('auto')) {
+    definitions.push({
+      name: 'auto',
+      description: 'Autonomous multi-step task execution. AI plans steps then executes them using available tools. Actions: start(goal), resume(taskId), stop(taskId), list, status(taskId).',
+      input_schema: {
+        type: 'object' as const,
+        properties: {
+          action: { type: 'string' as const, enum: ['start', 'resume', 'stop', 'list', 'status'], description: 'Autonomous task action' },
+          goal: { type: 'string' as const, description: 'Goal description (for start)' },
+          taskId: { type: 'string' as const, description: 'Task ID (for resume/stop/status)' },
+        },
+        required: ['action'],
+      },
+    });
+  }
+
+  if (allowedTools.includes('email')) {
+    definitions.push({
+      name: 'email',
+      description: 'Gmail integration. Read, send, reply, search emails. Actions: inbox(maxResults?, unreadOnly?, search?), read(messageId), send(to, subject, body), reply(messageId, body), search(query, maxResults?), mark(messageId, read), unread_count(). Gmail search: "from:john", "subject:invoice", "is:unread", "has:attachment".',
+      input_schema: {
+        type: 'object' as const,
+        properties: {
+          action: { type: 'string' as const, enum: ['inbox', 'read', 'send', 'reply', 'search', 'mark', 'unread_count'], description: 'Email action' },
+          to: { type: 'string' as const, description: 'Recipient email (for send)' },
+          subject: { type: 'string' as const, description: 'Email subject (for send)' },
+          body: { type: 'string' as const, description: 'Email body (for send/reply)' },
+          messageId: { type: 'string' as const, description: 'Email ID (for read/reply/mark)' },
+          query: { type: 'string' as const, description: 'Search query (for search)' },
+          search: { type: 'string' as const, description: 'Search query (for inbox)' },
+          maxResults: { type: 'number' as const, description: 'Max results (default 10)' },
+          unreadOnly: { type: 'boolean' as const, description: 'Only unread (for inbox)' },
+          read: { type: 'boolean' as const, description: 'Mark as read (true) or unread (false)' },
+        },
+        required: ['action'],
+      },
+    });
+  }
+
+  if (allowedTools.includes('workflow')) {
+    definitions.push({
+      name: 'workflow',
+      description: 'Automation workflows — chain multiple tools together. Actions: create(name, description, trigger?, triggerConfig?), run(workflowId), list(userId?), toggle(workflowId), delete(workflowId). Triggers: manual, cron, webhook, event.',
+      input_schema: {
+        type: 'object' as const,
+        properties: {
+          action: { type: 'string' as const, enum: ['create', 'run', 'list', 'toggle', 'delete'], description: 'Workflow action' },
+          name: { type: 'string' as const, description: 'Workflow name (for create)' },
+          description: { type: 'string' as const, description: 'Natural language description (for create)' },
+          trigger: { type: 'string' as const, description: 'Trigger type: manual, cron, webhook, event' },
+          triggerConfig: { type: 'string' as const, description: 'Cron expression or event name' },
+          workflowId: { type: 'string' as const, description: 'Workflow ID (for run/toggle/delete)' },
+          userId: { type: 'string' as const, description: 'User ID (for list)' },
+        },
+        required: ['action'],
+      },
+    });
+  }
+
+  if (allowedTools.includes('analytics')) {
+    definitions.push({
+      name: 'analytics',
+      description: 'Usage analytics, cost reporting, API key health check, Claude Code savings. Actions: daily (daily activity report), cost (cost breakdown by model), keys (check all API keys), budget (budget status), savings (Claude Code savings vs API costs).',
+      input_schema: {
+        type: 'object' as const,
+        properties: {
+          action: { type: 'string' as const, enum: ['daily', 'cost', 'keys', 'budget', 'savings'], description: 'Analytics action' },
+        },
+        required: ['action'],
+      },
+    });
+  }
+
+  if (allowedTools.includes('claude-code')) {
+    definitions.push({
+      name: 'claude-code',
+      description: 'Run tasks via Claude Code CLI (free via Max subscription). Actions: chat (ask Claude a question), agent (run complex agentic task with file access), status (check CLI status).',
+      input_schema: {
+        type: 'object' as const,
+        properties: {
+          action: { type: 'string' as const, enum: ['chat', 'agent', 'status'], description: 'Claude Code action' },
+          message: { type: 'string' as const, description: 'Message for chat action' },
+          system: { type: 'string' as const, description: 'System prompt (for chat)' },
+          task: { type: 'string' as const, description: 'Task description (for agent action)' },
+          workingDir: { type: 'string' as const, description: 'Working directory (for agent action)' },
+          maxTokens: { type: 'number' as const, description: 'Max response tokens' },
+        },
+        required: ['action'],
+      },
+    });
+  }
+
+  if (allowedTools.includes('device')) {
+    definitions.push({
+      name: 'device',
+      description: 'Control Android devices — ADB, Appium, app recipes. INFO: list_devices, device_info. TOUCH: tap(x,y), long_press, swipe, double_tap. TEXT: type(text), key(keycode). SCREEN: screenshot, screen_xml. APPS: open_app, close_app, list_apps, install_app, current_app. NAV: back, home, recent. CLIPBOARD: get_clipboard, set_clipboard. ADB: adb(command), shell(command). APPIUM: appium_start, appium_find, appium_click, appium_send_keys, appium_stop. RECIPES: recipe(app, recipe, params), list_recipes. CLI: agent_device(command).',
+      input_schema: {
+        type: 'object' as const,
+        properties: {
+          action: { type: 'string' as const, description: 'Device action (see description for full list)' },
+          x: { type: 'number' as const, description: 'X coordinate (for tap, long_press, double_tap)' },
+          y: { type: 'number' as const, description: 'Y coordinate (for tap, long_press, double_tap)' },
+          startX: { type: 'number' as const, description: 'Start X (for swipe)' },
+          startY: { type: 'number' as const, description: 'Start Y (for swipe)' },
+          endX: { type: 'number' as const, description: 'End X (for swipe)' },
+          endY: { type: 'number' as const, description: 'End Y (for swipe)' },
+          duration: { type: 'number' as const, description: 'Duration in ms (for long_press, swipe)' },
+          text: { type: 'string' as const, description: 'Text to type or set clipboard' },
+          keycode: { type: 'string' as const, description: 'Key code (e.g. ENTER, BACK, HOME)' },
+          packageName: { type: 'string' as const, description: 'App package name (e.g. com.whatsapp)' },
+          activityName: { type: 'string' as const, description: 'App activity name (for appium_start)' },
+          apkPath: { type: 'string' as const, description: 'APK file path (for install_app)' },
+          command: { type: 'string' as const, description: 'ADB/shell command or agent-device CLI command' },
+          args: { type: 'string' as const, description: 'CLI arguments (for agent_device)' },
+          deviceId: { type: 'string' as const, description: 'Target device ID (optional, for multi-device)' },
+          strategy: { type: 'string' as const, description: 'Appium find strategy: id, xpath, accessibility id, class, uiautomator' },
+          selector: { type: 'string' as const, description: 'Appium element selector' },
+          elementId: { type: 'string' as const, description: 'Appium element ID (from appium_find)' },
+          serverUrl: { type: 'string' as const, description: 'Appium server URL (default: http://localhost:4723)' },
+          noReset: { type: 'boolean' as const, description: 'Keep app data between sessions (for appium_start)' },
+          app: { type: 'string' as const, description: 'App name for recipe (whatsapp, tiktok, instagram)' },
+          recipe: { type: 'string' as const, description: 'Recipe name (send_message, upload_video, post_photo, etc.)' },
+          params: { type: 'object' as const, description: 'Recipe parameters (contact, message, videoPath, etc.)' },
+        },
+        required: ['action'],
+      },
+    });
+  }
+
   if (allowedTools.includes('db')) {
     definitions.push({
       name: 'db',
@@ -246,8 +446,24 @@ export function getToolDefinitions(allowedTools: string[]): any[] {
   return definitions;
 }
 
+// Per-tool timeout limits (ms) — prevents a stuck tool from blocking everything
+const TOOL_TIMEOUTS: Record<string, number> = {
+  'bash': 60000,          // 60s — commands can be slow
+  'claude-code': 120000,  // 120s — Claude Code CLI can take time
+  'browser': 60000,       // 60s — page loads + rendering
+  'search': 30000,        // 30s — web search
+  'github': 30000,        // 30s — API calls
+  'email': 30000,         // 30s — Gmail API
+  'kie': 60000,           // 60s — AI generation polling
+  'social': 30000,        // 30s — social media API
+  'openclaw': 30000,      // 30s — bridge call
+  'auto': 300000,         // 5min — multi-step autonomous
+  'device': 30000,         // 30s — ADB/Appium commands
+};
+const DEFAULT_TOOL_TIMEOUT = 30000; // 30s default
+
 /**
- * Execute a tool call from the AI.
+ * Execute a tool call from the AI — with per-tool timeout.
  */
 export async function executeTool(
   toolName: string,
@@ -263,14 +479,21 @@ export async function executeTool(
 
   logger.info('Executing tool', { toolName, input: JSON.stringify(input).slice(0, 300) });
   const start = Date.now();
+  const timeout = TOOL_TIMEOUTS[toolName] ?? DEFAULT_TOOL_TIMEOUT;
 
   try {
-    const result = await tool.execute(input);
+    const result = await Promise.race([
+      tool.execute(input),
+      new Promise<ToolResult>((_, reject) =>
+        setTimeout(() => reject(new Error(`Tool "${toolName}" timed out after ${timeout / 1000}s`)), timeout)
+      ),
+    ]);
     const duration = Date.now() - start;
     logger.info('Tool executed', { toolName, success: result.success, duration, outputLength: result.output.length });
     return result;
   } catch (err: any) {
-    logger.error('Tool execution failed', { toolName, error: err.message });
+    const duration = Date.now() - start;
+    logger.error('Tool execution failed', { toolName, error: err.message, duration });
     return { success: false, output: '', error: err.message };
   }
 }

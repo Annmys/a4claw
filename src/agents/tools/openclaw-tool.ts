@@ -220,8 +220,8 @@ export class OpenClawTool extends BaseTool {
       health:            { method: 'health' },
       status:            { method: 'status' },
       send:              { method: 'send' },
-      agent:             { method: 'agent', timeout: 135000 },
-      agent_wait:        { method: 'agent.wait', timeout: 135000 },
+      agent:             { method: 'agent', timeout: 60000 },
+      agent_wait:        { method: 'agent.wait', timeout: 60000 },
       sessions_list:     { method: 'sessions.list' },
       sessions_preview:  { method: 'sessions.preview' },
       cron_list:         { method: 'cron.list' },
@@ -243,9 +243,9 @@ export class OpenClawTool extends BaseTool {
     const entry = methodMap[action];
     if (!entry) {
       // Try the action as a direct method name (e.g. "cron.list")
-      return { method: action, params: p, timeout: 35000 };
+      return { method: action, params: p, timeout: 15000 };
     }
 
-    return { method: entry.method, params: p, timeout: entry.timeout || 35000 };
+    return { method: entry.method, params: p, timeout: entry.timeout || 15000 };
   }
 }

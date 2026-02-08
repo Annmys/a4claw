@@ -3,9 +3,13 @@ import logger from './utils/logger.js';
 import { Engine } from './core/engine.js';
 import { AIClient } from './core/ai-client.js';
 import { Heartbeat } from './core/heartbeat.js';
-import { SelfRepair } from './core/self-repair.js';
+import { SelfRepair, setSelfRepairAI } from './core/self-repair.js';
+import { SelfImprove } from './core/self-improve.js';
+import { ProactiveThinker } from './core/proactive-thinker.js';
+import { setAutoToolDeps } from './agents/tools/auto-tool.js';
 import { AutoUpgrade } from './core/auto-upgrade.js';
 import { MCPClient } from './core/mcp-client.js';
+import { MCPManager } from './core/mcp-manager.js';
 import { CronEngine } from './core/cron-engine.js';
 import { UsageTracker } from './core/usage-tracker.js';
 import { WorkflowEngine } from './core/workflows.js';
@@ -23,6 +27,21 @@ import { getUserKnowledge, learnFact, getKnowledgeCount } from './memory/reposit
 import { getUserTasks, getOverdueTasks } from './memory/repositories/tasks.js';
 import { getUserServers } from './memory/repositories/servers.js';
 import { TelegramBot } from './interfaces/telegram/bot.js';
+import { createWebhookTunnel, SSHTunnel } from './services/ssh-tunnel.js';
+import { setCronToolEngine } from './agents/tools/cron-tool.js';
+import { setWorkflowToolDeps } from './agents/tools/workflow-tool.js';
+import { setAnalyticsToolDeps } from './agents/tools/analytics-tool.js';
+// Round 11 imports
+import { setClaudeCodeToolProvider } from './agents/tools/claude-code-tool.js';
+import { setClaudeCodeSavingsGetter } from './agents/tools/analytics-tool.js';
+// Round 10 imports
+import { initConfigFiles, loadMainConfig } from './core/config-loader.js';
+import { BehaviorEngine } from './core/behavior-engine.js';
+import { AgentQueueManager } from './core/agent-queue.js';
+import { Updater } from './core/updater.js';
+import { OpenClawSync } from './core/openclaw-sync.js';
+import { PluginLoader } from './core/plugin-loader.js';
+import { initKeyRotation, stopKeyRotation } from './security/key-rotation.js';
 import type { Message } from './core/ai-client.js';
 import type { BaseInterface } from './interfaces/base.js';
 
@@ -50,6 +69,11 @@ function findDbUserId(platformUserId: string): string | undefined {
 async function main() {
   logger.info('🐙 Starting ClawdAgent MEGA — The Autonomous Octopus...', { nodeEnv: config.NODE_ENV });
 
+  // 0. YAML Config + Config files
+  await initConfigFiles();
+  const yamlConfig = await loadMainConfig();
+  logger.info('📄 YAML config loaded', { name: yamlConfig.agent.name, version: yamlConfig.agent.version });
+
   // 1. Database
   await initDatabase();
   logger.info('💾 Database connected');
@@ -57,6 +81,20 @@ async function main() {
   // 2. Cache
   initCache();
   logger.info('📦 Redis cache connected');
+
+  // 2a. Behavior Engine
+  const behaviorEngine = new BehaviorEngine();
+  await behaviorEngine.init();
+  logger.info('🎭 Behavior engine ready', { behaviors: behaviorEngine.getBehaviorCount() });
+
+  // 2b. Plugin Loader
+  const pluginLoader = new PluginLoader(yamlConfig.plugins?.directory);
+  if (yamlConfig.plugins?.enabled) {
+    await pluginLoader.init().catch(err => {
+      logger.warn('Plugin loader init failed', { error: err.message });
+    });
+    logger.info('🔌 Plugin loader ready', { plugins: pluginLoader.getPluginCount(), loaded: pluginLoader.getLoadedCount() });
+  }
 
   // 3. Engine + Skills + Memory Bridge
   const engine = new Engine();
@@ -172,10 +210,51 @@ If no facts to extract, return []. Return ONLY valid JSON, nothing else.`,
 
   logger.info('🧠 Engine initialized with memory + skills + goals');
 
+  // 3a. Claude Code CLI Provider — FREE via Max subscription
+  const aiClient = engine.getAIClient();
+  await aiClient.initClaudeCode();
+  const ccAdapter = aiClient.getClaudeCodeAdapter();
+  if (ccAdapter && ccAdapter.available) {
+    // Wire into claude-code tool
+    setClaudeCodeToolProvider(ccAdapter.getProvider());
+    // Wire savings getter into analytics
+    setClaudeCodeSavingsGetter(() => ccAdapter.getSavings());
+    logger.info('🆓 Claude Code CLI active (FREE — Max subscription)', { provider: 'claude-code' });
+  } else {
+    logger.info('Claude Code CLI not available, using API providers', {
+      enabled: config.CLAUDE_CODE_ENABLED,
+    });
+  }
+
   // 4. Heartbeat (proactive monitoring) + Self-Repair + Goals + AutoUpgrade
   const heartbeat = new Heartbeat();
   const selfRepair = new SelfRepair(engine.getMetaAgent());
   const autoUpgrade = new AutoUpgrade(engine.getAIClient(), engine.getSkillsEngine());
+  // Shared AI chat helper for subsystems (uses free model)
+  const aiChatHelper = async (system: string, message: string): Promise<string> => {
+    const response = await engine.getAIClient().chat({
+      systemPrompt: system,
+      messages: [{ role: 'user', content: message }],
+      maxTokens: 500,
+      temperature: 0.3,
+      model: config.OPENROUTER_API_KEY ? config.OPENROUTER_ECONOMY_MODEL : 'claude-haiku-4-5-20251001',
+      provider: config.OPENROUTER_API_KEY ? 'openrouter' : 'anthropic',
+    });
+    return response.content;
+  };
+
+  const selfImprove = new SelfImprove(aiChatHelper);
+
+  // Wire AI into self-repair for smart diagnosis
+  setSelfRepairAI(aiChatHelper);
+
+  // Wire auto tool dependencies (pre-Telegram, will be re-wired later)
+  setAutoToolDeps({
+    aiChat: aiChatHelper,
+    alert: async (msg: string) => {
+      logger.info('Auto-tool alert (pre-telegram)', { msg: msg.slice(0, 100) });
+    },
+  });
 
   // Wire subsystems into heartbeat
   heartbeat.setSubsystems({
@@ -269,30 +348,92 @@ If no facts to extract, return []. Return ONLY valid JSON, nothing else.`,
   await usageTracker.loadFromDb().catch(() => {});
   await ragEngine.init().catch(() => {});
 
+  // Wire cron tool to engine so AI can manage cron tasks
+  setCronToolEngine(cronEngine);
+
   // Wire modules into engine for intent intercepts
   engine.setCronEngine(cronEngine);
   engine.setUsageTracker(usageTracker);
   engine.setRAGEngine(ragEngine);
+
+  // Now create ProactiveThinker (needs cronEngine)
+  const proactiveThinker = new ProactiveThinker({
+    aiChat: aiChatHelper,
+    getSystemStatus: async () => {
+      const uptime = process.uptime();
+      const mem = process.memoryUsage();
+      return `Uptime: ${Math.floor(uptime / 3600)}h ${Math.floor((uptime % 3600) / 60)}m | Heap: ${Math.round(mem.heapUsed / 1024 / 1024)}MB / ${Math.round(mem.heapTotal / 1024 / 1024)}MB | Cron tasks: ${cronEngine.getTaskCount()}`;
+    },
+    getMemoryContext: async () => {
+      try {
+        const count = await getKnowledgeCount('system');
+        return `Knowledge entries: ${count}`;
+      } catch { return 'Knowledge: unavailable'; }
+    },
+  });
+
+  // Wire workflow + analytics tool deps
+  setWorkflowToolDeps({ engine: workflowEngine, aiChat: aiChatHelper });
+  setAnalyticsToolDeps(usageTracker);
 
   logger.info('⏰ Cron + Usage + Workflows + RAG initialized', {
     cronTasks: cronEngine.getTaskCount(),
     workflows: workflowEngine.getWorkflowCount(),
   });
 
-  // 4c. MCP Client — connect to external tool servers
-  const mcpClient = new MCPClient();
-  if (config.MCP_SERVERS && config.MCP_SERVERS.length > 0) {
+  // 4c. MCP Manager — connect to external tool servers (YAML-based config)
+  const mcpManager = new MCPManager(yamlConfig.mcp?.config_path);
+  if (yamlConfig.mcp?.enabled) {
+    await mcpManager.init().catch(err => {
+      logger.warn('MCP Manager init failed', { error: err.message });
+    });
+  }
+  // Fallback: legacy MCP_SERVERS env var
+  const mcpClient = mcpManager.getClient();
+  if (mcpClient.getServerCount() === 0 && config.MCP_SERVERS && config.MCP_SERVERS.length > 0) {
     try {
       const mcpConfigs = config.MCP_SERVERS.map((s: string) => {
         const [id, command, ...args] = s.split(':');
         return { id, command, args };
       });
       await mcpClient.init(mcpConfigs);
-      logger.info('MCP Client initialized', { servers: mcpClient.getServerCount(), tools: mcpClient.getToolCount() });
     } catch (err: any) {
-      logger.warn('MCP Client init failed', { error: err.message });
+      logger.warn('Legacy MCP init failed', { error: err.message });
     }
   }
+  logger.info('🔗 MCP ready', { servers: mcpClient.getServerCount(), tools: mcpClient.getToolCount() });
+
+  // 4d. Agent Queue Manager — per-agent BullMQ queues for scaling
+  const agentQueue = new AgentQueueManager();
+  try {
+    const { getAllAgents } = await import('./agents/registry.js');
+    const agentIds = getAllAgents().map(a => a.id);
+    await agentQueue.init(agentIds);
+    logger.info('📊 Agent queues initialized', { queues: agentQueue.getQueueCount() });
+  } catch (err: any) {
+    logger.warn('Agent queue init failed (non-critical)', { error: err.message });
+  }
+
+  // 4e. Auto-Update from GitHub
+  const updater = new Updater({ repoOwner: 'clawdagent', repoName: 'clawdagent' });
+  await updater.init();
+
+  // 4f. OpenClaw Deep Sync
+  const openclawSync = new OpenClawSync();
+  if (config.DEFAULT_SSH_SERVER && config.OPENCLAW_GATEWAY_TOKEN) {
+    const { executeTool } = await import('./core/tool-executor.js');
+    openclawSync.setExecutor(async (action, params) => {
+      return executeTool('openclaw', { action, ...params });
+    });
+    openclawSync.start();
+    logger.info('🔄 OpenClaw sync started');
+  }
+
+  // 4g. Key Rotation
+  initKeyRotation({
+    enabled: yamlConfig.security?.rotate_keys ?? false,
+    rotateIntervalHours: yamlConfig.security?.rotate_interval_hours ?? 72,
+  });
 
   // 5. Queue
   startWorker();
@@ -349,7 +490,21 @@ If no facts to extract, return []. Return ONLY valid JSON, nothing else.`,
     logger.info('🔗 OpenClaw webhook listener ready on /webhook/openclaw');
   }
 
-  // 7b. Wire reminder sender to Telegram
+  // 7b. Re-wire auto-tool alert + self-improve alert to Telegram
+  if (telegramInterface && config.TELEGRAM_ADMIN_IDS.length > 0) {
+    const telegramAlert = async (msg: string) => {
+      for (const adminId of config.TELEGRAM_ADMIN_IDS) {
+        try {
+          await telegramInterface.sendMessagePlain(adminId, msg);
+        } catch { /* skip */ }
+      }
+    };
+
+    setAutoToolDeps({ aiChat: aiChatHelper, alert: telegramAlert });
+    selfImprove.setAlertSender(telegramAlert);
+  }
+
+  // 7c. Wire reminder sender to Telegram
   setReminderSender(async (userId, platform, text) => {
     if (telegramInterface) {
       await telegramInterface.sendMessage(userId, text);
@@ -363,13 +518,27 @@ If no facts to extract, return []. Return ONLY valid JSON, nothing else.`,
     }
   });
 
+  // 8. SSH Tunnel — reverse tunnel for webhook forwarding (server:13000 → local:3000)
+  let sshTunnel: SSHTunnel | null = null;
+  if (config.DEFAULT_SSH_SERVER && config.DEFAULT_SSH_KEY_PATH) {
+    sshTunnel = createWebhookTunnel();
+    if (sshTunnel) {
+      sshTunnel.start();
+      logger.info('🔐 SSH tunnel started', {
+        remote: `${config.DEFAULT_SSH_SERVER}:13000`,
+        local: `localhost:${config.PORT}`,
+      });
+    }
+  }
+
   if (config.HEARTBEAT_ENABLED) {
     heartbeat.start(config.HEARTBEAT_INTERVAL_MS);
   }
 
-  logger.info(`✅ ClawdAgent MEGA started with ${interfaces.length} interface(s)`, {
+  logger.info(`✅ ClawdAgent PRODUCTION v${yamlConfig.agent.version} started with ${interfaces.length} interface(s)`, {
     providers: engine.getAIClient().getAvailableProviders(),
     skills: engine.getSkillsEngine().getSkillCount(),
+    behaviors: behaviorEngine.getBehaviorCount(),
     heartbeat: config.HEARTBEAT_ENABLED,
     metaAgent: true,
     goalEngine: true,
@@ -379,10 +548,19 @@ If no facts to extract, return []. Return ONLY valid JSON, nothing else.`,
     mcpTools: mcpClient.getToolCount(),
     cronTasks: cronEngine.getTaskCount(),
     workflows: workflowEngine.getWorkflowCount(),
+    agentQueues: agentQueue.getQueueCount(),
+    plugins: pluginLoader.getLoadedCount(),
     rag: true,
     email: !!(config as any).GMAIL_CLIENT_ID || !!(config as any).SMTP_USER,
     voice: !!config.OPENAI_API_KEY,
     vision: !!(config.ANTHROPIC_API_KEY || config.OPENROUTER_API_KEY),
+    sshTunnel: !!sshTunnel,
+    selfImprove: true,
+    proactiveThinker: true,
+    openclawSync: openclawSync.isRunning(),
+    updater: updater.getCurrentVersion(),
+    claudeCode: ccAdapter?.available ? 'active (FREE)' : 'unavailable',
+    tools: 17,
   });
 
   // Graceful shutdown
@@ -390,7 +568,13 @@ If no facts to extract, return []. Return ONLY valid JSON, nothing else.`,
     logger.info(`${signal} received, shutting down...`);
     heartbeat.stop();
     cronEngine.stopAll();
-    await mcpClient.shutdown();
+    updater.stop();
+    openclawSync.stop();
+    stopKeyRotation();
+    if (sshTunnel) sshTunnel.stop();
+    await agentQueue.shutdown();
+    await mcpManager.shutdown();
+    await pluginLoader.shutdown();
     await stopInterfaces(interfaces);
     await closeCache();
     await closeDatabase();

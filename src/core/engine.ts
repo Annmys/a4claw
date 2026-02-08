@@ -423,9 +423,17 @@ If they want to check a running project, use "status" with projectName.`,
         }
       }
 
-      // 2i. Meta-agent think step — plan before acting
-      const thought = await this.meta.think(incoming.text, contextSummary);
-      logger.info('Meta-agent thought', { situation: thought.situation, confidence: thought.confidence, planSteps: thought.plan.length });
+      // 2i. Meta-agent think step — skip for simple intents to reduce latency
+      const SIMPLE_INTENTS = new Set([
+        Intent.GENERAL_CHAT, Intent.HELP, Intent.SETTINGS, Intent.USAGE,
+        Intent.TASK_LIST, Intent.REMINDER_SET, Intent.CALENDAR,
+      ]);
+      if (!SIMPLE_INTENTS.has(routing.intent)) {
+        const thought = await this.meta.think(incoming.text, contextSummary);
+        logger.info('Meta-agent thought', { situation: thought.situation, confidence: thought.confidence, planSteps: thought.plan?.length ?? 0 });
+      } else {
+        logger.info('Skipping meta-agent for simple intent', { intent: routing.intent });
+      }
 
       // 3. Select agent
       const agent = getAgent(routing.agentId) ?? getAgent('general')!;
@@ -527,6 +535,7 @@ If they want to check a running project, use "status" with projectName.`,
             temperature: agent.temperature,
             ...(selectedModelId ? { model: selectedModelId } : {}),
             ...(selectedProvider ? { provider: selectedProvider } : {}),
+            ...(agent.maxToolIterations ? { maxToolIterations: agent.maxToolIterations } : {}),
           },
           async (toolName, toolInput) => {
             if ((toolName === 'task' || toolName === 'db') && !toolInput.userId) {
@@ -551,6 +560,12 @@ If they want to check a running project, use "status" with projectName.`,
           ...(selectedModelId ? { model: selectedModelId } : {}),
           ...(selectedProvider ? { provider: selectedProvider } : {}),
         });
+      }
+
+      // Empty response fallback — don't send blank messages
+      if (!response.content || response.content.trim().length === 0) {
+        logger.warn('AI returned empty response, using fallback', { agent: agent.id, provider: response.provider });
+        response.content = 'קיבלתי את ההודעה שלך אבל לא הצלחתי לעבד אותה. נסה שוב או נסח אחרת 🔄';
       }
 
       // Track usage for cost monitoring

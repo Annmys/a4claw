@@ -154,7 +154,7 @@ export function classifyComplexity(params: {
   const simpleIntents = ['reminder_set', 'general_chat', 'help', 'usage'];
   if (simpleIntents.includes(intent) && messageLength < 200) return 'simple';
 
-  const complexIntents = ['code_write', 'code_fix', 'build_project', 'document'];
+  const complexIntents = ['code_write', 'code_fix', 'build_project', 'document', 'content_create', 'social_publish', 'orchestrate'];
   if (complexIntents.includes(intent) || isMultiStep) return 'complex';
 
   const criticalIntents = ['code_review'];
@@ -187,7 +187,8 @@ export function selectModel(params: {
   if (candidates.length === 0) candidates = ALL_MODELS;
 
   // Budget check: if low budget, force free models
-  if (dailyBudgetLeft < 0.10 || preferFree) {
+  // But NEVER force free for complex/critical tasks — they need models that handle tools properly
+  if (dailyBudgetLeft < 0.10 || (preferFree && complexity !== 'complex' && complexity !== 'critical')) {
     const freeCandidates = candidates.filter(m => m.tier === 'free');
     if (freeCandidates.length > 0) candidates = freeCandidates;
   }

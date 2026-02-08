@@ -35,6 +35,16 @@ export class WebServer extends BaseInterface {
     this.app.use(helmet());
     this.app.use(express.json({ limit: '1mb' }));
     this.app.use(rateLimitMiddleware);
+
+    // Global error handler for malformed JSON (entity.parse.failed)
+    this.app.use((err: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
+      if (err.type === 'entity.parse.failed') {
+        logger.warn('Malformed JSON in request body', { message: err.message });
+        res.status(400).json({ error: 'Invalid JSON in request body' });
+        return;
+      }
+      next(err);
+    });
   }
 
   private setupRoutes() {
@@ -52,7 +62,21 @@ export class WebServer extends BaseInterface {
     }));
     // Serve dashboard HTML
     this.app.use('/dashboard', express.static(new URL('./public', import.meta.url).pathname));
-    this.app.get('/health', (_req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
+    this.app.get('/health', (_req, res) => {
+      const mem = process.memoryUsage();
+      res.json({
+        status: 'ok',
+        uptime: Math.floor(process.uptime()),
+        version: '5.0.0',
+        memory: {
+          heapUsedMB: Math.round(mem.heapUsed / 1024 / 1024),
+          heapTotalMB: Math.round(mem.heapTotal / 1024 / 1024),
+          rssMB: Math.round(mem.rss / 1024 / 1024),
+        },
+        providers: this.engine.getAIClient().getAvailableProviders(),
+        timestamp: new Date().toISOString(),
+      });
+    });
     this.app.get('/', (_req, res) => res.json({
       name: 'ClawdAgent',
       status: 'running',

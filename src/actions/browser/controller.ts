@@ -18,17 +18,17 @@ export interface BrowserResult {
   title?: string;
 }
 
-let puppeteer: any = null;
+let playwright: any = null;
 
-async function getPuppeteer() {
-  if (!puppeteer) {
+async function getPlaywright() {
+  if (!playwright) {
     try {
-      puppeteer = await import('puppeteer');
+      playwright = await import('playwright');
     } catch {
-      throw new Error('Puppeteer is not installed. Run: pnpm add puppeteer');
+      throw new Error('Playwright is not installed. Run: pnpm add playwright && npx playwright install chromium');
     }
   }
-  return puppeteer;
+  return playwright;
 }
 
 export class BrowserController {
@@ -36,15 +36,17 @@ export class BrowserController {
   private page: any = null;
 
   async launch(): Promise<void> {
-    const pptr = await getPuppeteer();
-    this.browser = await pptr.default.launch({
+    const pw = await getPlaywright();
+    this.browser = await pw.chromium.launch({
       headless: true,
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
     });
-    this.page = await this.browser.newPage();
-    await this.page.setViewport({ width: 1280, height: 720 });
-    await this.page.setUserAgent('ClawdAgent/1.0 (Autonomous AI Browser)');
-    logger.info('Browser launched');
+    const context = await this.browser.newContext({
+      viewport: { width: 1280, height: 720 },
+      userAgent: 'ClawdAgent/1.0 (Autonomous AI Browser)',
+    });
+    this.page = await context.newPage();
+    logger.info('Browser launched (Playwright)');
   }
 
   async close(): Promise<void> {
@@ -68,7 +70,7 @@ export class BrowserController {
       switch (action.type) {
         case 'navigate': {
           if (!action.url) return { success: false, error: 'URL is required for navigate' };
-          await page.goto(action.url, { waitUntil: 'networkidle2', timeout: 30000 });
+          await page.goto(action.url, { waitUntil: 'networkidle', timeout: 30000 });
           return {
             success: true,
             url: page.url(),
@@ -87,7 +89,7 @@ export class BrowserController {
         case 'type': {
           if (!action.selector || !action.value) return { success: false, error: 'Selector and value required for type' };
           await page.waitForSelector(action.selector, { timeout: 10000 });
-          await page.type(action.selector, action.value);
+          await page.fill(action.selector, action.value);
           return { success: true, data: `Typed "${action.value}" into ${action.selector}` };
         }
 
@@ -135,22 +137,16 @@ export class BrowserController {
     }
   }
 
-  /**
-   * Execute a sequence of browser actions
-   */
   async executeSequence(actions: BrowserAction[]): Promise<BrowserResult[]> {
     const results: BrowserResult[] = [];
     for (const action of actions) {
       const result = await this.execute(action);
       results.push(result);
-      if (!result.success) break; // Stop on first failure
+      if (!result.success) break;
     }
     return results;
   }
 
-  /**
-   * Quick scrape: navigate to URL and return text content
-   */
   async scrapeUrl(url: string, selector?: string): Promise<string> {
     const navResult = await this.execute({ type: 'navigate', url });
     if (!navResult.success) return `Error navigating: ${navResult.error}`;

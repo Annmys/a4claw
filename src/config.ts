@@ -77,6 +77,10 @@ const configSchema = z.object({
   BLOTATO_ACCOUNT_THREADS: z.string().optional(),
   BLOTATO_ACCOUNT_BLUESKY: z.string().optional(),
   BLOTATO_ACCOUNT_PINTEREST: z.string().optional(),
+  BLOTATO_FACEBOOK_PAGE_ID: z.string().optional(),
+  // Claude Code CLI (FREE via Max subscription — $200/month flat)
+  CLAUDE_CODE_ENABLED: z.string().default('true').transform(v => v === 'true'),
+  CLAUDE_CODE_PATH: z.string().default('claude'),
   // OpenClaw bridge
   OPENCLAW_GATEWAY_TOKEN: z.string().optional(),
   OPENCLAW_GATEWAY_PORT: z.coerce.number().default(18789),

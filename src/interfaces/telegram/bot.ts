@@ -52,6 +52,37 @@ export class TelegramBot extends BaseInterface {
     return msg.message_id;
   }
 
+  async sendPhoto(chatId: number | string, photo: Buffer | string, caption?: string): Promise<void> {
+    if (typeof photo === 'string') {
+      // URL or file_id
+      await this.bot.api.sendPhoto(chatId, photo, { caption, parse_mode: 'Markdown' });
+    } else {
+      // Buffer
+      const inputFile = new (await import('grammy')).InputFile(photo, 'image.jpg');
+      await this.bot.api.sendPhoto(chatId, inputFile, { caption, parse_mode: 'Markdown' });
+    }
+  }
+
+  async sendDocument(chatId: number | string, doc: Buffer | string, filename: string, caption?: string): Promise<void> {
+    if (typeof doc === 'string') {
+      await this.bot.api.sendDocument(chatId, doc, { caption, parse_mode: 'Markdown' });
+    } else {
+      const inputFile = new (await import('grammy')).InputFile(doc, filename);
+      await this.bot.api.sendDocument(chatId, inputFile, { caption, parse_mode: 'Markdown' });
+    }
+  }
+
+  async sendVideo(chatId: number | string, video: Buffer | string, caption?: string): Promise<void> {
+    if (typeof video === 'string') {
+      await this.bot.api.sendVideo(chatId, video, { caption, parse_mode: 'Markdown' });
+    } else {
+      const inputFile = new (await import('grammy')).InputFile(video, 'video.mp4');
+      await this.bot.api.sendVideo(chatId, inputFile, { caption, parse_mode: 'Markdown' });
+    }
+  }
+
+  getBot(): Bot { return this.bot; }
+
   async start() {
     logger.info('Starting Telegram bot...');
     this.bot.start({ onStart: (info) => logger.info(`Telegram bot started: @${info.username}`) });

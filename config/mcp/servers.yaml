@@ -1,0 +1,25 @@
+# MCP Server Configuration
+# Each server connects ClawdAgent to external tool ecosystems
+
+servers: []
+  # Example configurations:
+  # - id: filesystem
+  #   command: npx
+  #   args: ["-y", "@modelcontextprotocol/server-filesystem", "/home/user/projects"]
+  #   env: {}
+  #
+  # - id: github
+  #   command: npx
+  #   args: ["-y", "@modelcontextprotocol/server-github"]
+  #   env:
+  #     GITHUB_PERSONAL_ACCESS_TOKEN: "ghp_..."
+  #
+  # - id: postgres
+  #   command: npx
+  #   args: ["-y", "@modelcontextprotocol/server-postgres", "postgresql://user:pass@localhost/db"]
+  #
+  # - id: brave-search
+  #   command: npx
+  #   args: ["-y", "@modelcontextprotocol/server-brave-search"]
+  #   env:
+  #     BRAVE_API_KEY: "..."
