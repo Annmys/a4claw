@@ -146,16 +146,15 @@ export class IntentRouter {
     try {
       // Classification needs FAST JSON responses (< 5s).
       // CLI is too slow (120s timeout) and returns prose instead of JSON.
-      // Always use Anthropic API (Haiku = fast + cheap) or OpenRouter for classification.
+      // OpenRouter free models (Llama) return 429 rate limits consistently.
+      // Always use Anthropic Haiku — fast, cheap ($0.25/M), reliable JSON output.
       const response = await this.ai.chat({
         systemPrompt: ROUTING_PROMPT + contextNote,
         messages: [{ role: 'user', content: message }],
         maxTokens: 200,
         temperature: 0.1,
-        model: config.OPENROUTER_API_KEY
-          ? 'meta-llama/llama-3.3-70b-instruct:free'
-          : 'claude-haiku-4-5-20251001',
-        provider: (config.OPENROUTER_API_KEY ? 'openrouter' : 'anthropic') as 'openrouter' | 'anthropic',
+        model: 'claude-haiku-4-5-20251001',
+        provider: 'anthropic' as const,
       });
 
       const parsed = extractJSON(response.content);

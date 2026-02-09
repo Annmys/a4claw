@@ -480,7 +480,19 @@ If they want to check a running project, use "status" with projectName.`,
       const messages: Message[] = [...trimmedHistory, { role: 'user', content: incoming.text }];
 
       // 8. Smart model/provider selection
-      const toolDefs = agentTools.length > 0 ? getToolDefinitions(agentTools) : [];
+      //
+      // Simple intents (greetings, help, etc.) don't need tools even if the agent has them.
+      // This lets us use CLI (FREE) instead of Anthropic API for simple messages.
+      const TOOLLESS_INTENTS = new Set([
+        Intent.GENERAL_CHAT, Intent.HELP, Intent.SETTINGS,
+        Intent.QUESTION_ANSWER, Intent.REMEMBER,
+      ]);
+      const skipTools = TOOLLESS_INTENTS.has(routing.intent);
+      const toolDefs = (!skipTools && agentTools.length > 0) ? getToolDefinitions(agentTools) : [];
+      if (skipTools && agentTools.length > 0) {
+        logger.info('Skipping tools for simple intent', { intent: routing.intent, agentTools: agentTools.length });
+      }
+
       const lastMsg = messages[messages.length - 1]?.content ?? '';
       const lastMsgStr = typeof lastMsg === 'string' ? lastMsg : '';
       const hasHebrew = /[\u0590-\u05FF]/.test(lastMsgStr);
