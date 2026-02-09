@@ -42,6 +42,9 @@ export enum Intent {
   ANALYTICS = 'analytics',
   DEVICE_CONTROL = 'device_control',
   DEVICE_CONFIG = 'device_config',
+  UGC_CREATE = 'ugc_create',
+  PODCAST_CREATE = 'podcast_create',
+  SITE_ANALYZE = 'site_analyze',
 }
 
 export interface RoutingResult {
@@ -93,6 +96,9 @@ Available intents:
 - analytics: Usage stats, cost reports, API key status — סטטיסטיקות, analytics, כמה עולה, cost, דו"ח, כמה עלה, budget, תבדוק API keys
 - device_control: Control Android phone/tablet — tap, swipe, type, open app, screenshot, ADB command, Appium, send WhatsApp from phone, post TikTok from phone — תשלוט בטלפון, תלחץ על, תפתח אפליקציה, צילום מסך טלפון, תשלח ווטסאפ מהטלפון
 - device_config: Configure device connection, list devices, device info — חבר טלפון, הגדרות מכשיר, מה המכשירים
+- ugc_create: Create UGC (User Generated Content) — product showcase, AI influencer, brand content, UGC video, תוכן UGC, צור UGC, תיצור UGC, מוצר, שיווק, brand video, product video
+- podcast_create: Create podcast, audio show, multi-speaker conversation — פודקאסט, תיצור פודקאסט, podcast, audio show, שיחה, דיון, דיבייט, ראיון, interview
+- site_analyze: Analyze a website, build a clone, compare sites, tech stack analysis — תנתח אתר, נתח אתר, analyze site, analyze website, site analysis, תבנה אתר דומה, clone site, מה הטכנולוגיה של, tech stack
 
 Hebrew examples:
 - "מה מצב השרת" → server_status
@@ -124,11 +130,21 @@ Hebrew examples:
 - "תלחץ על הטלפון" → device_control
 - "תשלח ווטסאפ מהטלפון" → device_control
 - "מה המכשירים המחוברים" → device_config
+- "צור UGC למוצר הזה" → ugc_create
+- "תעשה סרטון UGC לקרם פנים" → ugc_create
+- "תיצור פודקאסט על AI" → podcast_create
+- "תעשה ראיון בין שני אנשים על טכנולוגיה" → podcast_create
+- "תנתח את האתר הזה" → site_analyze
+- "מה הטכנולוגיה של wix.com" → site_analyze
+- "תבנה לי אתר דומה ל..." → site_analyze
 
 Respond ONLY with valid JSON (no markdown, no text before/after):
 {"intent":"<intent_name>","confidence":<0.0-1.0>,"agent":"<best_agent>","params":{"key":"value"}}
 
-Agent options: server-manager, code-assistant, researcher, task-planner, general, desktop-controller, project-builder, web-agent, content-creator, orchestrator, device-controller`;
+Agent options: server-manager, code-assistant, researcher, task-planner, general, desktop-controller, project-builder, web-agent, content-creator, orchestrator, device-controller
+
+For ugc_create and podcast_create → use content-creator agent.
+For site_analyze → use orchestrator agent.`;
 
 export class IntentRouter {
   private ai: AIClient;
@@ -185,8 +201,23 @@ export class IntentRouter {
   private keywordClassify(message: string): RoutingResult | null {
     const m = message.toLowerCase();
 
+    // UGC Factory — product showcase, AI influencer, brand content
+    if (/UGC|ugc|תוכן.*מוצר|product.*video|brand.*content|AI.*influencer|מוצר.*וידאו|שיווק.*מוצר|product.*showcase/i.test(message)) {
+      return { intent: Intent.UGC_CREATE, confidence: 0.9, agentId: 'content-creator', extractedParams: {} };
+    }
+
+    // Podcast creation
+    if (/פודקאסט|podcast|audio.*show|ראיון.*בין|interview.*between|דיון.*על|debate.*about|דיבייט|multi.*speaker|שיחה.*בין/i.test(message)) {
+      return { intent: Intent.PODCAST_CREATE, confidence: 0.9, agentId: 'content-creator', extractedParams: {} };
+    }
+
+    // Site analysis / clone
+    if (/תנתח.*אתר|נתח.*אתר|analyze.*site|analyze.*website|site.*analysis|clone.*site|tech.*stack|טכנולוגי.*של.*אתר|תבנה.*אתר.*דומה/i.test(message)) {
+      return { intent: Intent.SITE_ANALYZE, confidence: 0.9, agentId: 'orchestrator', extractedParams: {} };
+    }
+
     // Content creation (images, videos, music)
-    if (/תיצור|צור.*תמונ|תעשה.*תמונ|generate.*image|create.*image|make.*image|תיצור.*וידאו|צור.*וידאו|generate.*video|create.*video|make.*video|תעשה.*וידאו|צור.*שיר|generate.*music|AI art|UGC|וידאו|סרטון|תמונה|שיר|מוזיקה/i.test(message)) {
+    if (/תיצור|צור.*תמונ|תעשה.*תמונ|generate.*image|create.*image|make.*image|תיצור.*וידאו|צור.*וידאו|generate.*video|create.*video|make.*video|תעשה.*וידאו|צור.*שיר|generate.*music|AI art|וידאו|סרטון|תמונה|שיר|מוזיקה/i.test(message)) {
       return { intent: Intent.CONTENT_CREATE, confidence: 0.85, agentId: 'content-creator', extractedParams: {} };
     }
 

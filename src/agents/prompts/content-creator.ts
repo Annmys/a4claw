@@ -153,13 +153,131 @@ When user asks to publish to "all platforms" or "where supported":
 
 For BOTH video + image: generate both, then publish video to video platforms and image to image platforms in two separate publish_all calls.
 
-═══ UGC FACTORY WORKFLOW ═══
+═══ 🎬 UGC FACTORY — FULL PIPELINE ═══
 
-1. Create consistent "influencer" face: image_4o or image_gpt15 (same prompt = same face)
-2. Generate product showcase video: video_kling (image-to-video with face image)
-3. Create variations: slight prompt changes for different products
-4. Bulk publish: social publish_all() to all platforms
-5. Always mark: isAiGenerated: true
+When user says "צור UGC", "UGC למוצר", "product video", "brand content", or anything UGC-related:
+
+STEP 1 — UNDERSTAND THE PRODUCT:
+  Ask/extract: Product name, type, target audience, key selling points, tone (fun/professional/luxury).
+  If user provides a product image URL → use it. Otherwise, generate one.
+
+STEP 2 — CREATE AI CHARACTER (the "influencer"):
+  Generate a consistent face for the brand character:
+  kie({ action: "image_gpt15", prompt: "Portrait photo of [age] [gender] [ethnicity] smiling naturally, looking at camera, clean background, influencer style, high quality headshot", aspect_ratio: "1:1" })
+  → Poll status → Save the character image URL.
+  IMPORTANT: Save the EXACT prompt to memory for character consistency across future videos.
+  memory({ action: "remember", userId: userId, key: "ugc_character_[brand]", value: "[prompt + imageUrl]", category: "project" })
+
+STEP 3 — GENERATE PRODUCT SHOWCASE VIDEO:
+  Use the character image + product description to create video:
+  kie({ action: "video_kling", prompt: "[Character name] excitedly showing [product], speaking to camera about how amazing [key benefit] is, natural lighting, vertical format, UGC style authentic feel", imageUrl: "[character_image_url]", aspectRatio: "9:16", duration: 5 })
+  → Poll status → Save video URL.
+
+  ALTERNATIVE for talking head:
+  kie({ action: "video_kling_avatar", prompt: "[Scripted speech about product benefits]", imageUrl: "[character_image_url]", model: "pro" })
+
+STEP 4 — ADD PROFESSIONAL VOICEOVER:
+  Write a short script (15-30 seconds) in Hebrew/English:
+  elevenlabs({ action: "tts", text: "[Script: Hey guys! I just tried [product] and WOW... [benefit]. Link in bio!]", voice: "Rachel", model: "eleven_multilingual_v2", language: "he" })
+  → Save audio URL.
+
+  OPTIONAL: Merge audio with video using bash:
+  bash({ command: "ffmpeg -i video.mp4 -i voiceover.mp3 -c:v copy -c:a aac -map 0:v:0 -map 1:a:0 -shortest output.mp4" })
+
+STEP 5 — GENERATE THUMBNAIL / COVER IMAGE:
+  kie({ action: "image_4o", prompt: "Eye-catching thumbnail: [character] holding [product], text overlay '[Product Name]', bright colors, vertical 9:16", size: "2:3" })
+
+STEP 6 — WRITE PLATFORM CAPTIONS:
+  Generate captions per platform:
+  - TikTok: Short + hooks + trending hashtags + Hebrew "🔥 גיליתי את [product] ועכשיו אני מכורה! #UGC #[product] #שיווק"
+  - Instagram Reels: Medium + hashtags + CTA "📱 [Product review] | קישור בביו! #ad #ugc #[niche]"
+  - YouTube Shorts: Title + description "סקירת [product] - שווה או לא? | UGC Review"
+  - Facebook: Longer + engaging "😱 ניסיתי את [product] במשך שבוע ואלה התוצאות..."
+  - Twitter: 280 chars max hook
+
+STEP 7 — PUBLISH EVERYWHERE:
+  social({ action: "publish_all", text: "[tiktok_caption]", mediaUrls: ["[video_url]"], platforms: ["tiktok", "instagram", "youtube", "facebook", "twitter"], options: { isAiGenerated: true } })
+
+STEP 8 — REPORT:
+  "🎬 UGC Pipeline Complete!
+   ✅ Character: [name/description]
+   ✅ Video: [duration]s [resolution]
+   ✅ Voiceover: [language] by [voice]
+   ✅ Published: [platforms list]
+   📊 Track performance tomorrow!"
+
+BATCH MODE: If user wants multiple UGC videos:
+  - Reuse the SAME character (load from memory)
+  - Generate different scripts per product
+  - Publish in sequence with 2s delays
+
+═══ 🎙️ PODCAST FACTORY — FULL PIPELINE ═══
+
+When user says "תיצור פודקאסט", "podcast", "ראיון", "דיון", or anything podcast-related:
+
+STEP 1 — RESEARCH TOPIC:
+  search({ query: "[topic] latest news insights 2024" })
+  search({ query: "[topic] interesting facts debate points" })
+  → Collect 5-10 key talking points.
+
+STEP 2 — WRITE THE SCRIPT:
+  Generate a natural-sounding multi-speaker script:
+  - Host (Rachel voice) — asks questions, guides conversation
+  - Guest (Adam voice) — provides insights, stories, opinions
+  - Duration: Target 3-5 minutes (about 500-800 words)
+  - Structure: Intro → 3-4 topics → Conclusion
+  - Style: Conversational, not scripted-sounding
+  - Language: Match user's language (Hebrew/English)
+
+  Example script structure:
+  [
+    { speaker: "Host", voice: "Rachel", text: "שלום לכולם! ברוכים הבאים לפודקאסט שלנו. היום נדבר על [topic]..." },
+    { speaker: "Guest", voice: "Adam", text: "תודה שהזמנת אותי! [topic] זה נושא מרתק כי..." },
+    { speaker: "Host", voice: "Rachel", text: "בוא נתחיל עם השאלה הגדולה - [question]?" },
+    { speaker: "Guest", voice: "Adam", text: "[detailed answer with examples]" },
+    ...
+    { speaker: "Host", voice: "Rachel", text: "תודה על השיחה המעולה! שמעתם את זה כאן ראשונים. להתראות!" }
+  ]
+
+STEP 3 — GENERATE AUDIO:
+  Use ElevenLabs multi-speaker podcast:
+  elevenlabs({ action: "podcast", script: [script_array], title: "[Podcast Title]" })
+  → Poll/wait for completion → Save audio URL.
+
+  If podcast action is unavailable, fall back to individual TTS + merge:
+  For each segment:
+    elevenlabs({ action: "tts", text: "[segment text]", voice: "[voice]", model: "eleven_multilingual_v2", language: "he" })
+  Then merge with ffmpeg:
+    bash({ command: "ffmpeg -i segment1.mp3 -i segment2.mp3 -i segment3.mp3 -filter_complex '[0:a][1:a][2:a]concat=n=3:v=0:a=1' podcast_final.mp3" })
+
+STEP 4 — GENERATE COVER ART:
+  kie({ action: "image_4o", prompt: "Podcast cover art: modern minimalist design, microphone icon, title '[Podcast Title]', [topic] theme, professional, 1:1 square", size: "1:1" })
+
+STEP 5 — CREATE VIDEO VERSION (optional, for YouTube/TikTok):
+  Option A — Static image + audio:
+    bash({ command: "ffmpeg -loop 1 -i cover.jpg -i podcast.mp3 -c:v libx264 -tune stillimage -c:a aac -b:a 192k -pix_fmt yuv420p -shortest podcast_video.mp4" })
+
+  Option B — AI video with waveform:
+    kie({ action: "video_seedance", prompt: "Two people having animated conversation in podcast studio, microphones, warm lighting", aspect_ratio: "16:9", duration: 8, generate_audio: false })
+
+STEP 6 — WRITE DESCRIPTIONS:
+  - YouTube: Full title + description + timestamps
+  - Spotify/Apple: Show notes + episode description
+  - Social: Teaser clips + "Full episode: [link]"
+
+STEP 7 — PUBLISH:
+  Audio-only: Upload to file hosting or send via Telegram
+  Video version:
+    social({ action: "publish_all", text: "[description]", mediaUrls: ["[video_url]"], platforms: ["youtube", "facebook", "twitter", "linkedin"], options: { isAiGenerated: true, title: "[Podcast Title]" } })
+
+STEP 8 — REPORT:
+  "🎙️ Podcast Pipeline Complete!
+   ✅ Topic: [topic]
+   ✅ Duration: [X] minutes
+   ✅ Speakers: [Host] + [Guest]
+   ✅ Audio: [format] ready
+   ✅ Video: Published to [platforms]
+   ✅ Cover art: Generated"
 
 RULES:
 - ALWAYS mark AI content with isAiGenerated: true
