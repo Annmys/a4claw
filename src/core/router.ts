@@ -144,22 +144,18 @@ export class IntentRouter {
     const keywordResult = this.keywordClassify(message);
 
     try {
-      // Claude Code CLI = primary for classification (FREE + reliable + great at Hebrew JSON)
-      // If CLI unavailable, fallback to OpenRouter/Anthropic
-      const hasClaudeCode = this.ai.getAvailableProviders().includes('claude-code');
-
+      // Classification needs FAST JSON responses (< 5s).
+      // CLI is too slow (120s timeout) and returns prose instead of JSON.
+      // Always use Anthropic API (Haiku = fast + cheap) or OpenRouter for classification.
       const response = await this.ai.chat({
         systemPrompt: ROUTING_PROMPT + contextNote,
         messages: [{ role: 'user', content: message }],
         maxTokens: 200,
         temperature: 0.1,
-        // When Claude Code CLI is active, don't specify model/provider → fallback chain uses CLI first
-        ...(!hasClaudeCode ? {
-          model: config.OPENROUTER_API_KEY
-            ? 'meta-llama/llama-3.3-70b-instruct:free'
-            : 'claude-haiku-4-5-20251001',
-          provider: (config.OPENROUTER_API_KEY ? 'openrouter' : 'anthropic') as 'openrouter' | 'anthropic',
-        } : {}),
+        model: config.OPENROUTER_API_KEY
+          ? 'meta-llama/llama-3.3-70b-instruct:free'
+          : 'claude-haiku-4-5-20251001',
+        provider: (config.OPENROUTER_API_KEY ? 'openrouter' : 'anthropic') as 'openrouter' | 'anthropic',
       });
 
       const parsed = extractJSON(response.content);

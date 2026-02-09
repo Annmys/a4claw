@@ -152,8 +152,8 @@ export function setupHandlers(bot: Bot, engine: Engine) {
     // Detect content-creation requests for extended timeout + progress updates
     // NOTE: \b word boundary does NOT work with Hebrew/Unicode — removed it
     const textLower = ctx.message.text.toLowerCase();
-    const isContentCreation = /(צור|תיצור|יצר|עשה|תעשה|create|generate|make|הפק|סרטון|וידאו|תמונה|שיר|video|image|photo|music|ugc|kie|publish|פרסם|תפרסם|פרסום|אוטומציה|automation|reels|רילס|content)/i.test(textLower);
-    const TIMEOUT = isContentCreation ? 300000 : 120000; // 5 min for content, 2 min for normal
+    const isContentCreation = /(צור|תיצור|יצר|עשה|תעשה|create|generate|make|הפק|סרטון|וידאו|תמונה|שיר|video|image|photo|music|ugc|kie|publish|פרסם|תפרסם|פרסום|אוטומציה|automation|reels|רילס|content|תעלה|העלה|טיק.?טוק|tiktok|אינסטגרם|אינסטרגם|instagram|פייסבוק|facebook|יוטיוב|youtube)/i.test(textLower);
+    const TIMEOUT = isContentCreation ? 420000 : 120000; // 7 min for content (kie generation + social publishing), 2 min for normal
 
     // Keep sending 'typing' indicator every 4s while processing
     const typingInterval = setInterval(() => {
