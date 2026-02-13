@@ -225,6 +225,54 @@ export const tradingRiskConfig = pgTable('trading_risk_config', {
   index('idx_risk_config_user').on(table.userId),
 ]);
 
+// ---------------------------------------------------------------------------
+// Persistent Memory tables (Cross-Session Memory — AGI 2026)
+// ---------------------------------------------------------------------------
+
+export const memoryEntries = pgTable('memory_entries', {
+  id: text('id').primaryKey(),
+  layer: varchar('layer', { length: 30 }).notNull(),         // execution, infrastructure, strategic, skill, error
+  key: varchar('key', { length: 500 }).notNull(),
+  value: text('value').notNull(),
+  tags: jsonb('tags').default([]),
+  impact: doublePrecision('impact').default(0.5),
+  accessCount: integer('access_count').default(0),
+  expiresAt: timestamp('expires_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  lastAccessed: timestamp('last_accessed').defaultNow().notNull(),
+}, (table) => [
+  index('idx_memory_layer').on(table.layer),
+  index('idx_memory_impact').on(table.impact),
+]);
+
+export const failurePatterns = pgTable('failure_patterns', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  errorType: varchar('error_type', { length: 200 }).notNull(),
+  context: text('context').notNull(),
+  count: integer('count').default(1).notNull(),
+  resolution: text('resolution'),
+  resolved: boolean('resolved').default(false).notNull(),
+  lastSeen: timestamp('last_seen').defaultNow().notNull(),
+}, (table) => [
+  index('idx_failure_error_type').on(table.errorType),
+  index('idx_failure_resolved').on(table.resolved),
+]);
+
+export const experienceRecords = pgTable('experience_records', {
+  id: text('id').primaryKey(),
+  taskType: varchar('task_type', { length: 100 }).notNull(),
+  input: text('input').notNull(),
+  output: text('output').notNull(),
+  success: boolean('success').default(false).notNull(),
+  agentUsed: varchar('agent_used', { length: 50 }).notNull(),
+  toolsUsed: jsonb('tools_used').default([]),
+  duration: integer('duration').default(0).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => [
+  index('idx_experience_task_type').on(table.taskType),
+  index('idx_experience_success').on(table.success),
+]);
+
 export const auditLog = pgTable('audit_log', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id'),

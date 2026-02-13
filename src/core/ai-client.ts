@@ -15,7 +15,7 @@ export interface Message {
 export interface ToolDefinition {
   name: string;
   description: string;
-  input_schema: Record<string, unknown>;
+  input_schema: { type: 'object'; properties: Record<string, unknown>; required?: string[]; [key: string]: unknown };
 }
 
 export interface AIRequest {
@@ -27,6 +27,8 @@ export interface AIRequest {
   model?: string;
   provider?: 'anthropic' | 'openai' | 'ollama' | 'openrouter' | 'claude-code';
   maxToolIterations?: number;
+  thinkingMode?: 'none' | 'basic' | 'extended';
+  thinkingBudget?: number;
 }
 
 export interface AIResponse {
@@ -57,18 +59,31 @@ class AnthropicProvider implements ProviderClient {
   }
 
   async chat(request: AIRequest): Promise<AIResponse> {
+    // Extended thinking support (Anthropic requires temperature=1 for thinking)
+    const useThinking = request.thinkingMode === 'extended';
+    const thinkingConfig = useThinking
+      ? { thinking: { type: 'enabled' as const, budget_tokens: request.thinkingBudget ?? 10000 } }
+      : {};
+
     const response = await this.client.messages.create({
       model: request.model ?? config.AI_MODEL,
-      max_tokens: request.maxTokens ?? config.AI_MAX_TOKENS,
-      temperature: request.temperature ?? 0.7,
+      max_tokens: useThinking ? Math.max(request.maxTokens ?? config.AI_MAX_TOKENS, 16000) : (request.maxTokens ?? config.AI_MAX_TOKENS),
+      temperature: useThinking ? 1 : (request.temperature ?? 0.7),
       system: request.systemPrompt,
       messages: request.messages,
       ...(request.tools?.length ? { tools: request.tools } : {}),
+      ...thinkingConfig,
     });
 
     const textContent = response.content
       .filter(block => block.type === 'text')
       .map(block => block.type === 'text' ? block.text : '')
+      .join('\n');
+
+    // Extract thinking content (extended thinking mode)
+    const thinkingContent = response.content
+      .filter((block: any) => block.type === 'thinking')
+      .map((block: any) => block.thinking ?? '')
       .join('\n');
 
     const toolCalls = response.content
@@ -83,6 +98,7 @@ class AnthropicProvider implements ProviderClient {
 
     return {
       content: textContent,
+      thinking: thinkingContent || undefined,
       toolCalls: toolCalls?.length ? toolCalls : undefined,
       usage: { inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens },
       stopReason: response.stop_reason ?? 'end_turn',
@@ -143,7 +159,7 @@ class OpenAIProvider implements ProviderClient {
   }
 }
 
-// ── Ollama Provider (local) ─────────────────────────────────────────
+// ── Ollama Provider (local — AGI 2026 models) ──────────────────────
 class OllamaProvider implements ProviderClient {
   name = 'ollama';
   available: boolean;
@@ -151,24 +167,46 @@ class OllamaProvider implements ProviderClient {
 
   constructor() {
     this.baseUrl = config.OLLAMA_URL ?? 'http://localhost:11434';
-    this.available = !!config.OLLAMA_URL;
+    this.available = !!(config.OLLAMA_URL || config.OLLAMA_ENABLED);
   }
 
   async chat(request: AIRequest): Promise<AIResponse> {
-    const model = request.model ?? 'llama3.1';
+    const model = request.model ?? config.OLLAMA_DEFAULT_MODEL ?? 'llama3.1';
+
+    // Convert messages — handle Anthropic content blocks
+    const convertedMessages = this.convertMessages(request);
+
+    // Inject chain-of-thought for basic thinking mode
+    let systemPrompt = request.systemPrompt;
+    if (request.thinkingMode === 'basic' && systemPrompt) {
+      systemPrompt += '\n\nIMPORTANT: Think step-by-step before answering. Show your reasoning process clearly, then provide your final answer.';
+    }
+
+    // Override system prompt in messages if present
+    if (systemPrompt && convertedMessages.length > 0 && convertedMessages[0].role === 'system') {
+      convertedMessages[0].content = systemPrompt;
+    }
+
+    const body: Record<string, unknown> = {
+      model,
+      messages: convertedMessages,
+      stream: false,
+      options: { temperature: request.temperature ?? 0.7 },
+    };
+
+    // Add tools if provided (Ollama supports OpenAI-format tool_calls)
+    if (request.tools?.length) {
+      body.tools = request.tools.map(t => ({
+        type: 'function',
+        function: { name: t.name, description: t.description, parameters: t.input_schema },
+      }));
+    }
 
     const res = await fetch(`${this.baseUrl}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: 'system', content: request.systemPrompt },
-          ...request.messages.map(m => ({ role: m.role, content: m.content })),
-        ],
-        stream: false,
-        options: { temperature: request.temperature ?? 0.7 },
-      }),
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(120000), // 2 min timeout for local models
     });
 
     if (!res.ok) {
@@ -177,16 +215,79 @@ class OllamaProvider implements ProviderClient {
     }
 
     const data = await res.json() as any;
+    const message = data.message;
+
+    // Parse tool calls from Ollama response (OpenAI-compatible format)
+    const toolCalls = message?.tool_calls?.map((tc: any, idx: number) => ({
+      id: `ollama_${Date.now()}_${idx}`,
+      name: tc.function?.name ?? tc.name,
+      input: typeof tc.function?.arguments === 'string'
+        ? JSON.parse(tc.function.arguments)
+        : tc.function?.arguments ?? tc.arguments ?? {},
+    }));
 
     return {
-      content: data.message?.content ?? '',
+      content: message?.content ?? '',
+      toolCalls: toolCalls?.length ? toolCalls : undefined,
       usage: {
         inputTokens: data.prompt_eval_count ?? 0,
         outputTokens: data.eval_count ?? 0,
       },
-      stopReason: 'stop',
+      stopReason: toolCalls?.length ? 'tool_use' : 'stop',
       provider: 'ollama',
+      modelUsed: model,
     };
+  }
+
+  /** Convert Anthropic-format messages to Ollama/OpenAI format */
+  private convertMessages(request: AIRequest): any[] {
+    const result: any[] = [{ role: 'system', content: request.systemPrompt }];
+
+    for (const msg of request.messages) {
+      if (typeof msg.content === 'string') {
+        result.push({ role: msg.role, content: msg.content });
+        continue;
+      }
+
+      if (!Array.isArray(msg.content)) {
+        result.push({ role: msg.role, content: String(msg.content ?? '') });
+        continue;
+      }
+
+      // Handle Anthropic content blocks (tool_use / tool_result)
+      const textParts: string[] = [];
+      const toolCallsArr: any[] = [];
+
+      for (const block of msg.content) {
+        if (block.type === 'text') {
+          textParts.push(block.text);
+        } else if (block.type === 'tool_use') {
+          toolCallsArr.push({
+            id: block.id,
+            type: 'function',
+            function: { name: block.name, arguments: JSON.stringify(block.input) },
+          });
+        } else if (block.type === 'tool_result') {
+          result.push({
+            role: 'tool',
+            tool_call_id: block.tool_use_id,
+            content: typeof block.content === 'string' ? block.content : JSON.stringify(block.content),
+          });
+        }
+      }
+
+      if (toolCallsArr.length > 0) {
+        result.push({
+          role: 'assistant',
+          content: textParts.join('\n') || null,
+          tool_calls: toolCallsArr,
+        });
+      } else if (textParts.length > 0) {
+        result.push({ role: msg.role, content: textParts.join('\n') });
+      }
+    }
+
+    return result;
   }
 }
 
@@ -407,7 +508,8 @@ ${toolList}`;
 const PROVIDER_FALLBACK_CHAINS: Record<string, string[]> = {
   max:     ['claude-code', 'anthropic', 'openrouter', 'openai', 'ollama'],
   pro:     ['anthropic', 'openrouter', 'openai', 'ollama'],
-  economy: ['openrouter', 'anthropic', 'openai', 'ollama'],
+  economy: ['openrouter', 'ollama', 'anthropic', 'openai'],
+  local:   ['ollama', 'openrouter', 'anthropic', 'openai'],  // Ollama-first for local AGI models
   auto:    ['claude-code', 'anthropic', 'openrouter', 'openai', 'ollama'], // resolved at init
 };
 
@@ -418,6 +520,7 @@ const PROVIDER_FALLBACK_CHAINS: Record<string, string[]> = {
 function resolveAutoMode(providers: Map<string, ProviderClient>): string {
   if (providers.has('claude-code')) return 'max';
   if (providers.has('anthropic')) return 'pro';
+  if (providers.has('ollama') && !providers.has('openrouter')) return 'local';
   return 'economy';
 }
 
@@ -494,7 +597,7 @@ export class AIClient {
   }
 
   /** Set provider mode at runtime (e.g. from /provider command) */
-  setProviderMode(mode: 'auto' | 'economy' | 'pro' | 'max'): void {
+  setProviderMode(mode: 'auto' | 'economy' | 'pro' | 'max' | 'local'): void {
     this.providerMode = mode;
     this.resolvedMode = mode === 'auto' ? resolveAutoMode(this.providers) : mode;
     this.fallbackOrder = PROVIDER_FALLBACK_CHAINS[this.resolvedMode] ?? PROVIDER_FALLBACK_CHAINS.auto;

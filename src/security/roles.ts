@@ -16,6 +16,11 @@ const permissions: Record<string, string[]> = {
     'knowledge', 'skills.read', 'logs.read',
     'history.read', 'costs.read', 'cron.read',
     'settings.read',
+    // Agent tools — essential for content creation, social publishing, memory, etc.
+    'social', 'kie', 'elevenlabs', 'file', 'memory',
+    'workflow', 'email', 'scrape', 'browser', 'firecrawl',
+    'rapidapi', 'apify', 'reminder', 'whatsapp', 'analytics',
+    'docker', 'openclaw', 'claude-code',
   ],
   readonly: [
     'chat', 'tasks.read', 'search',

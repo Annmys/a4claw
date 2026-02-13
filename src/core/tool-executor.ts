@@ -30,6 +30,7 @@ import { audit } from '../security/audit-log.js';
 import { onToolExecuted, checkCommandSafety, isBridgeReady } from './intelligence-bridge.js';
 import logger from '../utils/logger.js';
 import type { PluginLoader } from './plugin-loader.js';
+import type { ToolCreator } from './tool-creator.js';
 
 // Tracking context — set by engine.ts before each message processing cycle
 let currentAgentId = 'system';
@@ -45,11 +46,18 @@ export function setExecutionContext(agentId: string, intent: string): void {
 const toolInstances: Map<string, BaseTool> = new Map();
 let initialized = false;
 let pluginLoaderRef: PluginLoader | null = null;
+let toolCreatorRef: ToolCreator | null = null;
 
 /** Bridge plugin tools into the tool executor */
 export function setPluginLoader(loader: PluginLoader): void {
   pluginLoaderRef = loader;
   logger.info('Plugin loader bridged into tool executor');
+}
+
+/** Bridge dynamic tool creator into the tool executor */
+export function setToolCreator(creator: ToolCreator): void {
+  toolCreatorRef = creator;
+  logger.info('Tool creator bridged into tool executor');
 }
 
 export function initTools(): void {
@@ -686,6 +694,25 @@ export function getToolDefinitions(allowedTools: string[]): any[] {
     }
   }
 
+  // ── Dynamic tools from ToolCreator ──
+  if (toolCreatorRef) {
+    definitions.push({
+      name: 'create_tool',
+      description: 'Create, list, or remove dynamic tools at runtime. Actions: create (provide description), list (no params), remove (provide tool_name).',
+      input_schema: {
+        type: 'object' as const,
+        properties: {
+          action: { type: 'string' as const, enum: ['create', 'list', 'remove'], description: 'Action to perform' },
+          description: { type: 'string' as const, description: 'Description of the tool to create (for create action)' },
+          tool_name: { type: 'string' as const, description: 'Name of the tool to remove (for remove action)' },
+        },
+        required: ['action'],
+      },
+    });
+    // Append existing dynamic tool definitions
+    definitions.push(...toolCreatorRef.getToolDefinitions());
+  }
+
   return definitions;
 }
 
@@ -720,6 +747,34 @@ export async function executeTool(
 ): Promise<ToolResult> {
   if (!initialized) initTools();
 
+  // ── Handle create_tool meta-tool ──
+  if (toolName === 'create_tool' && toolCreatorRef) {
+    const action = input.action as string;
+    if (action === 'create') {
+      const result = await toolCreatorRef.createTool(input.description as string);
+      return { success: result.success, output: result.success ? `Tool "${result.name}" created successfully` : `Failed: ${result.error}` };
+    } else if (action === 'list') {
+      const tools = toolCreatorRef.listTools();
+      return { success: true, output: tools.length > 0 ? tools.map(t => `- ${t.name}: ${t.description} (used ${t.useCount}x)`).join('\n') : 'No dynamic tools created yet' };
+    } else if (action === 'remove') {
+      const removed = toolCreatorRef.removeTool(input.tool_name as string);
+      return { success: removed, output: removed ? `Tool "${input.tool_name}" removed` : `Tool "${input.tool_name}" not found` };
+    }
+    return { success: false, output: '', error: `Unknown create_tool action: ${action}` };
+  }
+
+  // ── Handle dynamic tool execution (dynamic_* prefix) ──
+  if (toolName.startsWith('dynamic_') && toolCreatorRef) {
+    const realName = toolName.slice(8); // Remove 'dynamic_' prefix
+    try {
+      const result = await toolCreatorRef.executeTool(realName, input as Record<string, unknown>);
+      logger.info('Dynamic tool executed', { toolName: realName, outputLength: result.length });
+      return { success: true, output: result };
+    } catch (err: any) {
+      return { success: false, output: '', error: err.message };
+    }
+  }
+
   const tool = toolInstances.get(toolName);
   if (!tool) {
     // Try plugin loader as fallback before giving up
@@ -734,6 +789,17 @@ export async function executeTool(
         logger.warn('Plugin tool execution failed', { toolName, error: err.message });
       }
     }
+
+    // Try dynamic tool creator (non-prefixed name)
+    if (toolCreatorRef && toolCreatorRef.getTool(toolName)) {
+      try {
+        const result = await toolCreatorRef.executeTool(toolName, input as Record<string, unknown>);
+        return { success: true, output: result };
+      } catch (err: any) {
+        return { success: false, output: '', error: err.message };
+      }
+    }
+
     logger.warn('Tool not found', { toolName });
     return { success: false, output: '', error: `Tool "${toolName}" not found` };
   }

@@ -18,7 +18,9 @@ import { scheduleReminder } from '../queue/scheduler.js';
 import { UsageTracker } from './usage-tracker.js';
 import { RAGEngine } from '../actions/rag/rag-engine.js';
 import { initTools, getToolDefinitions, executeTool, setExecutionContext } from './tool-executor.js';
-import { classifyComplexity, selectModel } from './model-router.js';
+import { classifyComplexity, selectModel, classifyEffort, mapEffortToThinking } from './model-router.js';
+import { resolveOllamaModel } from './ollama-model-registry.js';
+import type { CrewOrchestrator } from './crew-orchestrator.js';
 import { onMessageProcessed, onError, getIntelligenceContext, isBridgeReady } from './intelligence-bridge.js';
 import type { EvolutionEngine } from './evolution-engine.js';
 import config from '../config.js';
@@ -71,6 +73,7 @@ export class Engine {
   private usageTracker: UsageTracker | null = null;
   private ragEngine: RAGEngine | null = null;
   private evolution: EvolutionEngine | null = null;
+  private crewOrchestrator: CrewOrchestrator | null = null;
 
   private getHistory?: (userId: string, platform: string, limit: number) => Promise<Message[]>;
   private saveMessage?: (userId: string, platform: string, role: string, content: string, metadata?: any) => Promise<void>;
@@ -117,6 +120,75 @@ export class Engine {
   getRAGEngine(): RAGEngine | null { return this.ragEngine; }
   setEvolutionEngine(evo: EvolutionEngine) { this.evolution = evo; }
   getEvolutionEngine(): EvolutionEngine | null { return this.evolution; }
+  setCrewOrchestrator(crew: CrewOrchestrator) { this.crewOrchestrator = crew; }
+  getCrewOrchestrator(): CrewOrchestrator | null { return this.crewOrchestrator; }
+
+  /** Detect if a task should trigger multi-agent crew execution */
+  private shouldUseCrew(intent: string, text: string, _agentId: string): {
+    id: string; name: string; mode: 'sequential' | 'hierarchical' | 'ensemble';
+    members: Array<{ agentId: string; role?: string }>; task: string;
+  } | null {
+    if (!this.crewOrchestrator) return null;
+    const lowerText = text.toLowerCase();
+
+    // Explicit orchestrate intent → hierarchical crew
+    if (intent === 'orchestrate') {
+      return {
+        id: `crew_${Date.now()}`, name: 'Orchestration Crew', mode: 'hierarchical',
+        members: [
+          { agentId: 'orchestrator', role: 'leader' },
+          { agentId: 'researcher', role: 'research' },
+          { agentId: 'code-assistant', role: 'implementation' },
+        ],
+        task: text,
+      };
+    }
+
+    // Multi-domain detection: research + build → sequential crew
+    const hasResearch = /research|חקור|analyze|analys|נתח/i.test(lowerText);
+    const hasBuild = /build|בנה|create|צור|implement|develop/i.test(lowerText);
+    const hasTrade = /trade|signal|מסחר|סיגנל|portfolio/i.test(lowerText);
+    const hasSecurity = /secur|audit|vulnerab|אבטח/i.test(lowerText);
+    const hasReview = /review|בדוק|check|סקור/i.test(lowerText);
+
+    // Research + Build → sequential (researcher → code-assistant)
+    if (hasResearch && hasBuild) {
+      return {
+        id: `crew_${Date.now()}`, name: 'Research & Build', mode: 'sequential',
+        members: [
+          { agentId: 'researcher', role: 'research' },
+          { agentId: 'code-assistant', role: 'build' },
+        ],
+        task: text,
+      };
+    }
+
+    // Research + Trade → sequential (researcher → crypto-analyst)
+    if (hasResearch && hasTrade) {
+      return {
+        id: `crew_${Date.now()}`, name: 'Research & Trade', mode: 'sequential',
+        members: [
+          { agentId: 'researcher', role: 'research' },
+          { agentId: 'crypto-analyst', role: 'analysis' },
+        ],
+        task: text,
+      };
+    }
+
+    // Review + Security → ensemble (parallel independent review)
+    if (hasReview && hasSecurity) {
+      return {
+        id: `crew_${Date.now()}`, name: 'Security Review', mode: 'ensemble',
+        members: [
+          { agentId: 'code-assistant', role: 'code-review' },
+          { agentId: 'security-guard', role: 'security-review' },
+        ],
+        task: text,
+      };
+    }
+
+    return null;
+  }
 
   setMemoryFunctions(fns: {
     getHistory: typeof this.getHistory;
@@ -538,14 +610,40 @@ If they want to check a running project, use "status" with projectName.`,
       const hasHebrew = /[\u0590-\u05FF]/.test(lastMsgStr);
 
       let selectedModelId: string | undefined;
-      let selectedProvider: 'anthropic' | 'openrouter' | 'claude-code' | undefined;
+      let selectedProvider: 'anthropic' | 'openrouter' | 'claude-code' | 'ollama' | undefined;
 
       // Provider mode drives provider selection
       const { resolved: resolvedMode } = this.ai.getProviderMode();
       const claudeCodeActive = this.ai.getAvailableProviders().includes('claude-code');
       const needsTools = toolDefs.length > 0;
 
-      if (resolvedMode === 'max' && claudeCodeActive) {
+      if (resolvedMode === 'local' && config.OLLAMA_ENABLED) {
+        // LOCAL mode: Ollama-first with per-agent model assignment
+        const ollamaModel = resolveOllamaModel(agent.id, agent.preferredOllamaModel);
+        if (ollamaModel) {
+          // Check if model supports tools when needed
+          if (needsTools && !ollamaModel.supportsTools) {
+            // Fallback to a tool-capable Ollama model
+            const toolModel = resolveOllamaModel(agent.id, config.OLLAMA_TOOL_MODEL);
+            selectedModelId = toolModel?.ollamaTag ?? config.OLLAMA_TOOL_MODEL;
+            logger.info('Ollama model lacks tool support, using tool model', {
+              agent: agent.id, original: ollamaModel.id, fallback: selectedModelId,
+            });
+          } else {
+            selectedModelId = ollamaModel.ollamaTag;
+          }
+          selectedProvider = 'ollama';
+          logger.info('Model selected', {
+            provider: 'ollama', mode: 'local', model: ollamaModel.displayName,
+            agent: agent.id, supportsTools: ollamaModel.supportsTools,
+          });
+        } else {
+          // No Ollama model mapped — use default Ollama model
+          selectedModelId = config.OLLAMA_DEFAULT_MODEL;
+          selectedProvider = 'ollama';
+          logger.info('Model selected', { provider: 'ollama', mode: 'local', model: selectedModelId, reason: 'default' });
+        }
+      } else if (resolvedMode === 'max' && claudeCodeActive) {
         // MAX mode: Claude Code CLI for ALL requests (FREE — Max subscription)
         // Tools are embedded in the prompt and tool_call tags are parsed from response
         selectedProvider = 'claude-code';
@@ -600,8 +698,44 @@ If they want to check a running project, use "status" with projectName.`,
         logger.info('Model selected', { provider: selectedProvider, mode: resolvedMode, reason: 'fallback' });
       }
 
+      // ── Adaptive Thinking Mode ──
+      // Compute effort level → map to thinking config for supported providers
+      const effortLevel = classifyEffort({
+        intent: routing.intent,
+        complexity: classifyComplexity({
+          intent: routing.intent,
+          messageLength: lastMsgStr.length,
+          hasTools: needsTools,
+          requiresHebrew: hasHebrew,
+          requiresVision: false,
+          isMultiStep: toolDefs.length > 3,
+        }),
+        messageLength: lastMsgStr.length,
+      });
+      const thinkingConfig = mapEffortToThinking(effortLevel, selectedProvider ?? 'anthropic');
+
       // ── Intelligence: set execution context so tool-executor tracks agent/intent ──
       setExecutionContext(agent.id, routing.intent);
+
+      // ── Crew Orchestrator: detect multi-agent tasks ──
+      const crewConfig = this.shouldUseCrew(routing.intent, incoming.text, agent.id);
+      if (crewConfig && this.crewOrchestrator) {
+        incoming.onProgress?.({ type: 'status', message: `Running ${crewConfig.mode} crew (${crewConfig.members.length} agents)...` });
+        logger.info('Crew triggered', { mode: crewConfig.mode, members: crewConfig.members.map(m => m.agentId), task: crewConfig.task.slice(0, 80) });
+        const crewResult = await this.crewOrchestrator.runCrew(crewConfig);
+
+        if (this.saveMessage) {
+          await this.saveMessage(incoming.userId, incoming.platform, 'user', incoming.text, { intent: routing.intent });
+          await this.saveMessage(incoming.userId, incoming.platform, 'assistant', crewResult.output, { agent: 'crew', mode: crewConfig.mode });
+        }
+
+        return {
+          text: crewResult.output,
+          format: 'markdown' as const,
+          agentUsed: `crew:${crewConfig.mode}`,
+          provider: selectedProvider ?? 'anthropic',
+        };
+      }
 
       incoming.onProgress?.({ type: 'status', message: 'Generating response...' });
       let response;
@@ -615,6 +749,8 @@ If they want to check a running project, use "status" with projectName.`,
             tools: toolDefs,
             maxTokens: agent.maxTokens,
             temperature: agent.temperature,
+            thinkingMode: thinkingConfig.thinkingMode,
+            ...(thinkingConfig.thinkingBudget ? { thinkingBudget: thinkingConfig.thinkingBudget } : {}),
             ...(selectedModelId ? { model: selectedModelId } : {}),
             ...(selectedProvider ? { provider: selectedProvider } : {}),
             ...(agent.maxToolIterations ? { maxToolIterations: agent.maxToolIterations } : {}),
@@ -643,6 +779,8 @@ If they want to check a running project, use "status" with projectName.`,
           messages,
           maxTokens: agent.maxTokens,
           temperature: agent.temperature,
+          thinkingMode: thinkingConfig.thinkingMode,
+          ...(thinkingConfig.thinkingBudget ? { thinkingBudget: thinkingConfig.thinkingBudget } : {}),
           ...(selectedModelId ? { model: selectedModelId } : {}),
           ...(selectedProvider ? { provider: selectedProvider } : {}),
         });

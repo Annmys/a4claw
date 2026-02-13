@@ -67,6 +67,28 @@ input:focus, button:focus-visible, textarea:focus { outline: none; box-shadow: 0
   animation: pulse 2s ease-in-out infinite;
 }
 
+/* ── Glass theme background ───────────────────────────────────── */
+.chat-glass {
+  background: radial-gradient(ellipse at 20% 50%, rgba(59, 130, 246, 0.04) 0%, transparent 50%),
+              radial-gradient(ellipse at 80% 20%, rgba(168, 85, 247, 0.03) 0%, transparent 50%);
+}
+
+/* ── Formatted message styles ─────────────────────────────────── */
+.formatted-msg h3 { border-bottom: 1px solid rgba(71, 85, 105, 0.3); padding-bottom: 4px; }
+.formatted-msg h4 { border-bottom: 1px solid rgba(71, 85, 105, 0.15); padding-bottom: 3px; }
+.formatted-msg pre { scrollbar-width: thin; scrollbar-color: #334155 transparent; }
+.formatted-msg pre::-webkit-scrollbar { height: 4px; }
+.formatted-msg pre::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
+.formatted-msg ul, .formatted-msg ol { margin-block: 4px; }
+.formatted-msg li::marker { color: #64748b; }
+.formatted-msg hr { opacity: 0.5; }
+.formatted-msg a { text-decoration-skip-ink: auto; }
+.formatted-msg a:hover { text-decoration: underline; }
+
+/* ── RTL adjustments ──────────────────────────────────────────── */
+[dir="rtl"] .formatted-msg ul,
+[dir="rtl"] .formatted-msg ol { padding-right: 1.25rem; padding-left: 0; }
+
 /* ── Recharts overrides ────────────────────────────────────────── */
 .recharts-cartesian-grid line { stroke: rgba(51, 65, 85, 0.3); }
 .recharts-text { fill: #94a3b8; font-size: 11px; }

@@ -49,7 +49,8 @@ import { AgentFactory } from './core/agent-factory.js';
 import { CapabilityLearner } from './core/capability-learner.js';
 import { CrewOrchestrator } from './core/crew-orchestrator.js';
 import { EvolutionEngine } from './core/evolution-engine.js';
-import { setPluginLoader } from './core/tool-executor.js';
+import { setPluginLoader, setToolCreator } from './core/tool-executor.js';
+import { ToolCreator } from './core/tool-creator.js';
 import { initBridge, runPeriodicIntelligence, isBridgeReady } from './core/intelligence-bridge.js';
 import type { Message } from './core/ai-client.js';
 import type { BaseInterface } from './interfaces/base.js';
@@ -265,8 +266,11 @@ If no facts to extract, return []. Return ONLY valid JSON, nothing else.`,
     },
   });
 
-  // 4a. Self-Evolution Engine
+  // 4a. Self-Evolution Engine + Tool Creator
   setPluginLoader(pluginLoader);
+  const toolCreator = new ToolCreator(engine.getAIClient());
+  setToolCreator(toolCreator);
+  logger.info('🔧 Tool Creator initialized (dynamic tool generation enabled)');
   const skillFetcher = new SkillFetcher(engine.getAIClient(), engine.getSkillsEngine());
   const agentFactory = new AgentFactory(engine.getAIClient(), engine.getSkillsEngine());
   const capabilityLearner = new CapabilityLearner(engine.getAIClient(), engine.getSkillsEngine(), agentFactory);
@@ -285,6 +289,19 @@ If no facts to extract, return []. Return ONLY valid JSON, nothing else.`,
 
   // ── Intelligence Bridge: connect all 9 subsystems to the live pipeline ──
   initBridge(evolutionEngine);
+
+  // ── Wire Crew Orchestrator to Engine ──
+  engine.setCrewOrchestrator(crewOrchestrator);
+
+  // ── Persistent Memory: load cross-session data from DB ──
+  const memoryHierarchy = evolutionEngine.getMemoryHierarchy();
+  await memoryHierarchy.initPersistence();
+  // Flush memory to DB every 5 minutes
+  const memoryFlushInterval = setInterval(() => {
+    memoryHierarchy.flush().catch(err => {
+      logger.debug('Memory flush error', { error: err.message });
+    });
+  }, 5 * 60 * 1000);
 
   logger.info('🧬 Evolution Engine initialized', {
     skillFetcher: true,
@@ -680,6 +697,8 @@ If no facts to extract, return []. Return ONLY valid JSON, nothing else.`,
   // Graceful shutdown
   const shutdown = async (signal: string) => {
     logger.info(`${signal} received, shutting down...`);
+    clearInterval(memoryFlushInterval);
+    await memoryHierarchy.flush(); // Final persistence before DB close
     heartbeat.stop();
     cronEngine.stopAll();
     updater.stop();

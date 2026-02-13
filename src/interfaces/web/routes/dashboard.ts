@@ -2,6 +2,7 @@ import { Router } from 'express';
 import os from 'os';
 import { getDashboardData, isBridgeReady } from '../../../core/intelligence-bridge.js';
 import { getAllAgents } from '../../../agents/registry.js';
+import { checkOllamaModels, getAgentModelMapping, OLLAMA_MODELS } from '../../../core/ollama-model-registry.js';
 import type { Skill } from '../../../core/skills-engine.js';
 import type { ModelOption } from '../../../core/model-router.js';
 
@@ -71,6 +72,36 @@ export function setupDashboardRoutes(deps: {
   // GET /api/dashboard/activity — recent activity feed
   router.get('/activity', (_req, res) => {
     res.json(activityLog.slice(0, 20));
+  });
+
+  // GET /api/dashboard/models — Ollama model status + agent mappings
+  router.get('/models', async (_req, res) => {
+    try {
+      const ollamaStatus = await checkOllamaModels('http://localhost:11434');
+      const agentMapping = getAgentModelMapping();
+      const providers = deps.getProviders?.() ?? [];
+
+      res.json({
+        ollama: {
+          available: ollamaStatus.available.length > 0,
+          models: ollamaStatus.available,
+          missing: ollamaStatus.missing,
+          totalRegistered: OLLAMA_MODELS.length,
+        },
+        cloud: {
+          anthropic: providers.includes('anthropic'),
+          openrouter: providers.includes('openrouter'),
+          claudeCode: providers.includes('claude-code'),
+        },
+        agentMapping,
+      });
+    } catch (err: any) {
+      res.json({
+        ollama: { available: false, models: [], missing: [], error: err.message },
+        cloud: { anthropic: false, openrouter: false, claudeCode: false },
+        agentMapping: [],
+      });
+    }
   });
 
   // GET /api/dashboard/intelligence — full intelligence subsystem data

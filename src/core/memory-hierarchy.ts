@@ -1,4 +1,9 @@
 import logger from '../utils/logger.js';
+import {
+  loadMemoryEntries, upsertMemoryEntry, deleteMemoryEntry, deleteExpiredEntries,
+  loadFailurePatterns, upsertFailurePattern,
+  loadExperienceRecords, insertExperienceRecord,
+} from '../memory/repositories/memory-persistence.js';
 
 /** Memory layers as defined in the architecture */
 type MemoryLayer = 'execution' | 'infrastructure' | 'strategic' | 'skill' | 'error';
@@ -56,6 +61,98 @@ export class MemoryHierarchy {
   private failurePatterns: FailurePattern[] = [];
   private experiences: ExperienceRecord[] = [];
   private idCounter = 0;
+  private persistenceEnabled = false;
+  private dirtyMemories = new Set<string>();
+  private dirtyFailures = false;
+  private dirtyExperiences: ExperienceRecord[] = [];
+
+  /** Initialize persistence: load all data from DB into memory */
+  async initPersistence(): Promise<void> {
+    try {
+      // Load memory entries
+      const entries = await loadMemoryEntries();
+      for (const e of entries) {
+        this.memories.set(e.id, {
+          id: e.id,
+          layer: e.layer as MemoryLayer,
+          key: e.key,
+          value: e.value,
+          tags: e.tags,
+          impact: e.impact,
+          accessCount: e.accessCount,
+          createdAt: e.createdAt,
+          lastAccessed: e.lastAccessed,
+          expiresAt: e.expiresAt,
+        });
+        // Track highest ID counter
+        const idNum = parseInt(e.id.replace(/\D/g, ''), 10);
+        if (!isNaN(idNum) && idNum > this.idCounter) this.idCounter = idNum;
+      }
+
+      // Load failure patterns
+      const patterns = await loadFailurePatterns();
+      this.failurePatterns = patterns;
+
+      // Load experience records
+      const exps = await loadExperienceRecords();
+      this.experiences = exps;
+
+      this.persistenceEnabled = true;
+      logger.info('Memory persistence initialized', {
+        memories: entries.length,
+        failurePatterns: patterns.length,
+        experiences: exps.length,
+      });
+    } catch (err: any) {
+      logger.warn('Memory persistence init failed — running in-memory only', { error: err.message });
+      this.persistenceEnabled = false;
+    }
+  }
+
+  /** Flush dirty data to DB (called periodically) */
+  async flush(): Promise<void> {
+    if (!this.persistenceEnabled) return;
+
+    try {
+      // Flush dirty memory entries
+      const dirtyIds = [...this.dirtyMemories];
+      this.dirtyMemories.clear();
+      for (const id of dirtyIds) {
+        const entry = this.memories.get(id);
+        if (entry) {
+          await upsertMemoryEntry(entry);
+        }
+      }
+
+      // Flush dirty failure patterns
+      if (this.dirtyFailures) {
+        this.dirtyFailures = false;
+        for (const fp of this.failurePatterns) {
+          await upsertFailurePattern(fp);
+        }
+      }
+
+      // Flush new experiences
+      const newExps = [...this.dirtyExperiences];
+      this.dirtyExperiences = [];
+      for (const exp of newExps) {
+        await insertExperienceRecord(exp);
+      }
+
+      // Clean expired entries from DB
+      const expired = await deleteExpiredEntries();
+
+      if (dirtyIds.length > 0 || newExps.length > 0 || expired > 0) {
+        logger.info('Memory flushed to DB', {
+          memories: dirtyIds.length,
+          experiences: newExps.length,
+          expiredCleaned: expired,
+        });
+      }
+    } catch (err: any) {
+      logger.warn('Memory flush failed', { error: err.message });
+    }
+  }
 
   /** Store a memory entry */
   store(layer: MemoryLayer, key: string, value: string, opts?: {
@@ -78,6 +175,13 @@ export class MemoryHierarchy {
 
     this.memories.set(id, entry);
     this.enforceLayerLimits(layer);
+
+    // Mark as dirty for persistence
+    this.dirtyMemories.add(id);
+    // High-impact entries persist immediately
+    if (this.persistenceEnabled && (opts?.impact ?? 0.5) >= 0.8) {
+      upsertMemoryEntry(entry).catch(() => {});
+    }
     return id;
   }
 
@@ -145,6 +249,7 @@ export class MemoryHierarchy {
         else this.failurePatterns.shift();
       }
     }
+    this.dirtyFailures = true;
   }
 
   /** Find known fix for an error */
@@ -189,8 +294,11 @@ export class MemoryHierarchy {
 
   /** Record an experience for replay */
   recordExperience(exp: Omit<ExperienceRecord, 'id'>): void {
-    this.experiences.push({ ...exp, id: `exp_${++this.idCounter}` });
+    const record: ExperienceRecord = { ...exp, id: `exp_${++this.idCounter}` };
+    this.experiences.push(record);
     if (this.experiences.length > MAX_EXPERIENCE_RECORDS) this.experiences.shift();
+    // Track for persistence
+    this.dirtyExperiences.push(record);
   }
 
   /** Replay similar past experiences for a task */
@@ -244,7 +352,13 @@ export class MemoryHierarchy {
     const toRemove = Math.floor(entries.length * 0.2);
     let removed = 0;
     for (let i = 0; i < toRemove; i++) {
-      this.memories.delete(entries[i].id);
+      const id = entries[i].id;
+      this.memories.delete(id);
+      this.dirtyMemories.delete(id);
+      // Persist deletion to DB
+      if (this.persistenceEnabled) {
+        deleteMemoryEntry(id).catch(() => {});
+      }
       removed++;
     }
 

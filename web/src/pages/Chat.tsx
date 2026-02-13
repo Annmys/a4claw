@@ -7,6 +7,7 @@ import {
   MessageSquare, WifiOff, Wifi, X, AlertCircle,
   Brain, ChevronDown, ChevronUp, Plus, PanelLeftClose, PanelLeft, MoreVertical,
   Paperclip, FileText, Image as ImageIcon, File as FileIcon,
+  Languages, Sparkles, Palette,
 } from 'lucide-react';
 
 /** Render message content — detects inline images (data URLs, markdown images) */
@@ -53,6 +54,139 @@ function renderMessageContent(content: string) {
   );
 }
 
+/** Detect if text is predominantly Hebrew/Arabic → RTL */
+function detectDir(text: string): 'rtl' | undefined {
+  const rtlChars = text.match(/[\u0590-\u05FF\u0600-\u06FF\uFB50-\uFDFF\uFE70-\uFEFF]/g);
+  if (!rtlChars) return undefined;
+  const nonSpace = text.replace(/\s/g, '');
+  if (nonSpace.length === 0) return undefined;
+  return rtlChars.length / nonSpace.length > 0.3 ? 'rtl' : undefined;
+}
+
+/** Render inline markdown: **bold**, *italic*, `code`, [links](url) */
+function renderInline(text: string): React.ReactNode {
+  const parts: React.ReactNode[] = [];
+  const re = /(\*\*(.+?)\*\*)|(`(.+?)`)|(\[(.+?)\]\((.+?)\))|(\*(.+?)\*)/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  let k = 0;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) parts.push(text.slice(last, m.index));
+    if (m[2]) parts.push(<strong key={k++} className="font-semibold text-white">{m[2]}</strong>);
+    else if (m[4]) parts.push(<code key={k++} className="px-1 py-0.5 rounded bg-dark-950 text-primary-300 text-xs font-mono">{m[4]}</code>);
+    else if (m[6] && m[7]) parts.push(<a key={k++} href={m[7]} target="_blank" rel="noopener noreferrer" className="text-primary-400 hover:underline">{m[6]}</a>);
+    else if (m[9]) parts.push(<em key={k++} className="italic text-gray-200">{m[9]}</em>);
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+  return parts.length <= 1 ? (parts[0] ?? '') : <>{parts}</>;
+}
+
+/** Render a text block (non-code-block) with headers, lists, paragraphs */
+function renderTextLines(text: string): React.ReactNode[] {
+  const lines = text.split('\n');
+  const elements: React.ReactNode[] = [];
+  let listItems: string[] = [];
+  let ordered = false;
+
+  const flushList = () => {
+    if (listItems.length === 0) return;
+    const Tag = ordered ? 'ol' : 'ul';
+    elements.push(
+      <Tag key={`l${elements.length}`} className={`${ordered ? 'list-decimal' : 'list-disc'} ps-5 my-1 space-y-0.5 text-sm`}>
+        {listItems.map((item, j) => <li key={j}>{renderInline(item)}</li>)}
+      </Tag>
+    );
+    listItems = [];
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const ul = line.match(/^\s*[-*•]\s+(.+)/);
+    const ol = line.match(/^\s*\d+[.)]\s+(.+)/);
+
+    if (ul) {
+      if (ordered && listItems.length) flushList();
+      ordered = false;
+      listItems.push(ul[1]);
+    } else if (ol) {
+      if (!ordered && listItems.length) flushList();
+      ordered = true;
+      listItems.push(ol[1]);
+    } else {
+      flushList();
+      if (line.match(/^###\s+(.+)/)) {
+        elements.push(<h5 key={i} className="text-sm font-semibold text-white mt-2 mb-0.5">{renderInline(line.slice(4))}</h5>);
+      } else if (line.match(/^##\s+(.+)/)) {
+        elements.push(<h4 key={i} className="text-base font-semibold text-white mt-2.5 mb-0.5">{renderInline(line.slice(3))}</h4>);
+      } else if (line.match(/^#\s+(.+)/)) {
+        elements.push(<h3 key={i} className="text-lg font-bold text-white mt-3 mb-1">{renderInline(line.slice(2))}</h3>);
+      } else if (line.match(/^---+$/) || line.match(/^===+$/)) {
+        elements.push(<hr key={i} className="border-gray-700 my-2" />);
+      } else if (line.trim() === '') {
+        if (elements.length > 0) elements.push(<div key={i} className="h-1" />);
+      } else {
+        elements.push(<p key={i} className="mb-0.5">{renderInline(line)}</p>);
+      }
+    }
+  }
+  flushList();
+  return elements;
+}
+
+/** Render formatted (styled) content — markdown + code blocks + images */
+function renderFormattedContent(content: string) {
+  // Image pattern (same as renderMessageContent)
+  const imagePattern = /\[QR_IMAGE:(data:image\/[^\]]+)\]|!\[[^\]]*\]\((data:image\/[^)]+)\)|(data:image\/\S+)/g;
+  // Code block pattern
+  const codeBlockPattern = /```(\w*)\n?([\s\S]*?)```/g;
+
+  // Unified split: find all special segments (images + code blocks)
+  type Segment = { type: 'text' | 'image' | 'code'; value: string; lang?: string };
+  const segments: Segment[] = [];
+  let last = 0;
+
+  // Combine both patterns — find earliest match
+  const combined = new RegExp(`(${imagePattern.source})|(${codeBlockPattern.source})`, 'g');
+  let match: RegExpExecArray | null;
+  while ((match = combined.exec(content)) !== null) {
+    if (match.index > last) segments.push({ type: 'text', value: content.slice(last, match.index) });
+
+    // Determine which pattern matched
+    if (match[0].startsWith('```')) {
+      // Code block
+      const lang = match[0].match(/^```(\w*)/)?.[1];
+      const code = match[0].replace(/^```\w*\n?/, '').replace(/```$/, '').trimEnd();
+      segments.push({ type: 'code', value: code, lang: lang || undefined });
+    } else {
+      // Image
+      const url = match[0].match(/data:image\/[^\])\s]+/)?.[0];
+      if (url) segments.push({ type: 'image', value: url });
+    }
+    last = match.index + match[0].length;
+  }
+  if (last < content.length) segments.push({ type: 'text', value: content.slice(last) });
+
+  return (
+    <div className="formatted-msg text-sm leading-relaxed break-words space-y-1">
+      {segments.map((seg, i) => {
+        if (seg.type === 'code') {
+          return (
+            <pre key={i} className="bg-dark-950 border border-gray-800 rounded-lg px-3 py-2 overflow-x-auto text-xs my-2 font-mono">
+              {seg.lang && <span className="text-[10px] text-gray-500 block mb-1 font-sans">{seg.lang}</span>}
+              <code className="text-green-300">{seg.value}</code>
+            </pre>
+          );
+        }
+        if (seg.type === 'image') {
+          return <img key={i} src={seg.value} alt="Image" className="my-2 rounded-lg border border-gray-700 max-w-[280px]" />;
+        }
+        return <div key={i}>{renderTextLines(seg.value)}</div>;
+      })}
+    </div>
+  );
+}
+
 export default function Chat() {
   const [input, setInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -67,6 +201,11 @@ export default function Chat() {
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [progressStatus, setProgressStatus] = useState<string | null>(null);
+  const [isRtl, setIsRtl] = useState(() => localStorage.getItem('clawdagent-rtl') === 'true');
+  const [isStyled, setIsStyled] = useState(() => localStorage.getItem('clawdagent-styled') !== 'false');
+  const [chatTheme, setChatTheme] = useState<'default' | 'glass'>(() =>
+    (localStorage.getItem('clawdagent-theme') as 'default' | 'glass') || 'default'
+  );
 
   const {
     conversations, activeConversationId, isLoading, loadingConversationId,
@@ -249,6 +388,19 @@ export default function Chat() {
     setProgressStatus(null); // Clear progress text (response goes to original conversation)
     inputRef.current?.focus();
   }, [newConversation]);
+
+  // ── Toggle RTL / Styled / Theme ─────────────────────────────────
+  const toggleRtl = useCallback(() => {
+    setIsRtl(v => { const n = !v; localStorage.setItem('clawdagent-rtl', String(n)); return n; });
+  }, []);
+
+  const toggleStyled = useCallback(() => {
+    setIsStyled(v => { const n = !v; localStorage.setItem('clawdagent-styled', String(n)); return n; });
+  }, []);
+
+  const toggleTheme = useCallback(() => {
+    setChatTheme(v => { const n = v === 'default' ? 'glass' : 'default'; localStorage.setItem('clawdagent-theme', n); return n; });
+  }, []);
 
   // ── Switch conversation — free switch, no cancel ───────────────
   const handleSwitchConversation = useCallback((id: string) => {
@@ -464,6 +616,48 @@ export default function Chat() {
             >
               <Trash2 className="w-4 h-4" />
             </button>
+
+            {/* Divider */}
+            <div className="w-px h-5 bg-gray-700 mx-0.5" />
+
+            {/* RTL toggle */}
+            <button
+              onClick={toggleRtl}
+              className={`p-2 rounded-lg transition-colors ${
+                isRtl
+                  ? 'text-primary-400 bg-primary-500/15 hover:bg-primary-500/25'
+                  : 'text-gray-400 hover:text-white hover:bg-dark-800'
+              }`}
+              title={isRtl ? 'Switch to LTR' : 'Switch to RTL (Hebrew)'}
+            >
+              <Languages className="w-4 h-4" />
+            </button>
+
+            {/* Styled text toggle */}
+            <button
+              onClick={toggleStyled}
+              className={`p-2 rounded-lg transition-colors ${
+                isStyled
+                  ? 'text-amber-400 bg-amber-500/15 hover:bg-amber-500/25'
+                  : 'text-gray-400 hover:text-white hover:bg-dark-800'
+              }`}
+              title={isStyled ? 'Plain text mode' : 'Styled text mode'}
+            >
+              <Sparkles className="w-4 h-4" />
+            </button>
+
+            {/* Theme toggle */}
+            <button
+              onClick={toggleTheme}
+              className={`p-2 rounded-lg transition-colors ${
+                chatTheme === 'glass'
+                  ? 'text-purple-400 bg-purple-500/15 hover:bg-purple-500/25'
+                  : 'text-gray-400 hover:text-white hover:bg-dark-800'
+              }`}
+              title={chatTheme === 'glass' ? 'Default theme' : 'Glass theme'}
+            >
+              <Palette className="w-4 h-4" />
+            </button>
           </div>
         </div>
 
@@ -511,7 +705,7 @@ export default function Chat() {
         )}
 
         {/* ── Messages Area ──────────────────────────────────── */}
-        <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
+        <div className={`flex-1 overflow-y-auto px-4 py-6 space-y-4 ${chatTheme === 'glass' ? 'chat-glass' : ''}`}>
           {/* Empty state */}
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center h-full text-gray-500 select-none">
@@ -534,13 +728,17 @@ export default function Chat() {
           {/* Message bubbles */}
           {filteredMessages.map((m) => {
             const isUser = m.role === 'user';
+            const msgDir = isRtl ? 'rtl' : (detectDir(m.content) || undefined);
+            const isGlass = chatTheme === 'glass';
 
             return (
               <div key={m.id} className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
                 <div className={`flex items-end gap-2 max-w-[80%] md:max-w-2xl ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
                   {/* Avatar */}
                   <div className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center ${
-                    isUser ? 'bg-primary-600' : 'bg-dark-800 border border-gray-700'
+                    isUser
+                      ? (isGlass ? 'bg-gradient-to-br from-primary-500 to-primary-700 shadow-lg shadow-primary-500/20' : 'bg-primary-600')
+                      : (isGlass ? 'bg-dark-800/80 border border-gray-600/50 backdrop-blur-sm' : 'bg-dark-800 border border-gray-700')
                   }`}>
                     {isUser
                       ? <User className="w-3.5 h-3.5 text-white" />
@@ -548,18 +746,24 @@ export default function Chat() {
                     }
                   </div>
 
-                  {/* Bubble */}
-                  <div className={`group relative rounded-2xl px-4 py-2.5 ${
+                  {/* Bubble — dir goes HERE for text direction only */}
+                  <div dir={msgDir} className={`group relative rounded-2xl px-4 py-2.5 ${
                     isUser
-                      ? 'bg-primary-600 text-white rounded-br-md'
-                      : 'bg-dark-800 text-gray-100 border border-gray-800 rounded-bl-md'
+                      ? (isGlass
+                        ? 'bg-gradient-to-br from-primary-600/90 to-primary-700/90 text-white rounded-br-md backdrop-blur-sm shadow-lg shadow-primary-600/10 border border-primary-500/30'
+                        : 'bg-primary-600 text-white rounded-br-md')
+                      : (isGlass
+                        ? 'bg-dark-800/60 text-gray-100 border border-gray-700/50 rounded-bl-md backdrop-blur-md shadow-lg shadow-black/20'
+                        : 'bg-dark-800 text-gray-100 border border-gray-800 rounded-bl-md')
                   }`}>
                     {/* Agent name + provider badge */}
                     {!isUser && m.agent && (
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-semibold text-primary-400">{m.agent}</span>
+                      <div className={`flex items-center gap-2 mb-1.5 ${msgDir === 'rtl' ? 'flex-row-reverse' : ''}`}>
+                        <span className={`text-xs font-semibold ${isGlass ? 'text-primary-300' : 'text-primary-400'}`}>{m.agent}</span>
                         {m.provider && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary-500/15 text-primary-300 font-medium">
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                            isGlass ? 'bg-primary-400/10 text-primary-200 border border-primary-400/20' : 'bg-primary-500/15 text-primary-300'
+                          }`}>
                             {m.provider}
                           </span>
                         )}
@@ -585,20 +789,27 @@ export default function Chat() {
                           }
                         </button>
                         {expandedThinking.has(m.id) && (
-                          <div className="mt-1.5 px-3 py-2 rounded-lg bg-amber-500/5 border border-amber-500/10 text-[12px] text-amber-200/70 whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto">
+                          <div className={`mt-1.5 px-3 py-2 rounded-lg text-[12px] whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto ${
+                            isGlass
+                              ? 'bg-amber-500/5 border border-amber-500/15 text-amber-200/70 backdrop-blur-sm'
+                              : 'bg-amber-500/5 border border-amber-500/10 text-amber-200/70'
+                          }`}>
                             {m.thinking}
                           </div>
                         )}
                       </div>
                     )}
 
-                    {/* Content */}
-                    {renderMessageContent(m.content)}
+                    {/* Content — styled or plain */}
+                    {!isUser && isStyled
+                      ? renderFormattedContent(m.content)
+                      : renderMessageContent(m.content)
+                    }
 
                     {/* Timestamp */}
                     <p className={`text-[10px] mt-1 ${
-                      isUser ? 'text-white/50 text-right' : 'text-gray-500'
-                    }`}>
+                      isUser ? 'text-white/50' : (isGlass ? 'text-gray-400' : 'text-gray-500')
+                    } ${msgDir === 'rtl' ? 'text-left' : 'text-right'}`} dir="ltr">
                       {formatTime(m.timestamp)}
                     </p>
                   </div>
@@ -692,6 +903,7 @@ export default function Chat() {
             <textarea
               ref={inputRef}
               value={input}
+              dir={isRtl || detectDir(input) === 'rtl' ? 'rtl' : 'ltr'}
               onChange={(e) => {
                 setInput(e.target.value);
                 e.target.style.height = 'auto';
@@ -710,13 +922,19 @@ export default function Chat() {
               placeholder={
                 loadingConversationId
                   ? (loadingConversationId === activeConversationId
-                    ? 'Processing... press Stop or Escape to cancel'
-                    : 'Another conversation is processing... press Stop to cancel')
-                  : (attachedFile ? `Message about ${attachedFile.name}...` : 'Type a message...')
+                    ? (isRtl ? '...מעבד — לחץ Stop או Escape לביטול' : 'Processing... press Stop or Escape to cancel')
+                    : (isRtl ? '...שיחה אחרת מעובדת — לחץ Stop לביטול' : 'Another conversation is processing... press Stop to cancel'))
+                  : (attachedFile
+                    ? (isRtl ? `...הודעה על ${attachedFile.name}` : `Message about ${attachedFile.name}...`)
+                    : (isRtl ? '...כתוב הודעה' : 'Type a message...'))
               }
               disabled={false}
               rows={1}
-              className="flex-1 px-4 py-3 rounded-xl bg-dark-800 border border-gray-700 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-primary-500 transition-colors resize-none overflow-y-auto"
+              className={`flex-1 px-4 py-3 rounded-xl border text-white text-sm placeholder-gray-500 focus:outline-none focus:border-primary-500 transition-colors resize-none overflow-y-auto ${
+                chatTheme === 'glass'
+                  ? 'bg-dark-800/60 border-gray-700/50 backdrop-blur-sm'
+                  : 'bg-dark-800 border-gray-700'
+              }`}
               style={{ maxHeight: '160px' }}
             />
             {loadingConversationId ? (
@@ -738,7 +956,7 @@ export default function Chat() {
               </button>
             )}
           </div>
-          <p className="text-center text-[11px] text-gray-600 mt-2">
+          <p className="text-center text-[11px] text-gray-600 mt-2" dir="ltr">
             Enter to send · Shift+Enter for new line · Drag & drop files{!wsConnected && ' · REST fallback'}
           </p>
         </div>

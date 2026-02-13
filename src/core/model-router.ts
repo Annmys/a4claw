@@ -326,6 +326,38 @@ export function classifyEffort(params: {
   return 'medium';
 }
 
+/**
+ * Map effort level to thinking mode configuration.
+ * Drives adaptive thinking/non-thinking for supported providers.
+ * - Anthropic: extended thinking with budget_tokens (requires temperature=1)
+ * - Ollama: models with supportsThinking get basic CoT via prompt
+ * - Others: basic CoT at most (prompt-injected chain-of-thought)
+ */
+export function mapEffortToThinking(
+  effort: EffortLevel,
+  provider: string,
+): { thinkingMode: 'none' | 'basic' | 'extended'; thinkingBudget?: number } {
+  // Only Anthropic supports native extended thinking
+  const supportsExtended = provider === 'anthropic';
+
+  switch (effort) {
+    case 'critical':
+      return supportsExtended
+        ? { thinkingMode: 'extended', thinkingBudget: 32000 }
+        : { thinkingMode: 'basic' };
+    case 'high':
+      return supportsExtended
+        ? { thinkingMode: 'extended', thinkingBudget: 16000 }
+        : { thinkingMode: 'basic' };
+    case 'medium':
+      return { thinkingMode: 'basic' };
+    case 'low':
+      return { thinkingMode: 'none' };
+    default:
+      return { thinkingMode: 'none' };
+  }
+}
+
 /** Get all model options (for debugging/display) */
 export function getAllModels(): ModelOption[] { return [...ALL_MODELS]; }
 
