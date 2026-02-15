@@ -7,8 +7,14 @@ import {
   MessageSquare, WifiOff, Wifi, X, AlertCircle,
   Brain, ChevronDown, ChevronUp, Plus, PanelLeftClose, PanelLeft, MoreVertical,
   Paperclip, FileText, Image as ImageIcon, File as FileIcon,
-  Languages, Sparkles, Palette,
+  Languages, Sparkles, Palette, Cpu, Wrench, Zap,
 } from 'lucide-react';
+
+const RESPONSE_MODES = [
+  { id: 'auto' as const, label: 'אוטומטי', labelEn: 'Auto', icon: Cpu, color: 'text-blue-400', desc: 'המערכת מחליטה' },
+  { id: 'quick' as const, label: 'מהיר', labelEn: 'Fast', icon: Zap, color: 'text-yellow-400', desc: 'תגובה מהירה' },
+  { id: 'deep' as const, label: 'מעמיק', labelEn: 'Deep', icon: Brain, color: 'text-purple-400', desc: 'ניתוח מלא' },
+];
 
 /** Render message content — detects inline images (data URLs, markdown images) */
 function renderMessageContent(content: string) {
@@ -200,17 +206,29 @@ export default function Chat() {
   const [editTitleValue, setEditTitleValue] = useState('');
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [progressStatus, setProgressStatus] = useState<string | null>(null);
+  const [progressLog, setProgressLog] = useState<Array<{ type: string; message: string; agent?: string; tool?: string; time: number }>>([]);
   const [isRtl, setIsRtl] = useState(() => localStorage.getItem('clawdagent-rtl') === 'true');
   const [isStyled, setIsStyled] = useState(() => localStorage.getItem('clawdagent-styled') !== 'false');
   const [chatTheme, setChatTheme] = useState<'default' | 'glass'>(() =>
     (localStorage.getItem('clawdagent-theme') as 'default' | 'glass') || 'default'
   );
+  const [responseMode, setResponseMode] = useState<'auto' | 'quick' | 'deep'>(() =>
+    (localStorage.getItem('clawdagent-response-mode') as 'auto' | 'quick' | 'deep') || 'auto'
+  );
+  const [showModeMenu, setShowModeMenu] = useState(false);
+  const [selectedModel, setSelectedModel] = useState<string>(() =>
+    localStorage.getItem('clawdagent-selected-model') || 'auto'
+  );
+  const [showModelMenu, setShowModelMenu] = useState(false);
+  const [modelList, setModelList] = useState<Array<{ id: string; name: string; provider: string; tier: string; supportsHebrew?: boolean; supportsVision?: boolean }>>([
+    { id: 'auto', name: 'Auto', provider: 'auto', tier: 'auto' },
+  ]);
 
   const {
     conversations, activeConversationId, isLoading, loadingConversationId,
     getMessages, addMessage, addMessageTo, setConversationLoading, clear,
     newConversation, switchConversation, deleteConversation, renameConversation,
+    syncWithServer, loadConversationFromServer,
   } = useChatStore();
 
   // Track which conversation is awaiting a WS response
@@ -226,6 +244,8 @@ export default function Chat() {
   const wsRef = useRef<WsClient | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const modeMenuRef = useRef<HTMLDivElement>(null);
+  const modelMenuRef = useRef<HTMLDivElement>(null);
 
   // ── WebSocket lifecycle ──────────────────────────────────────────
   useEffect(() => {
@@ -243,7 +263,7 @@ export default function Chat() {
     ws.on('message', (data: { text: string; thinking?: string; agent?: string; tokens?: number; provider?: string; elapsed?: number }) => {
       const targetConv = pendingConvRef.current;
       pendingConvRef.current = null;
-      setProgressStatus(null);
+      setProgressLog([]);
       if (targetConv) {
         addMessageTo(targetConv, {
           role: 'assistant',
@@ -259,7 +279,7 @@ export default function Chat() {
     ws.on('error', (data: { message: string }) => {
       const targetConv = pendingConvRef.current;
       pendingConvRef.current = null;
-      setProgressStatus(null);
+      setProgressLog([]);
       if (targetConv) {
         addMessageTo(targetConv, {
           role: 'assistant',
@@ -270,12 +290,12 @@ export default function Chat() {
     });
 
     ws.on('progress', (data: { type: string; message: string; agent?: string; tool?: string }) => {
-      setProgressStatus(data.message);
+      setProgressLog(prev => [...prev, { ...data, time: Date.now() }]);
     });
 
     ws.on('cancelled', () => {
       pendingConvRef.current = null;
-      setProgressStatus(null);
+      setProgressLog([]);
       setConversationLoading(null);
     });
 
@@ -305,6 +325,47 @@ export default function Chat() {
     return () => document.removeEventListener('click', close);
   }, [contextMenu]);
 
+  // ── Close mode menu on outside click ──────────────────────────────
+  useEffect(() => {
+    if (!showModeMenu) return;
+    const close = (e: MouseEvent) => {
+      if (modeMenuRef.current && !modeMenuRef.current.contains(e.target as Node)) {
+        setShowModeMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [showModeMenu]);
+
+  // ── Close model menu on outside click ────────────────────────────
+  useEffect(() => {
+    if (!showModelMenu) return;
+    const close = (e: MouseEvent) => {
+      if (modelMenuRef.current && !modelMenuRef.current.contains(e.target as Node)) {
+        setShowModelMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [showModelMenu]);
+
+  // ── Fetch available models on mount ────────────────────────────
+  useEffect(() => {
+    api.getModels().then(data => setModelList(data.models)).catch(() => {});
+  }, []);
+
+  // ── Sync conversations from server on mount ──────────────────────
+  useEffect(() => {
+    syncWithServer();
+  }, [syncWithServer]);
+
+  // ── Load conversation messages from server when switching to an empty one ──
+  useEffect(() => {
+    if (activeConversationId) {
+      loadConversationFromServer(activeConversationId);
+    }
+  }, [activeConversationId, loadConversationFromServer]);
+
   // ── Send message (WS primary, REST fallback) ────────────────────
   const send = useCallback(async () => {
     const text = input.trim();
@@ -322,7 +383,7 @@ export default function Chat() {
 
     setInput('');
     setAttachedFile(null);
-    setProgressStatus(null);
+    setProgressLog([]);
     if (inputRef.current) inputRef.current.style.height = 'auto';
 
     const displayText = file
@@ -335,7 +396,7 @@ export default function Chat() {
     // If file attached, must use REST API (WebSocket doesn't support binary)
     if (file) {
       try {
-        const res = await api.chatWithFile(text, file);
+        const res = await api.chatWithFile(text, file, convId, responseMode === 'auto' ? undefined : responseMode, selectedModel === 'auto' ? undefined : selectedModel);
         addMessageTo(convId, { role: 'assistant', content: res.message, thinking: res.thinking, agent: res.agent, provider: res.provider });
       } catch (err: any) {
         addMessageTo(convId, { role: 'assistant', content: `Error: ${err.message}` });
@@ -348,7 +409,7 @@ export default function Chat() {
     // Try WebSocket first
     if (wsRef.current && wsConnected) {
       try {
-        wsRef.current.send(text);
+        wsRef.current.send(text, convId, responseMode === 'auto' ? undefined : responseMode, selectedModel === 'auto' ? undefined : selectedModel);
         return; // Response will arrive via WS event handler
       } catch {
         setWsConnected(false);
@@ -357,14 +418,14 @@ export default function Chat() {
 
     // REST API fallback
     try {
-      const res = await api.chat(text);
+      const res = await api.chat(text, convId, responseMode === 'auto' ? undefined : responseMode, selectedModel === 'auto' ? undefined : selectedModel);
       addMessageTo(convId, { role: 'assistant', content: res.message, thinking: res.thinking, agent: res.agent, provider: res.provider });
     } catch (err: any) {
       addMessageTo(convId, { role: 'assistant', content: `Error: ${err.message}` });
     }
     pendingConvRef.current = null;
     setConversationLoading(null);
-  }, [input, attachedFile, loadingConversationId, wsConnected, activeConversationId, addMessage, addMessageTo, setConversationLoading, newConversation]);
+  }, [input, attachedFile, loadingConversationId, wsConnected, activeConversationId, addMessage, addMessageTo, setConversationLoading, newConversation, responseMode, selectedModel]);
 
   // ── Cancel / Stop processing ────────────────────────────────────
   const handleCancel = useCallback(() => {
@@ -372,7 +433,7 @@ export default function Chat() {
       wsRef.current.cancel();
     }
     pendingConvRef.current = null;
-    setProgressStatus(null);
+    setProgressLog([]);
     setConversationLoading(null);
   }, [wsConnected, setConversationLoading]);
 
@@ -385,7 +446,7 @@ export default function Chat() {
   // ── New chat handler ─────────────────────────────────────────────
   const handleNewChat = useCallback(() => {
     newConversation();
-    setProgressStatus(null); // Clear progress text (response goes to original conversation)
+    setProgressLog([]); // Clear progress text (response goes to original conversation)
     inputRef.current?.focus();
   }, [newConversation]);
 
@@ -406,7 +467,7 @@ export default function Chat() {
   const handleSwitchConversation = useCallback((id: string) => {
     if (id === activeConversationId) return;
     switchConversation(id);
-    setProgressStatus(null); // Clear progress text for the new view
+    setProgressLog([]); // Clear progress text for the new view
   }, [activeConversationId, switchConversation]);
 
   // ── Filtered messages for search ─────────────────────────────────
@@ -818,24 +879,90 @@ export default function Chat() {
             );
           })}
 
-          {/* Live progress indicator */}
-          {isLoading && (
-            <div className="flex justify-start">
-              <div className="flex items-end gap-2 max-w-2xl">
-                <div className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center bg-dark-800 border border-gray-700">
-                  <Bot className="w-3.5 h-3.5 text-primary-400 animate-pulse" />
-                </div>
-                <div className="bg-dark-800 border border-gray-800 rounded-2xl rounded-bl-md px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <Loader2 className="w-4 h-4 text-primary-400 animate-spin shrink-0" />
-                    <span className="text-sm text-gray-400 animate-pulse">
-                      {progressStatus || 'Processing...'}
-                    </span>
+          {/* Live progress — narrative story view */}
+          {isLoading && (() => {
+            // Filter: skip "Still working..." / "Working..." keepalive spam, keep real events
+            const realEvents = progressLog.filter(ev =>
+              !/^(Still working|Working\.\.\.)/.test(ev.message) && ev.message !== 'Processing your message...'
+            );
+            const lastKeepAlive = progressLog.filter(ev => /working/i.test(ev.message)).pop();
+            const currentAgent = [...realEvents].reverse().find(ev => ev.agent)?.agent;
+            const elapsed = lastKeepAlive?.message.match(/(\d+)s/)?.[1] || (realEvents.length > 0 ? Math.round((Date.now() - realEvents[0].time) / 1000) : 0);
+            const toolCount = realEvents.filter(ev => ev.type === 'tool').length;
+            const errorCount = realEvents.filter(ev => ev.type === 'error' || ev.message.includes('failed')).length;
+            // Show only last 6 real events (newest at bottom)
+            const visible = realEvents.slice(-6);
+
+            return (
+              <div className="flex justify-start">
+                <div className="flex items-end gap-2 max-w-2xl w-full">
+                  <div className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center bg-dark-800 border border-gray-700">
+                    <Bot className="w-3.5 h-3.5 text-primary-400 animate-pulse" />
+                  </div>
+                  <div className="bg-dark-800/80 border border-gray-800 rounded-2xl rounded-bl-md px-4 py-3 min-w-[260px] max-w-lg backdrop-blur-sm">
+                    {/* Header: agent name + elapsed time */}
+                    <div className="flex items-center justify-between gap-3 mb-2 pb-1.5 border-b border-gray-800">
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="w-3.5 h-3.5 text-primary-400 animate-spin shrink-0" />
+                        <span className="text-xs font-medium text-gray-300">
+                          {currentAgent || (isRtl ? 'מעבד...' : 'Processing...')}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-[10px] text-gray-500">
+                        {toolCount > 0 && <span>{toolCount} {isRtl ? 'צעדים' : 'steps'}</span>}
+                        {errorCount > 0 && <span className="text-red-400">{errorCount} {isRtl ? 'שגיאות' : 'errors'}</span>}
+                        {Number(elapsed) > 0 && <span>{elapsed}s</span>}
+                      </div>
+                    </div>
+
+                    {/* Event log — narrative steps */}
+                    {visible.length === 0 ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-400 animate-pulse">{isRtl ? '...מתחיל לעבוד' : 'Starting...'}</span>
+                      </div>
+                    ) : (
+                      <div className="space-y-1">
+                        {visible.map((ev, i) => {
+                          const isLatest = i === visible.length - 1;
+                          const icon = ev.type === 'agent' ? <Cpu className="w-3 h-3" />
+                            : ev.type === 'tool' ? <Wrench className="w-3 h-3" />
+                            : ev.type === 'thinking' ? <Brain className="w-3 h-3" />
+                            : ev.type === 'error' ? <AlertCircle className="w-3 h-3" />
+                            : <Zap className="w-3 h-3" />;
+                          const color = ev.type === 'agent' ? 'text-blue-400'
+                            : ev.type === 'tool' ? 'text-green-400'
+                            : ev.type === 'thinking' ? 'text-amber-400'
+                            : ev.type === 'error' ? 'text-red-400'
+                            : 'text-primary-400';
+                          return (
+                            <div key={i} className={`flex items-center gap-2 transition-all duration-300 ${isLatest ? 'opacity-100' : 'opacity-50'}`}>
+                              <span className={`shrink-0 ${color}`}>{icon}</span>
+                              <span className={`text-[11px] ${isLatest ? 'text-gray-200' : 'text-gray-500'}`}>
+                                {ev.message}
+                              </span>
+                            </div>
+                          );
+                        })}
+                        {/* Current action indicator */}
+                        {visible.length > 0 && (
+                          <div className="flex items-center gap-2 mt-1 pt-1 border-t border-gray-800/50">
+                            <Loader2 className="w-3 h-3 text-primary-400 animate-spin shrink-0" />
+                            <span className="text-[10px] text-gray-400 animate-pulse">
+                              {visible[visible.length - 1].type === 'tool'
+                                ? (isRtl ? '...מריץ כלי' : 'Running tool...')
+                                : visible[visible.length - 1].type === 'thinking'
+                                ? (isRtl ? '...חושב' : 'Thinking...')
+                                : (isRtl ? '...עובד' : 'Working...')}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           <div ref={bottomRef} />
         </div>
@@ -899,6 +1026,110 @@ export default function Chat() {
             >
               <Paperclip className="w-5 h-5" />
             </button>
+
+            {/* Response mode selector */}
+            <div className="relative" ref={modeMenuRef}>
+              <button
+                onClick={() => setShowModeMenu(v => !v)}
+                className={`p-3 rounded-xl hover:bg-dark-800 transition-colors shrink-0 ${
+                  responseMode !== 'auto'
+                    ? (RESPONSE_MODES.find(m => m.id === responseMode)?.color ?? 'text-gray-400')
+                    : 'text-gray-400'
+                }`}
+                title={`${isRtl ? 'מצב תגובה' : 'Response mode'}: ${RESPONSE_MODES.find(m => m.id === responseMode)?.label ?? 'Auto'}`}
+              >
+                {responseMode === 'auto' ? <Cpu className="w-5 h-5" /> :
+                 responseMode === 'quick' ? <Zap className="w-5 h-5" /> :
+                 <Brain className="w-5 h-5" />}
+              </button>
+              {showModeMenu && (
+                <div className="absolute bottom-full mb-2 left-0 bg-dark-800 border border-gray-700 rounded-xl shadow-xl overflow-hidden min-w-[170px] z-50">
+                  {RESPONSE_MODES.map(mode => {
+                    const ModeIcon = mode.icon;
+                    return (
+                      <button
+                        key={mode.id}
+                        onClick={() => {
+                          setResponseMode(mode.id);
+                          localStorage.setItem('clawdagent-response-mode', mode.id);
+                          setShowModeMenu(false);
+                        }}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-dark-700 transition-colors ${
+                          responseMode === mode.id ? 'bg-dark-700' : ''
+                        }`}
+                      >
+                        <ModeIcon className={`w-4 h-4 ${mode.color}`} />
+                        <span className={responseMode === mode.id ? 'text-white font-medium' : 'text-gray-300'}>
+                          {isRtl ? mode.label : mode.labelEn}
+                        </span>
+                        {isRtl && <span className="text-gray-500 text-xs mr-auto">{mode.desc}</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Model selector */}
+            <div className="relative" ref={modelMenuRef}>
+              <button
+                onClick={() => setShowModelMenu(v => !v)}
+                className={`p-3 rounded-xl hover:bg-dark-800 transition-colors shrink-0 ${
+                  selectedModel !== 'auto' ? 'text-green-400' : 'text-gray-400'
+                }`}
+                title={`${isRtl ? 'מודל' : 'Model'}: ${modelList.find(m => m.id === selectedModel)?.name ?? 'Auto'}`}
+              >
+                <Bot className="w-5 h-5" />
+              </button>
+              {showModelMenu && (
+                <div className="absolute bottom-full mb-2 left-0 bg-dark-800 border border-gray-700 rounded-xl shadow-xl overflow-hidden min-w-[240px] max-h-[400px] overflow-y-auto z-50">
+                  {(['auto', 'free', 'cheap', 'mid', 'premium', 'ultra'] as const).map(tier => {
+                    const modelsInTier = modelList.filter(m => m.tier === tier);
+                    if (modelsInTier.length === 0) return null;
+                    const tierLabel: Record<string, string> = {
+                      auto: isRtl ? 'אוטומטי' : 'Automatic',
+                      free: isRtl ? 'חינמי' : 'Free',
+                      cheap: isRtl ? 'חסכוני' : 'Economy',
+                      mid: isRtl ? 'סטנדרטי' : 'Standard',
+                      premium: isRtl ? 'פרימיום' : 'Premium',
+                      ultra: isRtl ? 'אולטרה' : 'Ultra',
+                    };
+                    const tierColor: Record<string, string> = {
+                      auto: 'bg-blue-400', free: 'bg-gray-400', cheap: 'bg-green-400',
+                      mid: 'bg-cyan-400', premium: 'bg-amber-400', ultra: 'bg-purple-400',
+                    };
+                    return (
+                      <div key={tier}>
+                        <div className="px-4 py-1.5 text-[10px] font-semibold text-gray-500 uppercase tracking-wider bg-dark-900/50 sticky top-0">
+                          {tierLabel[tier] ?? tier}
+                        </div>
+                        {modelsInTier.map(model => (
+                          <button
+                            key={model.id}
+                            onClick={() => {
+                              setSelectedModel(model.id);
+                              localStorage.setItem('clawdagent-selected-model', model.id);
+                              setShowModelMenu(false);
+                            }}
+                            className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-dark-700 transition-colors ${
+                              selectedModel === model.id ? 'bg-dark-700' : ''
+                            }`}
+                          >
+                            <span className={`w-2 h-2 rounded-full shrink-0 ${tierColor[model.tier] ?? 'bg-gray-400'}`} />
+                            <span className={`flex-1 text-left truncate ${selectedModel === model.id ? 'text-white font-medium' : 'text-gray-300'}`}>
+                              {model.name}
+                            </span>
+                            {model.provider !== 'auto' && (
+                              <span className="text-[10px] text-gray-600 shrink-0">{model.provider}</span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
 
             <textarea
               ref={inputRef}

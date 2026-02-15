@@ -114,7 +114,7 @@ function setupMessageHandler(ws: WebSocket, engine: Engine, user: { userId: stri
         return;
       }
 
-      const { text } = msg;
+      const { text, conversationId, responseMode, model } = msg;
       if (!text) return;
 
       // Prevent concurrent requests from same user
@@ -125,9 +125,22 @@ function setupMessageHandler(ws: WebSocket, engine: Engine, user: { userId: stri
       processing = true;
       cancelled = false;
 
+      // ── Smart progress tracking ──
+      let lastRealEvent = '';
+      let lastRealEventTime = Date.now();
+      let currentAgent = '';
+      let currentTool = '';
+      let toolIterations = 0;
+
       // Register progress listener for this user
       progressListeners.set(user.userId, (event) => {
-        if (!cancelled) sendSafe(ws, { type: 'progress', data: event });
+        if (cancelled) return;
+        lastRealEvent = event.message;
+        lastRealEventTime = Date.now();
+        if (event.agent) currentAgent = event.agent;
+        if (event.tool) currentTool = event.tool;
+        if (event.type === 'tool') toolIterations++;
+        sendSafe(ws, { type: 'progress', data: event });
       });
 
       // Send initial "processing" status
@@ -138,21 +151,42 @@ function setupMessageHandler(ws: WebSocket, engine: Engine, user: { userId: stri
 
       const startTime = Date.now();
 
-      // Set a timeout to send "still working" updates
+      // Smart keepalive — only sends when no real event for 10s, with context
       currentKeepAlive = setInterval(() => {
         if (cancelled) return;
         const elapsed = Math.round((Date.now() - startTime) / 1000);
+        const sinceLast = Date.now() - lastRealEventTime;
+
+        // Skip if a real event was sent recently (within 10s)
+        if (sinceLast < 10000) return;
+
+        // Build contextual message
+        const parts: string[] = [];
+        if (currentAgent) parts.push(currentAgent);
+        if (currentTool) parts.push(`${currentTool}`);
+        if (toolIterations > 0) parts.push(`${toolIterations} steps`);
+        parts.push(`${elapsed}s`);
+
         sendSafe(ws, { type: 'progress', data: {
           type: 'status',
-          message: `Still working... (${elapsed}s)`,
+          message: parts.length > 1
+            ? `${parts[0]} — working... (${parts.slice(1).join(', ')})`
+            : `Working... (${elapsed}s)`,
         } });
-      }, 8000);
+      }, 10000);
 
       try {
         const response = await engine.process({
           platform: 'web', userId: user.userId, userName: user.userId, chatId: 'ws', text, userRole: user.role,
+          conversationId, responseMode, model,
           onProgress: (event) => {
-            if (!cancelled) sendSafe(ws, { type: 'progress', data: event });
+            if (cancelled) return;
+            lastRealEvent = event.message;
+            lastRealEventTime = Date.now();
+            if (event.agent) currentAgent = event.agent;
+            if (event.tool) currentTool = event.tool;
+            if (event.type === 'tool') toolIterations++;
+            sendSafe(ws, { type: 'progress', data: event });
           },
         });
 

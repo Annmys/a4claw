@@ -75,9 +75,9 @@ export class WsClient {
     this.statusHandlers.push(handler);
   }
 
-  send(text: string) {
+  send(text: string, conversationId?: string, responseMode?: string, model?: string) {
     if (this.ws?.readyState === WebSocket.OPEN && this.authenticated) {
-      this.ws.send(JSON.stringify({ text }));
+      this.ws.send(JSON.stringify({ text, conversationId, responseMode, model }));
     } else {
       throw new Error('WebSocket not connected');
     }

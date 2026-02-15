@@ -14,40 +14,80 @@ export interface ModelOption {
   supportsVision: boolean;
 }
 
-// ===== FREE MODELS (OpenRouter :free suffix) =====
-// Updated 2026-02-08 — live-tested: tools, system prompt, Hebrew
-// Priority: models confirmed working with tool_calls first
+// ===== STRONG MODELS — Used for main requests and fallbacks =====
+// Priority: Anthropic Claude first, then Gemini/DeepSeek
+const STRONG_MODELS: ModelOption[] = [
+  {
+    id: 'anthropic/claude-sonnet-4',
+    provider: 'openrouter', name: 'Claude Sonnet 4 (OpenRouter)',
+    tier: 'mid', costPer1kInput: 0.003, costPer1kOutput: 0.015,
+    maxContext: 200000, strengths: ['coding', 'reasoning', 'tool-use', 'hebrew', 'planning'],
+    supportsTools: true, supportsHebrew: true, supportsVision: true,
+  },
+  {
+    id: 'google/gemini-2.5-flash',
+    provider: 'openrouter', name: 'Gemini 2.5 Flash',
+    tier: 'mid', costPer1kInput: 0.00015, costPer1kOutput: 0.0006,
+    maxContext: 1000000, strengths: ['fast', 'general', 'tool-use', 'vision', 'coding', 'large-context'],
+    supportsTools: true, supportsHebrew: true, supportsVision: true,
+  },
+  {
+    id: 'google/gemini-2.5-pro-preview',
+    provider: 'openrouter', name: 'Gemini 2.5 Pro',
+    tier: 'premium', costPer1kInput: 0.00125, costPer1kOutput: 0.01,
+    maxContext: 1000000, strengths: ['reasoning', 'coding', 'tool-use', 'vision', 'hebrew', 'large-context'],
+    supportsTools: true, supportsHebrew: true, supportsVision: true,
+  },
+  {
+    id: 'deepseek/deepseek-chat-v3.1',
+    provider: 'openrouter', name: 'DeepSeek V3.1',
+    tier: 'cheap', costPer1kInput: 0.0003, costPer1kOutput: 0.0009,
+    maxContext: 64000, strengths: ['coding', 'general', 'tool-use', 'reasoning'],
+    supportsTools: true, supportsHebrew: true, supportsVision: false,
+  },
+  {
+    id: 'deepseek/deepseek-r1-0528',
+    provider: 'openrouter', name: 'DeepSeek R1 (Reasoning)',
+    tier: 'mid', costPer1kInput: 0.0008, costPer1kOutput: 0.002,
+    maxContext: 163840, strengths: ['reasoning', 'math', 'analysis', 'planning', 'coding'],
+    supportsTools: false, supportsHebrew: false, supportsVision: false,
+  },
+];
+
+// ===== NEW MODELS (Feb 2026) =====
+const NEW_MODELS: ModelOption[] = [
+  {
+    id: 'zhipu/glm-5',
+    provider: 'openrouter', name: 'GLM-5 (744B)',
+    tier: 'mid', costPer1kInput: 0.001, costPer1kOutput: 0.004,
+    maxContext: 128000, strengths: ['reasoning', 'coding', 'agentic', 'systems-engineering'],
+    supportsTools: true, supportsHebrew: false, supportsVision: false,
+  },
+  {
+    id: 'minimax/minimax-m2.5',
+    provider: 'openrouter', name: 'MiniMax M2.5',
+    tier: 'mid', costPer1kInput: 0.0005, costPer1kOutput: 0.002,
+    maxContext: 128000, strengths: ['coding', 'productivity', 'general', 'tool-use'],
+    supportsTools: true, supportsHebrew: false, supportsVision: false,
+  },
+  {
+    id: 'zhipu/glm-4.7-flash',
+    provider: 'openrouter', name: 'GLM 4.7 Flash',
+    tier: 'cheap', costPer1kInput: 0.0001, costPer1kOutput: 0.0004,
+    maxContext: 128000, strengths: ['fast', 'tool-use', 'thinking', 'general'],
+    supportsTools: true, supportsHebrew: false, supportsVision: false,
+  },
+  {
+    id: 'qwen/qwen3-coder-next',
+    provider: 'openrouter', name: 'Qwen3 Coder Next',
+    tier: 'mid', costPer1kInput: 0.0005, costPer1kOutput: 0.002,
+    maxContext: 128000, strengths: ['coding', 'agentic', 'tool-use', 'local-dev'],
+    supportsTools: true, supportsHebrew: false, supportsVision: false,
+  },
+];
+
+// ===== FREE MODELS — Only for sub-agents and helpers =====
 const FREE_MODELS: ModelOption[] = [
-  // --- Tier 1: Confirmed working with tools (2026-02-08) ---
-  {
-    id: 'stepfun/step-3.5-flash:free',
-    provider: 'openrouter', name: 'Step 3.5 Flash',
-    tier: 'free', costPer1kInput: 0, costPer1kOutput: 0,
-    maxContext: 256000, strengths: ['general', 'tool-use', 'fast', 'large-context'],
-    supportsTools: true, supportsHebrew: false, supportsVision: false,
-  },
-  {
-    id: 'nvidia/nemotron-nano-9b-v2:free',
-    provider: 'openrouter', name: 'Nemotron Nano 9B',
-    tier: 'free', costPer1kInput: 0, costPer1kOutput: 0,
-    maxContext: 128000, strengths: ['fast', 'tool-use', 'general'],
-    supportsTools: true, supportsHebrew: false, supportsVision: false,
-  },
-  {
-    id: 'nvidia/nemotron-nano-12b-v2-vl:free',
-    provider: 'openrouter', name: 'Nemotron Nano 12B VL',
-    tier: 'free', costPer1kInput: 0, costPer1kOutput: 0,
-    maxContext: 128000, strengths: ['vision', 'fast', 'tool-use'],
-    supportsTools: true, supportsHebrew: false, supportsVision: true,
-  },
-  {
-    id: 'upstage/solar-pro-3:free',
-    provider: 'openrouter', name: 'Solar Pro 3',
-    tier: 'free', costPer1kInput: 0, costPer1kOutput: 0,
-    maxContext: 128000, strengths: ['general', 'tool-use', 'fast'],
-    supportsTools: true, supportsHebrew: false, supportsVision: false,
-  },
-  // --- Tier 2: Often rate-limited but good when available ---
   {
     id: 'meta-llama/llama-3.3-70b-instruct:free',
     provider: 'openrouter', name: 'Llama 3.3 70B',
@@ -56,56 +96,30 @@ const FREE_MODELS: ModelOption[] = [
     supportsTools: true, supportsHebrew: true, supportsVision: false,
   },
   {
+    id: 'deepseek/deepseek-r1-0528:free',
+    provider: 'openrouter', name: 'DeepSeek R1 (Free)',
+    tier: 'free', costPer1kInput: 0, costPer1kOutput: 0,
+    maxContext: 163840, strengths: ['reasoning', 'math', 'analysis', 'planning'],
+    supportsTools: false, supportsHebrew: false, supportsVision: false,
+  },
+  {
     id: 'mistralai/mistral-small-3.1-24b-instruct:free',
     provider: 'openrouter', name: 'Mistral Small 3.1',
     tier: 'free', costPer1kInput: 0, costPer1kOutput: 0,
     maxContext: 128000, strengths: ['general', 'fast', 'tool-use', 'vision'],
     supportsTools: true, supportsHebrew: false, supportsVision: true,
   },
-  // --- Tier 3: No tool support (reasoning/chat only) ---
   {
-    id: 'deepseek/deepseek-r1-0528:free',
-    provider: 'openrouter', name: 'DeepSeek R1',
+    id: 'nvidia/nemotron-nano-9b-v2:free',
+    provider: 'openrouter', name: 'Nemotron Nano 9B',
     tier: 'free', costPer1kInput: 0, costPer1kOutput: 0,
-    maxContext: 163840, strengths: ['reasoning', 'math', 'analysis', 'planning'],
-    supportsTools: false, supportsHebrew: false, supportsVision: false,
-  },
-  {
-    id: 'arcee-ai/trinity-mini:free',
-    provider: 'openrouter', name: 'Trinity Mini',
-    tier: 'free', costPer1kInput: 0, costPer1kOutput: 0,
-    maxContext: 131072, strengths: ['general', 'fast', 'chat'],
-    supportsTools: false, supportsHebrew: false, supportsVision: false,
+    maxContext: 128000, strengths: ['fast', 'tool-use', 'general'],
+    supportsTools: true, supportsHebrew: false, supportsVision: false,
   },
 ];
 
-// ===== CHEAP MODELS =====
-const CHEAP_MODELS: ModelOption[] = [
-  {
-    id: 'deepseek/deepseek-chat-v3.1',
-    provider: 'openrouter', name: 'DeepSeek V3.1 (Paid)',
-    tier: 'cheap', costPer1kInput: 0.0003, costPer1kOutput: 0.0009,
-    maxContext: 64000, strengths: ['coding', 'general', 'tool-use'],
-    supportsTools: true, supportsHebrew: true, supportsVision: false,
-  },
-  {
-    id: 'anthropic/claude-haiku-3.5',
-    provider: 'openrouter', name: 'Claude Haiku 3.5',
-    tier: 'cheap', costPer1kInput: 0.0008, costPer1kOutput: 0.004,
-    maxContext: 200000, strengths: ['fast', 'general', 'tool-use', 'hebrew'],
-    supportsTools: true, supportsHebrew: true, supportsVision: true,
-  },
-  {
-    id: 'openai/gpt-4o-mini',
-    provider: 'openrouter', name: 'GPT-4o Mini',
-    tier: 'cheap', costPer1kInput: 0.00015, costPer1kOutput: 0.0006,
-    maxContext: 128000, strengths: ['fast', 'general', 'tool-use'],
-    supportsTools: true, supportsHebrew: true, supportsVision: true,
-  },
-];
-
-// ===== MID TIER =====
-const MID_MODELS: ModelOption[] = [
+// ===== ANTHROPIC DIRECT =====
+const ANTHROPIC_MODELS: ModelOption[] = [
   {
     id: 'claude-sonnet-4-20250514',
     provider: 'anthropic', name: 'Claude Sonnet 4',
@@ -113,17 +127,6 @@ const MID_MODELS: ModelOption[] = [
     maxContext: 200000, strengths: ['coding', 'reasoning', 'tool-use', 'hebrew', 'planning'],
     supportsTools: true, supportsHebrew: true, supportsVision: true,
   },
-  {
-    id: 'openai/gpt-4o',
-    provider: 'openrouter', name: 'GPT-4o',
-    tier: 'mid', costPer1kInput: 0.005, costPer1kOutput: 0.015,
-    maxContext: 128000, strengths: ['general', 'vision', 'tool-use'],
-    supportsTools: true, supportsHebrew: true, supportsVision: true,
-  },
-];
-
-// ===== PREMIUM =====
-const PREMIUM_MODELS: ModelOption[] = [
   {
     id: 'claude-opus-4-20250514',
     provider: 'anthropic', name: 'Claude Opus 4',
@@ -133,7 +136,26 @@ const PREMIUM_MODELS: ModelOption[] = [
   },
 ];
 
-const ALL_MODELS = [...FREE_MODELS, ...CHEAP_MODELS, ...MID_MODELS, ...PREMIUM_MODELS];
+const ALL_MODELS = [...STRONG_MODELS, ...NEW_MODELS, ...ANTHROPIC_MODELS, ...FREE_MODELS];
+
+/** Strong fallback models ordered by priority (Claude first) */
+export const STRONG_FALLBACK_CHAIN: string[] = [
+  'anthropic/claude-sonnet-4',
+  'google/gemini-2.5-flash',
+  'deepseek/deepseek-chat-v3.1',
+  'google/gemini-2.5-pro-preview',
+  'zhipu/glm-5',
+  'minimax/minimax-m2.5',
+  'qwen/qwen3-coder-next',
+];
+
+/** Free models for sub-agents only */
+export const SUB_AGENT_MODELS: string[] = [
+  'meta-llama/llama-3.3-70b-instruct:free',
+  'mistralai/mistral-small-3.1-24b-instruct:free',
+  'nvidia/nemotron-nano-9b-v2:free',
+  'deepseek/deepseek-r1-0528:free',
+];
 
 /**
  * Classify task complexity based on intent, message length, and context.
@@ -165,7 +187,9 @@ export function classifyComplexity(params: {
 
 /**
  * Select the best model for the task.
- * Strategy: Use the CHEAPEST model that can handle the task well.
+ * Strategy:
+ *   - Main requests: ALWAYS use strong models (Claude → Gemini → DeepSeek)
+ *   - Sub-agents: CAN use free/cheap models to save cost
  */
 export function selectModel(params: {
   complexity: TaskComplexity;
@@ -174,8 +198,9 @@ export function selectModel(params: {
   requiresVision: boolean;
   dailyBudgetLeft: number;
   preferFree: boolean;
+  isSubAgent?: boolean;
 }): ModelOption {
-  const { complexity, requiresTools, requiresHebrew, requiresVision, dailyBudgetLeft, preferFree } = params;
+  const { complexity, requiresTools, requiresHebrew, requiresVision, dailyBudgetLeft, isSubAgent } = params;
 
   // Filter compatible models
   let candidates = ALL_MODELS.filter(m => {
@@ -186,51 +211,58 @@ export function selectModel(params: {
 
   if (candidates.length === 0) candidates = ALL_MODELS;
 
-  // Budget check: if low budget, force free models
-  // But NEVER force free for complex/critical tasks — they need models that handle tools properly
-  if (dailyBudgetLeft < 0.10 || (preferFree && complexity !== 'complex' && complexity !== 'critical')) {
-    const freeCandidates = candidates.filter(m => m.tier === 'free');
-    if (freeCandidates.length > 0) candidates = freeCandidates;
+  // ── Sub-agent mode: CAN use free/cheap models ────────────────
+  if (isSubAgent) {
+    const free = candidates.filter(m => m.tier === 'free');
+    if (free.length > 0) {
+      if (requiresHebrew) return free.find(m => m.supportsHebrew) ?? free[0];
+      return free[0];
+    }
+    const cheap = candidates.filter(m => m.tier === 'cheap');
+    return cheap[0] ?? candidates[0];
   }
+
+  // ── Main request: ALWAYS use strong models ───────────────────
+  // Priority: Anthropic Claude > Gemini > DeepSeek > GLM/Qwen
+  const strongCandidates = candidates.filter(m =>
+    m.tier === 'mid' || m.tier === 'premium' || m.tier === 'ultra'
+  );
 
   switch (complexity) {
     case 'trivial':
     case 'simple': {
-      const free = candidates.filter(m => m.tier === 'free');
-      if (free.length > 0) {
-        if (requiresVision) return free.find(m => m.supportsVision) ?? free[0];
-        if (requiresHebrew) return free.find(m => m.supportsHebrew) ?? free[0];
-        return free[0];
-      }
-      const cheap = candidates.filter(m => m.tier === 'cheap');
-      return cheap[0] ?? candidates[0];
+      // Even simple tasks get strong models — use the cheapest strong one
+      const cheapStrong = strongCandidates.filter(m => m.tier === 'mid');
+      if (requiresHebrew) return cheapStrong.find(m => m.supportsHebrew) ?? cheapStrong[0] ?? candidates[0];
+      return cheapStrong[0] ?? candidates[0];
     }
 
     case 'medium': {
-      const free = candidates.filter(m => m.tier === 'free' && m.supportsTools);
-      if (free.length > 0) return free[0];
-      const cheap = candidates.filter(m => m.tier === 'cheap');
-      return cheap[0] ?? candidates[0];
+      const mid = strongCandidates.filter(m => m.tier === 'mid' && m.supportsTools);
+      if (requiresHebrew) return mid.find(m => m.supportsHebrew) ?? mid[0] ?? candidates[0];
+      return mid[0] ?? candidates[0];
     }
 
     case 'complex': {
-      const cheap = candidates.filter(m => m.tier === 'cheap' && m.supportsTools);
-      if (cheap.length > 0 && dailyBudgetLeft > 0.50) return cheap[0];
-      const mid = candidates.filter(m => m.tier === 'mid');
-      if (mid.length > 0 && dailyBudgetLeft > 1.00) return mid[0];
-      const free = candidates.filter(m => m.tier === 'free' && m.supportsTools);
-      return free[0] ?? candidates[0];
+      // Prefer Claude Sonnet or Gemini Pro for complex tasks
+      const preferred = strongCandidates.filter(m =>
+        (m.tier === 'mid' || m.tier === 'premium') && m.supportsTools
+      );
+      if (requiresHebrew) return preferred.find(m => m.supportsHebrew) ?? preferred[0] ?? candidates[0];
+      return preferred[0] ?? candidates[0];
     }
 
     case 'critical': {
-      const premium = candidates.filter(m => m.tier === 'ultra');
-      if (premium.length > 0 && dailyBudgetLeft > 5.00) return premium[0];
-      const mid = candidates.filter(m => m.tier === 'mid');
-      return mid[0] ?? candidates[0];
+      // Ultra tier if available (Claude Opus)
+      const ultra = strongCandidates.filter(m => m.tier === 'ultra');
+      if (ultra.length > 0 && dailyBudgetLeft > 2.00) return ultra[0];
+      const premium = strongCandidates.filter(m => m.tier === 'premium' || m.tier === 'mid');
+      if (requiresHebrew) return premium.find(m => m.supportsHebrew) ?? premium[0] ?? candidates[0];
+      return premium[0] ?? candidates[0];
     }
   }
 
-  return candidates[0] ?? ALL_MODELS[0];
+  return strongCandidates[0] ?? candidates[0] ?? ALL_MODELS[0];
 }
 
 /**
@@ -336,19 +368,21 @@ export function classifyEffort(params: {
 export function mapEffortToThinking(
   effort: EffortLevel,
   provider: string,
-): { thinkingMode: 'none' | 'basic' | 'extended'; thinkingBudget?: number } {
-  // Only Anthropic supports native extended thinking
+): { thinkingMode: 'none' | 'basic' | 'extended'; thinkingBudget?: number; useThinkingVariant?: boolean } {
+  // Anthropic: native extended thinking with budget_tokens
   const supportsExtended = provider === 'anthropic';
+  // OpenRouter: use :thinking model variant for deep reasoning
+  const supportsThinkingVariant = provider === 'openrouter';
 
   switch (effort) {
     case 'critical':
-      return supportsExtended
-        ? { thinkingMode: 'extended', thinkingBudget: 32000 }
-        : { thinkingMode: 'basic' };
+      if (supportsExtended) return { thinkingMode: 'extended', thinkingBudget: 32000 };
+      if (supportsThinkingVariant) return { thinkingMode: 'basic', useThinkingVariant: true };
+      return { thinkingMode: 'basic' };
     case 'high':
-      return supportsExtended
-        ? { thinkingMode: 'extended', thinkingBudget: 16000 }
-        : { thinkingMode: 'basic' };
+      if (supportsExtended) return { thinkingMode: 'extended', thinkingBudget: 16000 };
+      if (supportsThinkingVariant) return { thinkingMode: 'basic', useThinkingVariant: true };
+      return { thinkingMode: 'basic' };
     case 'medium':
       return { thinkingMode: 'basic' };
     case 'low':
@@ -363,3 +397,25 @@ export function getAllModels(): ModelOption[] { return [...ALL_MODELS]; }
 
 /** Find a model by ID */
 export function findModel(id: string): ModelOption | undefined { return ALL_MODELS.find(m => m.id === id); }
+
+/**
+ * OpenRouter model variant suffixes.
+ * Append to any model ID to get specialized behavior:
+ * - thinking: Chain-of-thought reasoning (e.g. anthropic/claude-sonnet-4:thinking)
+ * - nitro: Low-latency inference on premium hardware
+ * - online: Web access built-in (no need for web search plugin)
+ * - extended: Extended context window beyond default
+ * - free: Free tier (rate-limited, lower priority)
+ */
+export type ModelVariant = 'thinking' | 'nitro' | 'online' | 'extended' | 'free';
+
+/** Append a variant suffix to a model ID, stripping any existing variant first */
+export function withVariant(modelId: string, variant: ModelVariant): string {
+  const base = modelId.replace(/:(thinking|nitro|online|extended|free)$/, '');
+  return `${base}:${variant}`;
+}
+
+/** Strip any variant suffix from a model ID */
+export function stripVariant(modelId: string): string {
+  return modelId.replace(/:(thinking|nitro|online|extended|free)$/, '');
+}

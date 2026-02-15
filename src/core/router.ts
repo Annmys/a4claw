@@ -52,6 +52,8 @@ export enum Intent {
   CRYPTO_ANALYZE = 'crypto_analyze',
   CRYPTO_PORTFOLIO = 'crypto_portfolio',
   WHATSAPP_CONNECT = 'whatsapp_connect',
+  BUILD_APP = 'build_app',
+  MRR_STRATEGY = 'mrr_strategy',
 }
 
 export interface RoutingResult {
@@ -171,7 +173,7 @@ Hebrew examples:
 Respond ONLY with valid JSON (no markdown, no text before/after):
 {"intent":"<intent_name>","confidence":<0.0-1.0>,"agent":"<best_agent>","params":{"key":"value"}}
 
-Agent options: server-manager, code-assistant, researcher, task-planner, general, desktop-controller, project-builder, web-agent, content-creator, orchestrator, device-controller, crypto-trader, crypto-analyst
+Agent options: server-manager, code-assistant, researcher, task-planner, general, desktop-controller, project-builder, web-agent, content-creator, orchestrator, device-controller, crypto-trader, crypto-analyst, ai-app-builder, mrr-strategist
 
 For ugc_create and podcast_create → use content-creator agent.
 For site_analyze → use orchestrator agent.
@@ -339,6 +341,16 @@ export class IntentRouter {
     // Orchestrate / OpenClaw
     if (/openclaw|אופנקלאו|תתאם|coordinate|סינרגיה/i.test(message)) {
       return { intent: Intent.ORCHESTRATE, confidence: 0.8, agentId: 'orchestrator', extractedParams: {} };
+    }
+
+    // AI App Building / SaaS / MRR product
+    if (/\b(build|create|make)\b.*\b(ai|AI)\b.*\b(app|saas|product|tool)\b|בנה.*אפליקציי?ת?\s*AI|בנה.*מוצר\s*AI|אפליקציה.*שמכניסה.*כסף|build.*saas|build.*startup|micro.*saas|בנה.*סאאס|אפליקציות.*חזקות|revenue.*app|ai.*wrapper|בנה.*אפליקציה.*רווחית/i.test(message)) {
+      return { intent: Intent.BUILD_APP, confidence: 0.9, agentId: 'ai-app-builder', extractedParams: {} };
+    }
+
+    // MRR Strategy / Market Research / Revenue
+    if (/\bMRR\b|mrr|trustmrr|revenue.*strategy|אסטרטגיית.*הכנסות|מחקר.*שוק.*saas|pricing.*strategy|תמחור|מודל.*עסקי|business.*model|competitive.*intelligence|מודיעין.*תחרותי|מתחרים.*saas|niche.*research|חקר.*נישה|revenue.*model|הכנסה.*חודשית|monthly.*recurring/i.test(message)) {
+      return { intent: Intent.MRR_STRATEGY, confidence: 0.9, agentId: 'mrr-strategist', extractedParams: {} };
     }
 
     // Code

@@ -6,7 +6,7 @@ import { ExternalServiceError } from '../utils/errors.js';
 
 export interface Message {
   role: 'user' | 'assistant';
-  content: string;
+  content: string | any[];
 }
 
 export interface ToolDefinition {

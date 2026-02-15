@@ -15,6 +15,8 @@ import { cryptoTraderPrompt } from './prompts/crypto-trader.js';
 import { cryptoAnalystPrompt } from './prompts/crypto-analyst.js';
 import { marketMakerPrompt } from './prompts/market-maker.js';
 import { strategyLabPrompt } from './prompts/strategy-lab.js';
+import { aiAppBuilderPrompt } from './prompts/ai-app-builder.js';
+import { mrrStrategistPrompt } from './prompts/mrr-strategist.js';
 
 const agents: Map<string, AgentDefinition> = new Map();
 
@@ -36,6 +38,8 @@ register({ id: 'crypto-trader', name: 'Crypto Trader', description: 'Executes cr
 register({ id: 'crypto-analyst', name: 'Crypto Analyst', description: 'Technical analysis, signals, market scanning, crypto research.', systemPrompt: cryptoAnalystPrompt, model: 'dynamic', preferredOllamaModel: 'qwen3-next', tools: ['trading', 'search', 'memory'], maxTokens: 4096, temperature: 0.5, maxToolIterations: 15 });
 register({ id: 'market-maker', name: 'Market Maker', description: 'Two-sided quoting, spread capture, inventory management, adverse selection protection. Paper trading by default.', systemPrompt: marketMakerPrompt, model: 'dynamic', preferredOllamaModel: 'qwen3-next', tools: ['trading', 'memory', 'cron'], maxTokens: 4096, temperature: 0.2, maxToolIterations: 20 });
 register({ id: 'strategy-lab', name: 'Strategy Lab', description: 'R&D agent — designs, backtests, and validates new trading strategies with walk-forward optimization.', systemPrompt: strategyLabPrompt, model: 'dynamic', preferredOllamaModel: 'glm5', tools: ['trading', 'search', 'memory'], maxTokens: 8192, temperature: 0.5, maxToolIterations: 20 });
+register({ id: 'ai-app-builder', name: 'AI App Builder', description: 'Builds complete revenue-generating AI applications from scratch — market validation via TrustMRR, full-stack development, Stripe payments, deployment, and launch automation.', systemPrompt: aiAppBuilderPrompt, model: 'dynamic', preferredOllamaModel: 'qwen3-coder-next', tools: ['bash', 'file', 'search', 'browser', 'github', 'docker', 'kie', 'social', 'memory', 'firecrawl'], maxTokens: 8192, temperature: 0.4, maxToolIterations: 25 });
+register({ id: 'mrr-strategist', name: 'MRR Strategist', description: 'Revenue strategy agent — deep market research via TrustMRR, financial modeling, pricing optimization, competitive intelligence, growth planning, and churn prevention for AI/SaaS products.', systemPrompt: mrrStrategistPrompt, model: 'dynamic', preferredOllamaModel: 'deepseek-v3.1', tools: ['search', 'browser', 'firecrawl', 'file', 'memory', 'analytics', 'social', 'email'], maxTokens: 8192, temperature: 0.5, maxToolIterations: 20 });
 
 export function getAgent(id: string): AgentDefinition | undefined { return agents.get(id); }
 export function getAllAgents(): AgentDefinition[] { return Array.from(agents.values()); }

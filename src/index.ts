@@ -20,8 +20,8 @@ import { initCache, closeCache } from './memory/cache.js';
 import { startWorker } from './queue/worker.js';
 import { startScheduler } from './queue/scheduler.js';
 import { startInterfaces, stopInterfaces } from './interfaces/index.js';
-import { findOrCreateUser } from './memory/repositories/users.js';
-import { getOrCreateConversation } from './memory/repositories/conversations.js';
+import { findOrCreateUser, autoLinkUsers } from './memory/repositories/users.js';
+import { getOrCreateConversation, getCrossPlatformSummary } from './memory/repositories/conversations.js';
 import { saveMessage, getRecentMessages } from './memory/repositories/messages.js';
 import { getUserKnowledge, learnFact, getKnowledgeCount } from './memory/repositories/knowledge.js';
 import { getUserTasks, getOverdueTasks } from './memory/repositories/tasks.js';
@@ -45,6 +45,7 @@ import { PluginLoader } from './core/plugin-loader.js';
 import { initKeyRotation, stopKeyRotation } from './security/key-rotation.js';
 // Self-Evolution imports
 import { SkillFetcher } from './core/skill-fetcher.js';
+import { SkillsEngine } from './core/skills-engine.js';
 import { AgentFactory } from './core/agent-factory.js';
 import { CapabilityLearner } from './core/capability-learner.js';
 import { CrewOrchestrator } from './core/crew-orchestrator.js';
@@ -58,13 +59,76 @@ import type { BaseInterface } from './interfaces/base.js';
 // Cache platform ID → DB user ID mapping
 const userIdCache = new Map<string, string>();
 
+/**
+ * Promote mature patterns from FeedbackLoop into real Skills.
+ * Called after every evolution cycle. Patterns that recur 5+ times
+ * get turned into learned skills so the agent improves permanently.
+ */
+async function promoteReadyPatterns(
+  evolution: EvolutionEngine,
+  aiClient: AIClient,
+  skillsEngine: SkillsEngine,
+): Promise<number> {
+  const feedback = evolution.getFeedbackLoop();
+  const candidates = feedback.getPromotionCandidates();
+  if (candidates.length === 0) return 0;
+
+  let promoted = 0;
+  for (const pattern of candidates) {
+    try {
+      const response = await aiClient.chat({
+        systemPrompt: `You are a skill designer. Given a recurring pattern, create a reusable skill definition.
+Return ONLY valid JSON: {"name": "...", "description": "...", "trigger": "regex or keyword pattern", "prompt": "instructions for the agent when this skill triggers"}
+Keep the prompt concise but specific. The trigger should match user messages that activate this pattern.`,
+        messages: [{ role: 'user', content: `Pattern: ${pattern.description}\nCategory: ${pattern.category}\nOccurrences: ${pattern.occurrences}\nExample inputs: ${pattern.exampleInputs.slice(0, 3).join(' | ')}\nExample outputs: ${pattern.exampleOutputs.slice(0, 2).join(' | ')}` }],
+        maxTokens: 500,
+        temperature: 0.2,
+        isSubAgent: true,
+      });
+
+      const skillDef = JSON.parse(response.content.trim());
+      if (skillDef.name && skillDef.prompt) {
+        await skillsEngine.createSkill({
+          name: skillDef.name,
+          description: skillDef.description ?? pattern.description,
+          trigger: skillDef.trigger ?? pattern.description,
+          prompt: skillDef.prompt,
+          examples: pattern.exampleInputs.slice(0, 3),
+          source: 'learned',
+        });
+
+        feedback.promotePattern(pattern.id, `skill:${skillDef.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`);
+        promoted++;
+        logger.info('Pattern promoted to skill', {
+          patternId: pattern.id,
+          skillName: skillDef.name,
+          occurrences: pattern.occurrences,
+        });
+      }
+    } catch (err: any) {
+      logger.debug('Pattern promotion failed', { patternId: pattern.id, error: err.message });
+    }
+  }
+  return promoted;
+}
+
+function formatTimeAgo(date: Date): string {
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (seconds < 60) return 'just now';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  return `${Math.floor(seconds / 86400)}d ago`;
+}
+
 async function resolveUserId(platformId: string, platform: string): Promise<string> {
   const cacheKey = `${platform}:${platformId}`;
   if (userIdCache.has(cacheKey)) return userIdCache.get(cacheKey)!;
 
   const user = await findOrCreateUser(platformId, platform, platformId);
-  userIdCache.set(cacheKey, user.id);
-  return user.id;
+  // Identity linking: if linked to a master, use the master's ID
+  const effectiveId = user.masterUserId ?? user.id;
+  userIdCache.set(cacheKey, effectiveId);
+  return effectiveId;
 }
 
 function findDbUserId(platformUserId: string): string | undefined {
@@ -87,6 +151,17 @@ async function main() {
   // 1. Database
   await initDatabase();
   logger.info('💾 Database connected');
+
+  // 1b. Auto-link platform identities (single-user mode)
+  try {
+    const masterId = await autoLinkUsers();
+    if (masterId) {
+      userIdCache.clear();
+      logger.info('🔗 Auto-linked platform identities', { masterUserId: masterId });
+    }
+  } catch (err: any) {
+    logger.debug('Auto-link check skipped', { error: err.message });
+  }
 
   // 2. Cache
   initCache();
@@ -113,10 +188,10 @@ async function main() {
   await engine.initSkills();
 
   engine.setMemoryFunctions({
-    getHistory: async (platformUserId: string, platform: string, limit: number): Promise<Message[]> => {
+    getHistory: async (platformUserId: string, platform: string, limit: number, conversationId?: string): Promise<Message[]> => {
       try {
         const dbUserId = await resolveUserId(platformUserId, platform);
-        const conversation = await getOrCreateConversation(dbUserId, platform);
+        const conversation = await getOrCreateConversation(dbUserId, platform, conversationId);
         const msgs = await getRecentMessages(conversation.id, limit);
         return msgs.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
       } catch (err: any) {
@@ -128,7 +203,9 @@ async function main() {
     saveMessage: async (platformUserId: string, platform: string, role: string, content: string, metadata?: any): Promise<void> => {
       try {
         const dbUserId = await resolveUserId(platformUserId, platform);
-        const conversation = await getOrCreateConversation(dbUserId, platform);
+        // Extract _conversationId injected by engine.process() wrapper
+        const convId = metadata?._conversationId;
+        const conversation = await getOrCreateConversation(dbUserId, platform, convId);
         await saveMessage(conversation.id, dbUserId, role, content, metadata);
       } catch (err: any) {
         logger.warn('Failed to save message', { error: err.message });
@@ -216,6 +293,28 @@ If no facts to extract, return []. Return ONLY valid JSON, nothing else.`,
         logger.debug('Knowledge extraction skipped', { error: err.message });
       }
     },
+
+    getCrossPlatformSummary: async (platformUserId: string, currentPlatform: string): Promise<string> => {
+      try {
+        const dbUserId = await resolveUserId(platformUserId, currentPlatform);
+        const summary = await getCrossPlatformSummary(dbUserId, currentPlatform, 3);
+        if (summary.length === 0) return '';
+
+        const lines: string[] = [];
+        for (const entry of summary) {
+          const lastMsg = entry.msgs[entry.msgs.length - 1];
+          const ago = formatTimeAgo(lastMsg.createdAt);
+          const preview = entry.msgs.map(m =>
+            `${m.role === 'user' ? 'User' : 'Bot'}: ${m.content}`
+          ).join(' | ');
+          lines.push(`- ${entry.platform} (${ago}): ${preview}`);
+        }
+        return lines.join('\n');
+      } catch (err: any) {
+        logger.warn('Failed to load cross-platform summary', { error: err.message });
+        return '';
+      }
+    },
   });
 
   logger.info('🧠 Engine initialized with memory + skills + goals');
@@ -296,6 +395,8 @@ If no facts to extract, return []. Return ONLY valid JSON, nothing else.`,
   // ── Persistent Memory: load cross-session data from DB ──
   const memoryHierarchy = evolutionEngine.getMemoryHierarchy();
   await memoryHierarchy.initPersistence();
+  // Wire MetaAgent to persistent memory so errors survive restarts
+  engine.getMetaAgent().setMemoryHierarchy(memoryHierarchy);
   // Flush memory to DB every 5 minutes
   const memoryFlushInterval = setInterval(() => {
     memoryHierarchy.flush().catch(err => {
@@ -630,16 +731,30 @@ If no facts to extract, return []. Return ONLY valid JSON, nothing else.`,
     }
   }, INTEL_INTERVAL_MS);
 
-  // ── Evolution: periodic self-improvement cycle every 6 hours ──
-  const EVOLUTION_INTERVAL_MS = 6 * 60 * 60 * 1000;
+  // ── Evolution: periodic self-improvement cycle every 30 minutes ──
+  // Light evolution (no external skill fetching) runs every 30min.
+  // Full evolution (with external sources) runs every 6 hours.
+  const EVOLUTION_LIGHT_INTERVAL_MS = 30 * 60 * 1000;
+  const EVOLUTION_FULL_INTERVAL_MS = 6 * 60 * 60 * 1000;
   let lastEvolutionAt = 0;
+  let lastFullEvolutionAt = 0;
   setInterval(async () => {
-    if (Date.now() - lastEvolutionAt < EVOLUTION_INTERVAL_MS) return;
+    if (Date.now() - lastEvolutionAt < EVOLUTION_LIGHT_INTERVAL_MS) return;
     try {
-      logger.info('🧬 Periodic evolution cycle starting...');
-      const result = await evolutionEngine.evolve(false);
+      const isFull = Date.now() - lastFullEvolutionAt >= EVOLUTION_FULL_INTERVAL_MS;
+      logger.info(`🧬 Periodic evolution cycle starting (${isFull ? 'full' : 'light'})...`);
+      const result = await evolutionEngine.evolve(isFull);
       lastEvolutionAt = Date.now();
+      if (isFull) lastFullEvolutionAt = Date.now();
+
+      // After evolution, promote mature patterns to skills
+      await promoteReadyPatterns(evolutionEngine, engine.getAIClient(), engine.getSkillsEngine()).catch(() => {});
+
+      // Flush memory to persist any new learnings immediately
+      await memoryHierarchy.flush().catch(() => {});
+
       logger.info('🧬 Periodic evolution cycle completed', {
+        type: isFull ? 'full' : 'light',
         skillsFetched: result.skillsFetched,
         agentsCreated: result.agentsCreated,
         errors: result.errors.length,
@@ -648,7 +763,7 @@ If no facts to extract, return []. Return ONLY valid JSON, nothing else.`,
     } catch (err: any) {
       logger.debug('Periodic evolution error', { error: err.message });
     }
-  }, EVOLUTION_INTERVAL_MS);
+  }, EVOLUTION_LIGHT_INTERVAL_MS);
   // Also run a light evolution 30 seconds after startup
   setTimeout(async () => {
     try {

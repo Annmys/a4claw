@@ -117,7 +117,7 @@ export class WebServer extends BaseInterface {
     this.app.use('/api/logs', authMiddleware, setupLogsRoutes());
     this.app.use('/api/costs', authMiddleware, setupCostsRoutes(this.engine));
     this.app.use('/api/cron', authMiddleware, setupCronRoutes(this.engine));
-    this.app.use('/api/history', authMiddleware, setupHistoryRoutes(this.engine));
+    this.app.use('/api/history', authMiddleware, setupHistoryRoutes());
     this.app.use('/api/whatsapp', authMiddleware, setupWhatsAppQRRoutes());
     this.app.use('/api/trading', authMiddleware, setupTradingRoutes());
     // RAG routes (requires RAG engine — initialized later via setRAGEngine)

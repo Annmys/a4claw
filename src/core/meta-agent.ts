@@ -1,4 +1,5 @@
 import { AIClient } from './ai-client.js';
+import type { MemoryHierarchy } from './memory-hierarchy.js';
 import config from '../config.js';
 import logger from '../utils/logger.js';
 import { extractJSON } from '../utils/helpers.js';
@@ -57,11 +58,17 @@ export class MetaAgent {
   private ai: AIClient;
   private selfModel: SelfAssessment;
   private startTime: Date;
+  private memory: MemoryHierarchy | null = null;
 
   constructor(ai: AIClient) {
     this.ai = ai;
     this.startTime = new Date();
     this.selfModel = this.initSelfModel();
+  }
+
+  /** Connect to persistent memory so errors survive restarts */
+  setMemoryHierarchy(memory: MemoryHierarchy): void {
+    this.memory = memory;
   }
 
   private initSelfModel(): SelfAssessment {
@@ -81,6 +88,17 @@ export class MetaAgent {
   /** Chain-of-Thought: think before acting */
   async think(situation: string, context: string): Promise<ThoughtProcess> {
     try {
+      // Combine in-memory errors with persistent lessons from MemoryHierarchy
+      const recentErrors = this.selfModel.recentErrors.slice(-5).map(e => e.error + ': ' + e.lesson);
+      if (this.memory) {
+        const persistedLessons = this.memory.retrieve(situation, { layer: 'error', maxResults: 5 });
+        for (const lesson of persistedLessons) {
+          if (!recentErrors.some(e => e.includes(lesson.key))) {
+            recentErrors.push(`${lesson.key}: ${lesson.value}`);
+          }
+        }
+      }
+
       const response = await this.ai.chat({
         model: config.OPENROUTER_API_KEY
           ? config.OPENROUTER_REASONING_MODEL
@@ -91,7 +109,7 @@ export class MetaAgent {
 SITUATION: ${situation}
 CONTEXT: ${context}
 MY CAPABILITIES: ${JSON.stringify(this.selfModel.capabilities)}
-MY RECENT ERRORS: ${JSON.stringify(this.selfModel.recentErrors.slice(-5).map(e => e.error + ': ' + e.lesson))}
+MY RECENT ERRORS: ${JSON.stringify(recentErrors.slice(-10))}
 
 Think step by step. What should I do?` }],
         maxTokens: 1024,
@@ -117,6 +135,7 @@ Think step by step. What should I do?` }],
     this.selfModel.performance.totalInteractions++;
 
     if (!success) {
+      let lessonText = result;
       try {
         const lesson = await this.ai.chat({
           model: config.OPENROUTER_API_KEY
@@ -128,10 +147,19 @@ Think step by step. What should I do?` }],
           maxTokens: 100,
           temperature: 0.1,
         });
-        this.selfModel.recentErrors.push({ error: action, lesson: lesson.content, timestamp: new Date() });
-        if (this.selfModel.recentErrors.length > 20) this.selfModel.recentErrors.shift();
-      } catch {
-        this.selfModel.recentErrors.push({ error: action, lesson: result, timestamp: new Date() });
+        lessonText = lesson.content;
+      } catch { /* use raw result as lesson */ }
+
+      this.selfModel.recentErrors.push({ error: action, lesson: lessonText, timestamp: new Date() });
+      if (this.selfModel.recentErrors.length > 20) this.selfModel.recentErrors.shift();
+
+      // Persist to MemoryHierarchy (error layer) — survives restarts
+      if (this.memory) {
+        this.memory.store('error', `meta:${action.slice(0, 80)}`, lessonText, {
+          tags: ['meta-agent', 'lesson', 'auto-reflect'],
+          impact: 0.7,
+        });
+        this.memory.recordFailure('meta_agent_reflection', action.slice(0, 200), lessonText);
       }
     }
 

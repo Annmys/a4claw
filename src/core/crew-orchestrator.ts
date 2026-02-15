@@ -248,6 +248,7 @@ Pick the best parts from each response and create a unified, high-quality answer
                 maxTokens: agent.maxTokens,
                 temperature: agent.temperature,
                 maxToolIterations: agent.maxToolIterations ?? 10,
+                isSubAgent: true, // Crew members can use cheaper models
               },
               async (toolName, toolInput) => executeTool(toolName, toolInput),
             )
@@ -256,6 +257,7 @@ Pick the best parts from each response and create a unified, high-quality answer
               messages: [{ role: 'user', content: task }],
               maxTokens: agent.maxTokens,
               temperature: agent.temperature,
+              isSubAgent: true, // Crew members can use cheaper models
             }),
         new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error(`Member ${member.agentId} timed out`)), memberTimeout)

@@ -5,6 +5,7 @@ import { mkdirSync, existsSync, unlinkSync } from 'fs';
 import { readFile } from 'fs/promises';
 import { Engine } from '../../../core/engine.js';
 import { analyzeImage } from '../../../actions/vision/analyze.js';
+import { getAllModels } from '../../../core/model-router.js';
 import logger from '../../../utils/logger.js';
 
 const UPLOAD_DIR = pathResolve(process.cwd(), 'uploads');
@@ -43,6 +44,9 @@ export function setupApiRoutes(engine: Engine): Router {
   router.post('/chat', upload.single('file'), async (req: Request, res: Response) => {
     const user = (req as any).user;
     const text = req.body.text ?? '';
+    const conversationId = req.body.conversationId as string | undefined;
+    const responseMode = req.body.responseMode as string | undefined;
+    const model = req.body.model as string | undefined;
     const file = (req as any).file as Express.Multer.File | undefined;
 
     let attachments: Array<{ type: string; url: string }> | undefined;
@@ -122,7 +126,10 @@ export function setupApiRoutes(engine: Engine): Router {
         chatId: 'web',
         text: enrichedText,
         userRole: user.role,
+        conversationId,
         attachments,
+        responseMode: responseMode as any,
+        model,
       });
 
       res.json({
@@ -142,6 +149,19 @@ export function setupApiRoutes(engine: Engine): Router {
 
   router.get('/status', (_req: Request, res: Response) => {
     res.json({ status: 'online', uptime: process.uptime(), memory: process.memoryUsage().heapUsed });
+  });
+
+  // GET /api/models — list available AI models for the model selector
+  router.get('/models', (_req: Request, res: Response) => {
+    const models = getAllModels().map(m => ({
+      id: m.id, name: m.name, provider: m.provider, tier: m.tier,
+      supportsHebrew: m.supportsHebrew, supportsVision: m.supportsVision,
+    }));
+    res.json({ models: [
+      { id: 'auto', name: 'Auto', provider: 'auto', tier: 'auto', supportsHebrew: true, supportsVision: true },
+      { id: 'claude-code-cli', name: 'Claude Code CLI (Opus 4.6)', provider: 'claude-code', tier: 'ultra', supportsHebrew: true, supportsVision: true },
+      ...models,
+    ]});
   });
 
   return router;

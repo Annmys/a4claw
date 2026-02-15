@@ -43,6 +43,30 @@ const GROUP_LABELS: Record<string, string> = {
   skill: 'Skills',
 };
 
+// Stable hash per node ID → unique animation phase (0-1)
+function nodePhase(id: string): number {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
+  return (h & 0x7fffffff) / 0x7fffffff;
+}
+
+// Custom D3 force — gentle organic drift so nodes never fully stop
+function createDriftForce(strength = 0.04) {
+  let nodes: any[] = [];
+  function force(_alpha: number) {
+    const t = performance.now() / 1000;
+    for (let i = 0; i < nodes.length; i++) {
+      const node = nodes[i];
+      if (node.fx != null) continue; // skip pinned
+      const p = nodePhase(node.id || String(i)) * Math.PI * 2;
+      node.vx += Math.sin(t * 0.4 + p) * strength;
+      node.vy += Math.cos(t * 0.5 + p * 1.3) * strength;
+    }
+  }
+  force.initialize = (_n: any[]) => { nodes = _n; };
+  return force;
+}
+
 // Shape drawing helpers per group
 function drawHexagon(ctx: CanvasRenderingContext2D, x: number, y: number, r: number) {
   ctx.beginPath();
@@ -82,6 +106,11 @@ function drawRoundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, r:
   ctx.closePath();
 }
 
+// Quadratic bezier point at parameter t
+function bezierPoint(t: number, p0: number, cp: number, p1: number) {
+  return (1 - t) * (1 - t) * p0 + 2 * (1 - t) * t * cp + t * t * p1;
+}
+
 export default function Graph() {
   const [data, setData] = useState<GraphData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -96,21 +125,35 @@ export default function Graph() {
   const graphRef = useRef<any>(null);
   const hoveredRef = useRef<string | null>(null);
   const lastClickRef = useRef<{ id: string; time: number } | null>(null);
+  const clickRippleRef = useRef<{ x: number; y: number; time: number; color: string } | null>(null);
 
   useEffect(() => { loadGraph(); }, []);
 
+  // Register custom drift force + periodic reheat to keep simulation alive
+  useEffect(() => {
+    if (!graphRef.current || !data) return;
+    const fg = graphRef.current;
+
+    // Add gentle organic drift
+    fg.d3Force('drift', createDriftForce(0.035));
+
+    // Periodically reheat so nodes keep floating
+    const reheat = setInterval(() => {
+      try { fg.d3ReheatSimulation?.(); } catch { /* ignore */ }
+    }, 8000);
+
+    return () => clearInterval(reheat);
+  }, [data]);
+
   // Callback ref to attach ResizeObserver when the container mounts
   const containerCallbackRef = useCallback((el: HTMLDivElement | null) => {
-    // Disconnect previous observer
     if (roRef.current) { roRef.current.disconnect(); roRef.current = null; }
     containerRef.current = el;
     if (!el) return;
-    // Measure immediately
     const rect = el.getBoundingClientRect();
     if (rect.width > 0 && rect.height > 0) {
       setDimensions({ width: Math.floor(rect.width), height: Math.floor(rect.height) });
     }
-    // Observe for future resizes
     const ro = new ResizeObserver((entries) => {
       const entry = entries[0];
       if (entry) {
@@ -185,6 +228,14 @@ export default function Graph() {
 
     lastClickRef.current = { id: node.id, time: now };
 
+    // Click ripple
+    clickRippleRef.current = {
+      x: node.x ?? 0,
+      y: node.y ?? 0,
+      time: performance.now(),
+      color: GROUP_COLORS[node.group] || '#888',
+    };
+
     // Single click — select & zoom
     setSelected(node);
     if (graphRef.current) {
@@ -215,13 +266,19 @@ export default function Graph() {
     node.fy = node.y;
   }, []);
 
-  // Custom node rendering — different shapes per group, glow, gradients
+  // Custom node rendering — shapes, breathing glow, gradients, click ripple
   const nodeCanvasObject = useCallback(
     (node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
       if (node.x == null || node.y == null) return;
       const label: string = node.name;
+      const t = performance.now() / 1000;
+      const phase = nodePhase(node.id || '');
+
+      // Breathing: gentle size oscillation per node
+      const breathe = 1 + Math.sin(t * 0.8 + phase * 6.28) * 0.06;
       const baseR = Math.sqrt(node.val || 2) * 4;
-      const r = node.group === 'core' ? baseR * 1.3 : baseR;
+      const r = (node.group === 'core' ? baseR * 1.3 : baseR) * breathe;
+
       const color = GROUP_COLORS[node.group] || '#888';
       const isSelected = selected?.id === node.id;
       const isHovered = hoveredRef.current === node.id;
@@ -234,7 +291,19 @@ export default function Graph() {
       ctx.save();
       if (dimmed) ctx.globalAlpha = 0.15;
 
-      // Outer glow
+      // Ambient glow — subtle constant pulse (alive feeling)
+      if (!dimmed) {
+        const glowPulse = 0.12 + Math.sin(t * 1.2 + phase * 4) * 0.06;
+        const ambientGlow = ctx.createRadialGradient(node.x, node.y, r * 0.6, node.x, node.y, r * 2);
+        ambientGlow.addColorStop(0, color + Math.round(glowPulse * 255).toString(16).padStart(2, '0'));
+        ambientGlow.addColorStop(1, color + '00');
+        ctx.beginPath();
+        ctx.arc(node.x, node.y, r * 2, 0, Math.PI * 2);
+        ctx.fillStyle = ambientGlow;
+        ctx.fill();
+      }
+
+      // Selection / hover glow (brighter)
       if (highlight) {
         const glow = ctx.createRadialGradient(node.x, node.y, r * 0.5, node.x, node.y, r * 2.5);
         glow.addColorStop(0, color + '50');
@@ -243,6 +312,36 @@ export default function Graph() {
         ctx.arc(node.x, node.y, r * 2.5, 0, Math.PI * 2);
         ctx.fillStyle = glow;
         ctx.fill();
+      }
+
+      // Click ripple rings (expanding from selected node)
+      if (isSelected && clickRippleRef.current) {
+        const elapsed = (performance.now() - clickRippleRef.current.time) / 1000;
+        if (elapsed < 1.5) {
+          const rColor = clickRippleRef.current.color;
+          // Ring 1
+          const p1 = elapsed / 1.5;
+          const rippleR = r + p1 * 70;
+          const a1 = Math.round((1 - p1) * 0.5 * 255);
+          ctx.beginPath();
+          ctx.arc(node.x, node.y, rippleR, 0, Math.PI * 2);
+          ctx.strokeStyle = rColor + a1.toString(16).padStart(2, '0');
+          ctx.lineWidth = (2.5 - p1 * 2) / globalScale;
+          ctx.stroke();
+          // Ring 2 (delayed)
+          if (elapsed > 0.2) {
+            const p2 = (elapsed - 0.2) / 1.3;
+            const ripple2R = r + p2 * 50;
+            const a2 = Math.round((1 - p2) * 0.35 * 255);
+            ctx.beginPath();
+            ctx.arc(node.x, node.y, ripple2R, 0, Math.PI * 2);
+            ctx.strokeStyle = rColor + a2.toString(16).padStart(2, '0');
+            ctx.lineWidth = (1.8 - p2 * 1.5) / globalScale;
+            ctx.stroke();
+          }
+        } else {
+          clickRippleRef.current = null;
+        }
       }
 
       // Ring for pinned nodes
@@ -265,7 +364,6 @@ export default function Graph() {
       gradient.addColorStop(1, color + '88');
 
       if (node.group === 'core') {
-        // Core = double ring
         ctx.beginPath();
         ctx.arc(node.x, node.y, r, 0, Math.PI * 2);
         ctx.fillStyle = gradient;
@@ -279,7 +377,6 @@ export default function Graph() {
         ctx.lineWidth = 1 / globalScale;
         ctx.stroke();
       } else if (node.group === 'agent') {
-        // Agent = hexagon
         drawHexagon(ctx, node.x, node.y, r);
         ctx.fillStyle = gradient;
         ctx.fill();
@@ -287,7 +384,6 @@ export default function Graph() {
         ctx.lineWidth = (highlight ? 2 : 0.8) / globalScale;
         ctx.stroke();
       } else if (node.group === 'intelligence') {
-        // Intelligence = diamond
         drawDiamond(ctx, node.x, node.y, r);
         ctx.fillStyle = gradient;
         ctx.fill();
@@ -295,7 +391,6 @@ export default function Graph() {
         ctx.lineWidth = (highlight ? 2 : 0.8) / globalScale;
         ctx.stroke();
       } else if (node.group === 'skill') {
-        // Skill = rounded rectangle
         drawRoundedRect(ctx, node.x, node.y, r);
         ctx.fillStyle = gradient;
         ctx.fill();
@@ -311,7 +406,6 @@ export default function Graph() {
         ctx.strokeStyle = highlight ? '#fff' : color + '60';
         ctx.lineWidth = (highlight ? 1.5 : 0.5) / globalScale;
         ctx.stroke();
-        // Inner dot
         ctx.beginPath();
         ctx.arc(node.x, node.y, r * 0.3, 0, Math.PI * 2);
         ctx.fillStyle = '#ffffff50';
@@ -324,7 +418,6 @@ export default function Graph() {
         ctx.font = `${highlight ? 'bold ' : ''}${fontSize}px Inter, system-ui, sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
-        // Text shadow
         ctx.fillStyle = '#000000';
         ctx.fillText(label, node.x + 0.5 / globalScale, node.y + r + 3 + 0.5 / globalScale);
         ctx.fillStyle = dimmed ? '#666' : '#e5e7eb';
@@ -336,7 +429,7 @@ export default function Graph() {
     [selected, getConnectedIds],
   );
 
-  // Custom link rendering — curved, colored, animated
+  // Custom link rendering — curved, colored, flowing particles
   const linkCanvasObject = useCallback(
     (link: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
       const src = link.source;
@@ -357,9 +450,10 @@ export default function Graph() {
       const my = (src.y + tgt.y) / 2;
       const dx = tgt.x - src.x;
       const dy = tgt.y - src.y;
-      const offset = Math.min(Math.sqrt(dx * dx + dy * dy) * 0.08, 15);
-      const cx = mx + (-dy / Math.sqrt(dx * dx + dy * dy || 1)) * offset;
-      const cy = my + (dx / Math.sqrt(dx * dx + dy * dy || 1)) * offset;
+      const dist = Math.sqrt(dx * dx + dy * dy || 1);
+      const offset = Math.min(dist * 0.08, 15);
+      const cx = mx + (-dy / dist) * offset;
+      const cy = my + (dx / dist) * offset;
 
       ctx.beginPath();
       ctx.moveTo(src.x, src.y);
@@ -377,7 +471,6 @@ export default function Graph() {
         ctx.strokeStyle = grad;
         ctx.lineWidth = 2.5 / globalScale;
       } else {
-        // Gradient from source to target color — visible on dark bg
         const grad = ctx.createLinearGradient(src.x, src.y, tgt.x, tgt.y);
         grad.addColorStop(0, srcColor + '60');
         grad.addColorStop(1, tgtColor + '60');
@@ -386,6 +479,40 @@ export default function Graph() {
       }
 
       ctx.stroke();
+
+      // Flowing particles along bezier — energy flow effect
+      if (!dimmed) {
+        const t = performance.now() / 1000;
+        const linkSeed = nodePhase((src.id || '') + (tgt.id || ''));
+        const particleCount = isHighlighted ? 3 : 1;
+        const speed = isHighlighted ? 0.25 : 0.12;
+
+        for (let p = 0; p < particleCount; p++) {
+          const pt = ((t * speed + linkSeed + p * (1 / particleCount)) % 1);
+          const px = bezierPoint(pt, src.x, cx, tgt.x);
+          const py = bezierPoint(pt, src.y, cy, tgt.y);
+          // Fade in/out at endpoints
+          const fadeAlpha = Math.sin(pt * Math.PI);
+          const pAlpha = fadeAlpha * (isHighlighted ? 0.9 : 0.35);
+          const pRadius = (isHighlighted ? 2.2 : 1.2) / globalScale;
+
+          // Glow around particle
+          if (isHighlighted) {
+            const pGlow = ctx.createRadialGradient(px, py, 0, px, py, pRadius * 3);
+            pGlow.addColorStop(0, tgtColor + Math.round(pAlpha * 0.4 * 255).toString(16).padStart(2, '0'));
+            pGlow.addColorStop(1, tgtColor + '00');
+            ctx.beginPath();
+            ctx.arc(px, py, pRadius * 3, 0, Math.PI * 2);
+            ctx.fillStyle = pGlow;
+            ctx.fill();
+          }
+
+          ctx.beginPath();
+          ctx.arc(px, py, pRadius, 0, Math.PI * 2);
+          ctx.fillStyle = tgtColor + Math.round(pAlpha * 255).toString(16).padStart(2, '0');
+          ctx.fill();
+        }
+      }
 
       // Arrow head for highlighted links
       if (isHighlighted) {
@@ -483,9 +610,9 @@ export default function Graph() {
           onNodeClick={handleNodeClick}
           onNodeDragEnd={handleNodeDragEnd}
           onBackgroundClick={() => { setSelected(null); }}
-          cooldownTicks={120}
-          d3AlphaDecay={0.015}
-          d3VelocityDecay={0.25}
+          cooldownTicks={Infinity}
+          d3AlphaDecay={0.008}
+          d3VelocityDecay={0.3}
           backgroundColor="#0a0a0f"
           enableNodeDrag={true}
           enableZoomInteraction={true}

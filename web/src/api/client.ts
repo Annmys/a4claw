@@ -55,11 +55,14 @@ export const api = {
   register: (username: string, password: string) => apiRequest<{ token: string }>('/auth/register', { method: 'POST', body: JSON.stringify({ username, password }) }),
 
   // Chat
-  chat: (text: string) => apiRequest<{ message: string; thinking?: string; agent: string; provider?: string }>('/chat', { method: 'POST', body: JSON.stringify({ text }) }),
-  chatWithFile: (text: string, file: File) => {
+  chat: (text: string, conversationId?: string, responseMode?: string, model?: string) => apiRequest<{ message: string; thinking?: string; agent: string; provider?: string }>('/chat', { method: 'POST', body: JSON.stringify({ text, conversationId, responseMode, model }) }),
+  chatWithFile: (text: string, file: File, conversationId?: string, responseMode?: string, model?: string) => {
     const formData = new FormData();
     formData.append('text', text);
     formData.append('file', file);
+    if (conversationId) formData.append('conversationId', conversationId);
+    if (responseMode) formData.append('responseMode', responseMode);
+    if (model) formData.append('model', model);
     return uploadRequest<{ message: string; thinking?: string; agent: string; provider?: string }>('/chat', formData);
   },
   status: () => apiRequest<{ status: string; uptime: number; memory: number }>('/status'),
@@ -102,7 +105,19 @@ export const api = {
   deleteCronTask: (id: string) => apiRequest<any>(`/cron/${id}`, { method: 'DELETE' }),
   toggleCronTask: (id: string) => apiRequest<any>(`/cron/${id}/toggle`, { method: 'POST' }),
 
-  // History
+  // Conversations / History
+  getConversations: (params?: { platform?: string; limit?: number; offset?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.platform) qs.set('platform', params.platform);
+    if (params?.limit) qs.set('limit', String(params.limit));
+    if (params?.offset) qs.set('offset', String(params.offset));
+    return apiRequest<{ conversations: Array<{ id: string; title: string | null; platform: string; messageCount: number; lastMessage: { content: string; role: string; createdAt: string } | null; createdAt: string; updatedAt: string }> }>(`/history?${qs.toString()}`);
+  },
+  getConversation: (id: string) => apiRequest<{ id: string; messages: Array<{ id: string; role: string; content: string; agent?: string; createdAt: string }> }>(`/history/${id}`),
+  createConversationOnServer: (conversationId: string, title?: string) => apiRequest<{ id: string; ok: boolean }>('/history', { method: 'POST', body: JSON.stringify({ conversationId, title }) }),
+  renameConversationOnServer: (id: string, title: string) => apiRequest<{ ok: boolean }>(`/history/${id}`, { method: 'PUT', body: JSON.stringify({ title }) }),
+  deleteConversationOnServer: (id: string) => apiRequest<{ ok: boolean }>(`/history/${id}`, { method: 'DELETE' }),
+  // Legacy alias
   getHistory: (params?: { platform?: string; limit?: number; offset?: number }) => {
     const qs = new URLSearchParams();
     if (params?.platform) qs.set('platform', params.platform);
@@ -129,6 +144,9 @@ export const api = {
   dashboardCron: () => apiRequest<any>('/dashboard/cron'),
   dashboardActivity: () => apiRequest<any[]>('/dashboard/activity'),
   graphData: () => apiRequest<any>('/dashboard/graph'),
+
+  // Models
+  getModels: () => apiRequest<{ models: Array<{ id: string; name: string; provider: string; tier: string; supportsHebrew?: boolean; supportsVision?: boolean }> }>('/models'),
 
   // Generic GET
   get: <T = any>(path: string) => apiRequest<T>(path),

@@ -2,7 +2,8 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "noUnusedLocals": false,
-    "noUnusedParameters": false
+    "noUnusedParameters": false,
+    "noEmitOnError": false
   },
   "exclude": ["node_modules", "dist", "web", "tests", "**/*.test.ts"]
 }

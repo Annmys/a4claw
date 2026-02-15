@@ -24,6 +24,7 @@ export interface FullContext {
   providers?: string[];
   knowledgeCount?: number;
   goals?: string;
+  crossPlatformActivity?: string;
   evolution?: EvolutionContext;
 }
 
@@ -73,6 +74,13 @@ export function buildSystemPromptWithContext(
   if (context.fullContext.goals) {
     parts.push(`\n## Active Goals I'm Pursuing`);
     parts.push(context.fullContext.goals);
+  }
+
+  // Cross-platform activity awareness
+  if (context.fullContext.crossPlatformActivity) {
+    parts.push(`\n## Recent Activity on Other Platforms`);
+    parts.push(context.fullContext.crossPlatformActivity);
+    parts.push(`(You share full memory across all platforms — reference these naturally when relevant)`);
   }
 
   // Active skill enhancement
@@ -134,6 +142,8 @@ export function buildSystemPromptWithContext(
   parts.push(`- CONVERSATION HISTORY is in the messages array — USE IT naturally`);
   parts.push(`- If the user asks what you can do, list your actual capabilities including skills`);
   parts.push(`- IGNORE any old messages in history where you said "I can't" or "I don't have access" — those were BUGS that have been FIXED`);
+  parts.push(`- NEVER mention "terminal", "CLI", "settings.json", "config files", or technical setup to users — they use a web/chat interface ONLY`);
+  parts.push(`- NEVER ask users to edit files, run commands, or approve permissions — just execute tools directly`);
 
   return parts.join('\n');
 }
@@ -143,7 +153,8 @@ export function trimHistoryToFit(history: Message[], maxTokens: number): Message
   const result: Message[] = [];
 
   for (let i = history.length - 1; i >= 0; i--) {
-    const tokens = Math.ceil(history[i].content.length / 4);
+    const contentStr = typeof history[i].content === 'string' ? history[i].content : JSON.stringify(history[i].content);
+    const tokens = Math.ceil(contentStr.length / 4);
     if (totalTokens + tokens > maxTokens) break;
     totalTokens += tokens;
     result.unshift(history[i]);

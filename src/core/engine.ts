@@ -18,7 +18,7 @@ import { scheduleReminder } from '../queue/scheduler.js';
 import { UsageTracker } from './usage-tracker.js';
 import { RAGEngine } from '../actions/rag/rag-engine.js';
 import { initTools, getToolDefinitions, executeTool, setExecutionContext } from './tool-executor.js';
-import { classifyComplexity, selectModel, classifyEffort, mapEffortToThinking } from './model-router.js';
+import { classifyComplexity, selectModel, classifyEffort, mapEffortToThinking, withVariant, findModel } from './model-router.js';
 import { resolveOllamaModel } from './ollama-model-registry.js';
 import type { CrewOrchestrator } from './crew-orchestrator.js';
 import { onMessageProcessed, onError, getIntelligenceContext, isBridgeReady } from './intelligence-bridge.js';
@@ -42,9 +42,12 @@ export interface IncomingMessage {
   text: string;
   userRole?: string;
   replyTo?: string;
+  conversationId?: string;
   attachments?: Array<{ type: string; url: string }>;
   metadata?: Record<string, unknown>;
   onProgress?: (event: ProgressEvent) => void;
+  responseMode?: ResponseMode;
+  model?: string;
 }
 
 export interface OutgoingMessage {
@@ -56,6 +59,63 @@ export interface OutgoingMessage {
   tokensUsed?: { input: number; output: number };
   provider?: string;
   skillUsed?: string;
+}
+
+// ─── Response Mode System ──────────────────────────────────────────────────
+// Controls how much processing each message gets. Saves time on simple queries.
+export type ResponseMode = 'quick' | 'auto' | 'deep';
+
+// Per-user mode overrides (in-memory, reset on restart)
+const userModeOverrides = new Map<string, ResponseMode>();
+
+/**
+ * Detect if message is a mode-switch command.
+ * Returns the new mode, or null if not a mode command.
+ */
+function detectModeCommand(text: string): ResponseMode | null {
+  const t = text.trim().toLowerCase();
+  if (/^(מצב מהיר|quick|fast|מהיר)$/i.test(t)) return 'quick';
+  if (/^(מצב אוטומטי|auto|אוטומטי|רגיל)$/i.test(t)) return 'auto';
+  if (/^(מצב מעמיק|deep|מעמיק|עמוק)$/i.test(t)) return 'deep';
+  return null;
+}
+
+/**
+ * Auto-detect response mode from message content.
+ * Quick: short messages, greetings, simple questions
+ * Deep:  long multi-domain tasks, orchestration
+ * Auto:  everything else (default)
+ */
+function autoDetectMode(text: string): ResponseMode {
+  const len = text.length;
+
+  // Very short messages → always quick
+  if (len < 60) return 'quick';
+
+  // Simple greeting / question patterns
+  if (/^(היי|שלום|הי|hello|hi|hey|yo|בוקר טוב|ערב טוב|מה נשמע|מה קורה|thanks|תודה|ok|אוקי|כן|לא|good|טוב|בסדר)/i.test(text.trim())) {
+    return 'quick';
+  }
+
+  // Simple short questions (Hebrew + English)
+  if (len < 200 && /^(מה|איך|למה|כמה|האם|יש|what|how|why|when|who|where|is there|can you|do you|tell me|show me)/i.test(text.trim())) {
+    return 'quick';
+  }
+
+  // Multi-domain / complex → deep
+  if (len > 500) {
+    const domains = [
+      /research|חקור|analyze|נתח/i,
+      /build|בנה|create|צור|implement/i,
+      /trade|signal|מסחר|סיגנל|crypto/i,
+      /secur|audit|אבטח|penetr/i,
+      /review|בדוק|test|בדיקה/i,
+    ];
+    const matchCount = domains.filter(d => d.test(text)).length;
+    if (matchCount >= 2) return 'deep';
+  }
+
+  return 'auto';
 }
 
 export class Engine {
@@ -75,13 +135,14 @@ export class Engine {
   private evolution: EvolutionEngine | null = null;
   private crewOrchestrator: CrewOrchestrator | null = null;
 
-  private getHistory?: (userId: string, platform: string, limit: number) => Promise<Message[]>;
+  private getHistory?: (userId: string, platform: string, limit: number, conversationId?: string) => Promise<Message[]>;
   private saveMessage?: (userId: string, platform: string, role: string, content: string, metadata?: any) => Promise<void>;
   private getUserKnowledge?: (userId: string) => Promise<string>;
   private getUserTasks?: (userId: string) => Promise<string>;
   private getUserServers?: (userId: string) => Promise<string>;
   private learnFromConversation?: (userId: string, userMessage: string, agentResponse: string) => Promise<void>;
   private getKnowledgeCount?: (userId: string) => Promise<number>;
+  private getCrossPlatformSummary?: (userId: string, platform: string) => Promise<string>;
 
   constructor() {
     this.ai = new AIClient();
@@ -123,71 +184,240 @@ export class Engine {
   setCrewOrchestrator(crew: CrewOrchestrator) { this.crewOrchestrator = crew; }
   getCrewOrchestrator(): CrewOrchestrator | null { return this.crewOrchestrator; }
 
-  /** Detect if a task should trigger multi-agent crew execution */
+  /**
+   * Smart crew detection — decides if multiple agents are needed and WHY.
+   * Rules:
+   *   1. Short messages (<200 chars) → NEVER crew (single agent handles it)
+   *   2. Simple questions/greetings → NEVER crew
+   *   3. Only crew when multiple DISTINCT domains are detected
+   *   4. Log the reason so user understands why agents were activated
+   */
   private shouldUseCrew(intent: string, text: string, _agentId: string): {
     id: string; name: string; mode: 'sequential' | 'hierarchical' | 'ensemble';
     members: Array<{ agentId: string; role?: string }>; task: string;
+    reason: string;
   } | null {
     if (!this.crewOrchestrator) return null;
+
+    // Rule 1: Short messages → single agent always
+    if (text.length < 200) return null;
+
+    // Rule 2: Simple patterns → single agent
+    const isQuestion = /^(מה|יש|תבדוק|איך|למה|כמה|what|is there|check|status|how|why|when|who|where|tell me|show me|explain)/i.test(text.trim());
+    if (isQuestion && text.length < 400) return null;
+
     const lowerText = text.toLowerCase();
 
-    // Explicit orchestrate intent → hierarchical crew
-    if (intent === 'orchestrate') {
-      return {
-        id: `crew_${Date.now()}`, name: 'Orchestration Crew', mode: 'hierarchical',
-        members: [
-          { agentId: 'orchestrator', role: 'leader' },
-          { agentId: 'researcher', role: 'research' },
-          { agentId: 'code-assistant', role: 'implementation' },
-        ],
-        task: text,
-      };
+    // Rule 3: Detect distinct task domains
+    const domains = {
+      research: /research|חקור|analyze|analys|נתח|investigate|survey|compare/i.test(lowerText),
+      build: /build|בנה|create|צור|implement|develop|write code|תכתוב|תבנה/i.test(lowerText),
+      trade: /trade|signal|מסחר|סיגנל|portfolio|crypto|bitcoin|שוק/i.test(lowerText),
+      security: /secur|audit|vulnerab|אבטח|penetr|pentest/i.test(lowerText),
+      review: /review|בדוק|check|סקור|test|בדיקה/i.test(lowerText),
+      content: /write article|כתוב מאמר|blog|presentation|מצגת|document/i.test(lowerText),
+    };
+
+    const activeDomains = Object.entries(domains).filter(([, active]) => active);
+
+    // Need at least 2 distinct domains for crew
+    if (activeDomains.length < 2) {
+      // Special case: explicit orchestrate intent with complex multi-step task
+      if (intent === 'orchestrate' && text.length > 400) {
+        const hasMultipleSteps = /\d+\.\s|then\s|ואז\s|אחר כך|step\s?\d|first.*then|קודם.*אחר/i.test(text);
+        if (hasMultipleSteps) {
+          const reason = 'Multi-step orchestration task detected';
+          logger.info('Crew activated', { reason, textLength: text.length });
+          return {
+            id: `crew_${Date.now()}`, name: 'Orchestration Crew', mode: 'hierarchical',
+            members: [
+              { agentId: 'orchestrator', role: 'leader' },
+              { agentId: 'researcher', role: 'research' },
+              { agentId: 'code-assistant', role: 'implementation' },
+            ],
+            task: text, reason,
+          };
+        }
+      }
+      return null;
     }
 
-    // Multi-domain detection: research + build → sequential crew
-    const hasResearch = /research|חקור|analyze|analys|נתח/i.test(lowerText);
-    const hasBuild = /build|בנה|create|צור|implement|develop/i.test(lowerText);
-    const hasTrade = /trade|signal|מסחר|סיגנל|portfolio/i.test(lowerText);
-    const hasSecurity = /secur|audit|vulnerab|אבטח/i.test(lowerText);
-    const hasReview = /review|בדוק|check|סקור/i.test(lowerText);
+    // Build crew based on detected domains
+    const domainNames = activeDomains.map(([name]) => name);
+    const reason = `Multi-domain task: ${domainNames.join(' + ')}`;
+    logger.info('Crew activated', { reason, domains: domainNames, textLength: text.length });
 
-    // Research + Build → sequential (researcher → code-assistant)
-    if (hasResearch && hasBuild) {
+    // Research + Build → sequential
+    if (domains.research && domains.build) {
       return {
         id: `crew_${Date.now()}`, name: 'Research & Build', mode: 'sequential',
         members: [
           { agentId: 'researcher', role: 'research' },
           { agentId: 'code-assistant', role: 'build' },
         ],
-        task: text,
+        task: text, reason,
       };
     }
 
-    // Research + Trade → sequential (researcher → crypto-analyst)
-    if (hasResearch && hasTrade) {
+    // Research + Trade → sequential
+    if (domains.research && domains.trade) {
       return {
         id: `crew_${Date.now()}`, name: 'Research & Trade', mode: 'sequential',
         members: [
           { agentId: 'researcher', role: 'research' },
           { agentId: 'crypto-analyst', role: 'analysis' },
         ],
-        task: text,
+        task: text, reason,
       };
     }
 
-    // Review + Security → ensemble (parallel independent review)
-    if (hasReview && hasSecurity) {
+    // Review + Security → ensemble
+    if (domains.review && domains.security) {
       return {
         id: `crew_${Date.now()}`, name: 'Security Review', mode: 'ensemble',
         members: [
           { agentId: 'code-assistant', role: 'code-review' },
           { agentId: 'security-guard', role: 'security-review' },
         ],
-        task: text,
+        task: text, reason,
       };
     }
 
-    return null;
+    // Generic multi-domain → hierarchical with orchestrator
+    return {
+      id: `crew_${Date.now()}`, name: `Multi-Domain (${domainNames.join('+')})`, mode: 'hierarchical',
+      members: [
+        { agentId: 'orchestrator', role: 'leader' },
+        ...activeDomains.slice(0, 3).map(([domain]) => ({
+          agentId: domain === 'trade' ? 'crypto-analyst'
+            : domain === 'security' ? 'security-guard'
+            : domain === 'research' ? 'researcher'
+            : 'code-assistant',
+          role: domain,
+        })),
+      ],
+      task: text, reason,
+    };
+  }
+
+  /**
+   * Quick mode — minimal processing for fast responses.
+   * Skips: intent classification (AI call), meta-agent think, crew detection, full context loading.
+   * Only loads: recent history + sends directly to AI.
+   */
+  private async processQuick(incoming: IncomingMessage, startTime: number): Promise<OutgoingMessage> {
+    const _origSave = this.saveMessage;
+    if (_origSave && incoming.conversationId) {
+      this.saveMessage = async (userId, platform, role, content, metadata?) => {
+        await _origSave(userId, platform, role, content, { ...metadata, _conversationId: incoming.conversationId });
+      };
+    }
+
+    try {
+      incoming.onProgress?.({ type: 'status', message: 'Quick mode — fast response ⚡' });
+
+      // Load minimal history (last 10 messages instead of 20)
+      const rawHistory = this.getHistory ? await this.getHistory(incoming.userId, incoming.platform, 10, incoming.conversationId) : [];
+      const history = rawHistory.filter(m => {
+        if (typeof m.content === 'string') return m.content.trim().length > 0;
+        if (Array.isArray(m.content)) return m.content.length > 0;
+        return false;
+      });
+
+      // Use keyword classification (instant, no AI call)
+      const keywordRouting = (this.router as any).keywordClassify?.(incoming.text);
+      const agentId = keywordRouting?.agentId ?? 'general';
+      const agent = getAgent(agentId) ?? getAgent('general')!;
+
+      // Minimal system prompt — no full context loading
+      const lastMsgStr = incoming.text;
+      const hasHebrew = /[\u0590-\u05FF]/.test(lastMsgStr);
+      const minimalPrompt = `${agent.systemPrompt}\n\nUser: ${incoming.userName} | Platform: ${incoming.platform}${hasHebrew ? '\nThe user speaks Hebrew — respond in Hebrew.' : ''}`;
+
+      // Build messages
+      const trimmedHistory = trimHistoryToFit(history, 4000);
+      const messages: Message[] = [...trimmedHistory, { role: 'user', content: incoming.text }];
+
+      // Select provider (same logic but skip complexity classification)
+      const { resolved: resolvedMode } = this.ai.getProviderMode();
+      const claudeCodeActive = this.ai.getAvailableProviders().includes('claude-code');
+      let selectedProvider: 'anthropic' | 'openrouter' | 'claude-code' | 'ollama' | undefined;
+      let selectedModelId: string | undefined;
+
+      // User model override from UI selector
+      const userModelOverride = incoming.model && incoming.model !== 'auto'
+        ? findModel(incoming.model) : null;
+
+      if (incoming.model === 'claude-code-cli') {
+        selectedProvider = 'claude-code';
+        selectedModelId = undefined;
+      } else if (userModelOverride) {
+        selectedProvider = userModelOverride.provider as typeof selectedProvider;
+        selectedModelId = userModelOverride.id;
+        logger.info('Model override from UI (quick)', { model: userModelOverride.name });
+      } else if (resolvedMode === 'local' && config.OLLAMA_ENABLED) {
+        selectedProvider = 'ollama';
+        selectedModelId = config.OLLAMA_DEFAULT_MODEL;
+      } else if (resolvedMode === 'max' && claudeCodeActive) {
+        selectedProvider = 'claude-code';
+        selectedModelId = undefined;
+      } else if (claudeCodeActive) {
+        selectedProvider = 'claude-code';
+        selectedModelId = undefined;
+      } else {
+        selectedProvider = 'anthropic';
+        selectedModelId = config.AI_MODEL;
+      }
+
+      // Direct AI call — no tools, no thinking mode, just fast response
+      const response = await this.ai.chat({
+        systemPrompt: minimalPrompt,
+        messages,
+        maxTokens: agent.maxTokens,
+        temperature: agent.temperature,
+        ...(selectedModelId ? { model: selectedModelId } : {}),
+        ...(selectedProvider ? { provider: selectedProvider } : {}),
+      });
+
+      // Empty response fallback
+      if (!response.content || response.content.trim().length === 0) {
+        response.content = 'קיבלתי את ההודעה שלך אבל לא הצלחתי לעבד אותה. נסה שוב 🔄';
+      }
+
+      // Save messages
+      if (this.saveMessage) {
+        if (incoming.text) {
+          await this.saveMessage(incoming.userId, incoming.platform, 'user', incoming.text, { mode: 'quick' });
+        }
+        if (response.content) {
+          await this.saveMessage(incoming.userId, incoming.platform, 'assistant', response.content, {
+            agent: agent.id, provider: response.provider, mode: 'quick',
+          });
+        }
+      }
+
+      // Background learning (non-blocking)
+      if (this.learnFromConversation) {
+        this.learnFromConversation(incoming.userId, incoming.text, response.content).catch(() => {});
+      }
+
+      const duration = Date.now() - startTime;
+      logger.info('Quick mode response', { agent: agent.id, provider: response.provider, duration });
+      pushActivity('response', `[quick:${agent.id}] ${response.content.slice(0, 80)}...`, { agent: agent.id, platform: incoming.platform });
+
+      return {
+        text: response.content,
+        format: 'markdown',
+        agentUsed: `quick:${agent.id}`,
+        tokensUsed: response.usage ? { input: response.usage.inputTokens, output: response.usage.outputTokens } : undefined,
+        provider: response.provider,
+      };
+    } catch (error: any) {
+      logger.error('Quick mode error', { error: error.message });
+      return { text: `❌ שגיאה: ${error.message?.slice(0, 150)}`, format: 'text' };
+    } finally {
+      if (_origSave) this.saveMessage = _origSave;
+    }
   }
 
   setMemoryFunctions(fns: {
@@ -198,6 +428,7 @@ export class Engine {
     getUserServers?: typeof this.getUserServers;
     learnFromConversation?: typeof this.learnFromConversation;
     getKnowledgeCount?: typeof this.getKnowledgeCount;
+    getCrossPlatformSummary?: typeof this.getCrossPlatformSummary;
   }) {
     this.getHistory = fns.getHistory;
     this.saveMessage = fns.saveMessage;
@@ -206,6 +437,7 @@ export class Engine {
     this.getUserServers = fns.getUserServers;
     this.learnFromConversation = fns.learnFromConversation;
     this.getKnowledgeCount = fns.getKnowledgeCount;
+    this.getCrossPlatformSummary = fns.getCrossPlatformSummary;
   }
 
   async process(incoming: IncomingMessage): Promise<OutgoingMessage> {
@@ -213,9 +445,40 @@ export class Engine {
     logger.info('Processing message', { platform: incoming.platform, userId: incoming.userId, textLength: incoming.text.length });
     pushActivity('message', `${incoming.userName}: ${incoming.text.slice(0, 80)}${incoming.text.length > 80 ? '...' : ''}`, { platform: incoming.platform });
 
+    // ── 0. Mode-switch command detection ──
+    const modeCmd = detectModeCommand(incoming.text);
+    if (modeCmd) {
+      userModeOverrides.set(incoming.userId, modeCmd);
+      const modeNames: Record<ResponseMode, string> = { quick: 'מהיר (Quick)', auto: 'אוטומטי (Auto)', deep: 'מעמיק (Deep)' };
+      const responseText = `מצב ${modeNames[modeCmd]} הופעל.\n\n• **מהיר** — תגובה מהירה בלי סוכנים, מתאים לשיחה רגילה\n• **אוטומטי** — המערכת מחליטה מתי להפעיל סוכנים\n• **מעמיק** — כל הסוכנים פעילים, ניתוח מלא`;
+      if (this.saveMessage) {
+        await this.saveMessage(incoming.userId, incoming.platform, 'user', incoming.text);
+        await this.saveMessage(incoming.userId, incoming.platform, 'assistant', responseText);
+      }
+      return { text: responseText, format: 'markdown', agentUsed: 'system', provider: 'local' };
+    }
+
+    // ── 0b. Determine response mode ──
+    const userMode = incoming.responseMode ?? userModeOverrides.get(incoming.userId) ?? 'auto';
+    const effectiveMode = userMode === 'auto' ? autoDetectMode(incoming.text) : userMode;
+    logger.info('Response mode', { userMode, effectiveMode, textLength: incoming.text.length });
+
+    // Wrap saveMessage to auto-inject conversationId from the incoming message
+    const _origSave = this.saveMessage;
+    if (_origSave && incoming.conversationId) {
+      this.saveMessage = async (userId, platform, role, content, metadata?) => {
+        await _origSave(userId, platform, role, content, { ...metadata, _conversationId: incoming.conversationId });
+      };
+    }
+
     try {
+      // ── QUICK MODE: Minimal processing — skip intent classification, meta-agent, crew ──
+      if (effectiveMode === 'quick') {
+        return await this.processQuick(incoming, startTime);
+      }
+
       // 1. Load conversation history (filter out empty messages that would cause API errors)
-      const rawHistory = this.getHistory ? await this.getHistory(incoming.userId, incoming.platform, 20) : [];
+      const rawHistory = this.getHistory ? await this.getHistory(incoming.userId, incoming.platform, 20, incoming.conversationId) : [];
       const history = rawHistory.filter(m => {
         if (typeof m.content === 'string') return m.content.trim().length > 0;
         if (Array.isArray(m.content)) return m.content.length > 0;
@@ -226,7 +489,7 @@ export class Engine {
       const contextSummary = history.slice(-6).map(m => `${m.role}: ${m.content.slice(0, 200)}`).join('\n');
       const routing = await this.router.classify(incoming.text, contextSummary);
       logger.info('Intent classified', { intent: routing.intent, confidence: routing.confidence, agent: routing.agentId });
-      incoming.onProgress?.({ type: 'status', message: `Routing to ${routing.agentId}...` });
+      incoming.onProgress?.({ type: 'status', message: `Classifying intent → ${routing.agentId} (${Math.round(routing.confidence * 100)}% confidence)` });
 
       // 2a. Desktop control — intercept before normal AI flow
       if (
@@ -513,25 +776,32 @@ If they want to check a running project, use "status" with projectName.`,
         }
       }
 
-      // 2i. Meta-agent think step — skip for simple intents to reduce latency
+      // 2i. Meta-agent think step — skip for simple intents AND auto-mode short messages
       const SIMPLE_INTENTS = new Set([
         Intent.GENERAL_CHAT, Intent.HELP, Intent.SETTINGS, Intent.USAGE,
         Intent.TASK_LIST, Intent.REMINDER_SET, Intent.CALENDAR,
+        Intent.QUESTION_ANSWER, Intent.REMEMBER, Intent.WHATSAPP_CONNECT,
+        Intent.PHONE, Intent.EMAIL,
       ]);
       let metaThinking = '';
-      if (!SIMPLE_INTENTS.has(routing.intent)) {
-        incoming.onProgress?.({ type: 'thinking', message: 'Analyzing request...' });
+      const skipMeta = SIMPLE_INTENTS.has(routing.intent)
+        || (effectiveMode === 'auto' && incoming.text.length < 300);  // auto mode skips meta for short messages
+      if (!skipMeta) {
+        incoming.onProgress?.({ type: 'thinking', message: 'Thinking deeply about this...' });
         const thought = await this.meta.think(incoming.text, contextSummary);
         metaThinking = thought.situation ?? '';
-        if (thought.plan?.length) metaThinking += '\n' + thought.plan.map((s: string, i: number) => `${i + 1}. ${s}`).join('\n');
+        if (thought.plan?.length) {
+          metaThinking += '\n' + thought.plan.map((s: string, i: number) => `${i + 1}. ${s}`).join('\n');
+          incoming.onProgress?.({ type: 'thinking', message: `Plan: ${thought.plan.slice(0, 3).join(' → ')}${thought.plan.length > 3 ? '...' : ''}` });
+        }
         logger.info('Meta-agent thought', { situation: thought.situation, confidence: thought.confidence, planSteps: thought.plan?.length ?? 0 });
       } else {
-        logger.info('Skipping meta-agent for simple intent', { intent: routing.intent });
+        logger.info('Skipping meta-agent', { intent: routing.intent, mode: effectiveMode, textLength: incoming.text.length });
       }
 
       // 3. Select agent
       const agent = getAgent(routing.agentId) ?? getAgent('general')!;
-      incoming.onProgress?.({ type: 'agent', message: `Using ${agent.name}...`, agent: agent.id });
+      incoming.onProgress?.({ type: 'agent', message: `${agent.name} is handling this`, agent: agent.id });
 
       // 4. Match skills
       const matchedSkill = this.skills.matchSkill(incoming.text);
@@ -539,12 +809,14 @@ If they want to check a running project, use "status" with projectName.`,
         logger.info('Skill matched', { skill: matchedSkill.id, name: matchedSkill.name });
       }
 
-      // 5. Load full context (knowledge, tasks, servers, skills)
-      const [knowledgeStr, tasksStr, serversStr, knowledgeCount] = await Promise.all([
+      // 5. Load full context (knowledge, tasks, servers, skills, cross-platform)
+      incoming.onProgress?.({ type: 'status', message: 'Loading context & memory...' });
+      const [knowledgeStr, tasksStr, serversStr, knowledgeCount, crossPlatformStr] = await Promise.all([
         this.getUserKnowledge ? this.getUserKnowledge(incoming.userId) : '',
         this.getUserTasks ? this.getUserTasks(incoming.userId) : '',
         this.getUserServers ? this.getUserServers(incoming.userId) : '',
         this.getKnowledgeCount ? this.getKnowledgeCount(incoming.userId) : 0,
+        this.getCrossPlatformSummary ? this.getCrossPlatformSummary(incoming.userId, incoming.platform) : '',
       ]);
 
       // ── Intelligence: enrich context with live intelligence data ──
@@ -573,6 +845,7 @@ If they want to check a running project, use "status" with projectName.`,
         providers: this.ai.getAvailableProviders(),
         knowledgeCount,
         goals: this.goals.getGoalsSummary(incoming.userId),
+        crossPlatformActivity: crossPlatformStr || undefined,
         ...(evolutionContext ? { evolution: evolutionContext } : {}),
       };
 
@@ -612,12 +885,25 @@ If they want to check a running project, use "status" with projectName.`,
       let selectedModelId: string | undefined;
       let selectedProvider: 'anthropic' | 'openrouter' | 'claude-code' | 'ollama' | undefined;
 
+      // User model override from UI selector
+      const userModelOverride = incoming.model && incoming.model !== 'auto'
+        ? findModel(incoming.model) : null;
+
       // Provider mode drives provider selection
       const { resolved: resolvedMode } = this.ai.getProviderMode();
       const claudeCodeActive = this.ai.getAvailableProviders().includes('claude-code');
       const needsTools = toolDefs.length > 0;
 
-      if (resolvedMode === 'local' && config.OLLAMA_ENABLED) {
+      if (incoming.model === 'claude-code-cli') {
+        // Special: user explicitly selected Claude Code CLI
+        selectedProvider = 'claude-code';
+        selectedModelId = undefined;
+        logger.info('Model override from UI', { model: 'Claude Code CLI (Opus 4.6)', provider: 'claude-code' });
+      } else if (userModelOverride) {
+        selectedModelId = userModelOverride.id;
+        selectedProvider = userModelOverride.provider as typeof selectedProvider;
+        logger.info('Model override from UI', { model: userModelOverride.name, provider: userModelOverride.provider, tier: userModelOverride.tier });
+      } else if (resolvedMode === 'local' && config.OLLAMA_ENABLED) {
         // LOCAL mode: Ollama-first with per-agent model assignment
         const ollamaModel = resolveOllamaModel(agent.id, agent.preferredOllamaModel);
         if (ollamaModel) {
@@ -677,6 +963,7 @@ If they want to check a running project, use "status" with projectName.`,
             requiresVision: false,
             dailyBudgetLeft: this.usageTracker?.getDailyBudgetLeft() ?? 10,
             preferFree: config.PREFER_FREE_MODELS,
+            isSubAgent: false, // Main request — always use strong models
           });
 
           selectedModelId = selectedModel.id;
@@ -720,8 +1007,8 @@ If they want to check a running project, use "status" with projectName.`,
       // ── Crew Orchestrator: detect multi-agent tasks ──
       const crewConfig = this.shouldUseCrew(routing.intent, incoming.text, agent.id);
       if (crewConfig && this.crewOrchestrator) {
-        incoming.onProgress?.({ type: 'status', message: `Running ${crewConfig.mode} crew (${crewConfig.members.length} agents)...` });
-        logger.info('Crew triggered', { mode: crewConfig.mode, members: crewConfig.members.map(m => m.agentId), task: crewConfig.task.slice(0, 80) });
+        incoming.onProgress?.({ type: 'status', message: `${crewConfig.reason} → ${crewConfig.mode} crew (${crewConfig.members.map(m => m.agentId).join(', ')})` });
+        logger.info('Crew triggered', { reason: crewConfig.reason, mode: crewConfig.mode, members: crewConfig.members.map(m => m.agentId), task: crewConfig.task.slice(0, 80) });
         const crewResult = await this.crewOrchestrator.runCrew(crewConfig);
 
         if (this.saveMessage) {
@@ -737,7 +1024,26 @@ If they want to check a running project, use "status" with projectName.`,
         };
       }
 
-      incoming.onProgress?.({ type: 'status', message: 'Generating response...' });
+      // ── OpenRouter Enhancements ──
+      // Apply thinking variant, plugins, and response-healing when going through OpenRouter
+      let orPlugins: Array<{ id: string; [key: string]: unknown }> | undefined;
+      if (selectedProvider === 'openrouter') {
+        // Thinking variant: append :thinking to model ID for high/critical effort
+        if ((thinkingConfig as any).useThinkingVariant && selectedModelId) {
+          selectedModelId = withVariant(selectedModelId, 'thinking');
+        }
+        // Response-healing plugin: auto-fix malformed JSON from tool-calling models
+        if (needsTools) {
+          orPlugins = [{ id: 'response-healing' }];
+        }
+        // Web plugin: enable web search for agents that have search tools
+        if (agentTools.includes('search')) {
+          orPlugins = [...(orPlugins || []), { id: 'web' }];
+        }
+      }
+
+      const providerLabel = selectedProvider === 'claude-code' ? 'Claude Code' : selectedProvider === 'ollama' ? `Ollama (${selectedModelId ?? 'default'})` : selectedProvider ?? 'Anthropic';
+      incoming.onProgress?.({ type: 'status', message: `Generating response via ${providerLabel}${needsTools ? ` with ${toolDefs.length} tools` : ''}...` });
       let response;
       if (toolDefs.length > 0) {
         // Agent HAS tools → use chatWithTools (tool execution loop)
@@ -754,16 +1060,21 @@ If they want to check a running project, use "status" with projectName.`,
             ...(selectedModelId ? { model: selectedModelId } : {}),
             ...(selectedProvider ? { provider: selectedProvider } : {}),
             ...(agent.maxToolIterations ? { maxToolIterations: agent.maxToolIterations } : {}),
+            ...(orPlugins ? { plugins: orPlugins } : {}),
           },
           async (toolName, toolInput) => {
-            incoming.onProgress?.({ type: 'tool', message: `Running ${toolName}...`, tool: toolName });
+            const toolAction = toolInput?.action ? ` → ${toolInput.action}` : '';
+            incoming.onProgress?.({ type: 'tool', message: `Running ${toolName}${toolAction}...`, tool: toolName });
             if ((toolName === 'task' || toolName === 'db') && !toolInput.userId) {
               toolInput.userId = incoming.userId;
             }
             // Inject user role for permission checks
             toolInput._userRole = incoming.userRole ?? 'admin';
             toolInput._userId = incoming.userId;
-            return executeTool(toolName, toolInput);
+            const result = await executeTool(toolName, toolInput);
+            const ok = typeof result === 'string' && result.length > 0 && !result.startsWith('Error');
+            incoming.onProgress?.({ type: 'status', message: `${toolName}${toolAction} ${ok ? 'done' : 'failed'}`, tool: toolName });
+            return result;
           },
         );
         if (response.toolsUsed.length > 0) {
@@ -783,6 +1094,7 @@ If they want to check a running project, use "status" with projectName.`,
           ...(thinkingConfig.thinkingBudget ? { thinkingBudget: thinkingConfig.thinkingBudget } : {}),
           ...(selectedModelId ? { model: selectedModelId } : {}),
           ...(selectedProvider ? { provider: selectedProvider } : {}),
+          ...(orPlugins ? { plugins: orPlugins } : {}),
         });
       }
 
@@ -904,6 +1216,9 @@ If they want to check a running project, use "status" with projectName.`,
       }
 
       return { text: errorMsg, format: 'text' };
+    } finally {
+      // Restore original saveMessage if we wrapped it
+      if (_origSave) this.saveMessage = _origSave;
     }
   }
 }

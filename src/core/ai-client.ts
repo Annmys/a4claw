@@ -4,7 +4,7 @@ import logger from '../utils/logger.js';
 import { withRetry } from '../utils/retry.js';
 import { ExternalServiceError } from '../utils/errors.js';
 import { sanitizeUnicode } from '../utils/helpers.js';
-import { convertMessagesToOpenAI } from './model-router.js';
+import { convertMessagesToOpenAI, STRONG_FALLBACK_CHAIN } from './model-router.js';
 import { ClaudeCodeProvider } from '../providers/claude-code-provider.js';
 
 export interface Message {
@@ -29,6 +29,16 @@ export interface AIRequest {
   maxToolIterations?: number;
   thinkingMode?: 'none' | 'basic' | 'extended';
   thinkingBudget?: number;
+  /** Sub-agent requests can use cheaper/free models */
+  isSubAgent?: boolean;
+  /** OpenRouter plugins (e.g. web search, response-healing) */
+  plugins?: Array<{ id: string; [key: string]: unknown }>;
+  /** Structured output format (JSON mode or JSON schema) */
+  responseFormat?: { type: 'json_object' } | { type: 'json_schema'; json_schema: { name: string; strict?: boolean; schema: object } };
+  /** OpenRouter native fallback models — tried in order if primary fails */
+  fallbackModels?: string[];
+  /** OpenRouter provider preferences — control which backends are used */
+  providerPreferences?: { order?: string[]; allow_fallbacks?: boolean; require_parameters?: boolean };
 }
 
 export interface AIResponse {
@@ -141,7 +151,9 @@ class OpenAIProvider implements ProviderClient {
 
     if (!res.ok) {
       const error = await res.text();
-      throw new ExternalServiceError('OpenAI', `${res.status}: ${error}`);
+      const err = new ExternalServiceError('OpenAI', `${res.status}: ${error}`);
+      (err as any).status = res.status;
+      throw err;
     }
 
     const data = await res.json() as any;
@@ -211,7 +223,9 @@ class OllamaProvider implements ProviderClient {
 
     if (!res.ok) {
       const error = await res.text();
-      throw new ExternalServiceError('Ollama', `${res.status}: ${error}`);
+      const err = new ExternalServiceError('Ollama', `${res.status}: ${error}`);
+      (err as any).status = res.status;
+      throw err;
     }
 
     const data = await res.json() as any;
@@ -316,11 +330,33 @@ class OpenRouterProvider implements ProviderClient {
       temperature: request.temperature ?? 0.7,
     };
 
+    // Tools (OpenAI format)
     if (request.tools?.length) {
       body.tools = request.tools.map(t => ({
         type: 'function',
         function: { name: t.name, description: t.description, parameters: t.input_schema },
       }));
+    }
+
+    // Plugins — web search, response-healing, structured outputs
+    if (request.plugins?.length) {
+      body.plugins = request.plugins;
+    }
+
+    // Structured outputs — JSON mode or JSON schema
+    if (request.responseFormat) {
+      body.response_format = request.responseFormat;
+    }
+
+    // Native model fallbacks — let OpenRouter handle failover internally
+    if (request.fallbackModels?.length) {
+      body.models = [model, ...request.fallbackModels];
+      body.route = 'fallback';
+    }
+
+    // Provider preferences — control which backends are used
+    if (request.providerPreferences) {
+      body.provider = request.providerPreferences;
     }
 
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
@@ -337,12 +373,20 @@ class OpenRouterProvider implements ProviderClient {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`OpenRouter error ${response.status}: ${errorText}`);
+      const err = new Error(`OpenRouter error ${response.status}: ${errorText}`);
+      (err as any).status = response.status;
+      throw err;
     }
 
     const data = await response.json() as any;
     const choice = data.choices?.[0];
     const message = choice?.message;
+
+    // Fire-and-forget generation stats query for cost/latency tracking
+    const generationId = data.id as string | undefined;
+    if (generationId) {
+      this.queryGenerationStats(generationId).catch(() => {});
+    }
 
     return {
       content: message?.content ?? '',
@@ -357,8 +401,31 @@ class OpenRouterProvider implements ProviderClient {
       },
       stopReason: choice?.finish_reason === 'tool_calls' ? 'tool_use' : (choice?.finish_reason ?? 'end_turn'),
       provider: 'openrouter',
-      modelUsed: model,
+      modelUsed: data.model ?? model, // data.model shows actual model used (useful with fallbacks)
     };
+  }
+
+  /** Query OpenRouter's generation stats API for cost/latency data */
+  private async queryGenerationStats(generationId: string): Promise<void> {
+    // Wait briefly — stats may not be available immediately
+    await new Promise(r => setTimeout(r, 2000));
+    try {
+      const res = await fetch(`${this.baseUrl}/generation?id=${generationId}`, {
+        headers: { 'Authorization': `Bearer ${this.apiKey}` },
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!res.ok) return;
+      const stats = await res.json() as any;
+      logger.info('OpenRouter generation stats', {
+        id: generationId,
+        cost: stats.data?.total_cost,
+        latency: stats.data?.latency,
+        model: stats.data?.model,
+        provider: stats.data?.provider_name,
+        promptTokens: stats.data?.tokens_prompt,
+        completionTokens: stats.data?.tokens_completion,
+      });
+    } catch { /* non-critical — don't fail on stats */ }
   }
 }
 
@@ -504,6 +571,13 @@ ${toolList}`;
   markUnavailable(): void { this.available = false; }
 }
 
+// ── Free OpenRouter models for 402 (insufficient credits) fallback ───
+const FREE_FALLBACK_MODELS = [
+  'meta-llama/llama-3.3-70b-instruct:free',
+  'mistralai/mistral-small-3.1-24b-instruct:free',
+  'nvidia/nemotron-nano-9b-v2:free',
+];
+
 // ── Provider Mode Fallback Chains ────────────────────────────────────
 const PROVIDER_FALLBACK_CHAINS: Record<string, string[]> = {
   max:     ['claude-code', 'anthropic', 'openrouter', 'openai', 'ollama'],
@@ -640,16 +714,28 @@ export class AIClient {
         const provider = this.providers.get(providerName);
         if (!provider) continue;
 
-        // Model swapping: Claude Code CLI doesn't need model names from other providers,
-        // and Anthropic doesn't understand OpenRouter model IDs
+        // Smart model swapping per provider — always use strong models on fallback
         let requestForProvider = sanitizedRequest;
         const modelStr = sanitizedRequest.model ?? '';
-        if (providerName === 'anthropic' && modelStr.includes('/')) {
+        if (providerName === 'anthropic' && (modelStr.includes('/') || !modelStr)) {
+          // Anthropic: always use configured AI_MODEL (Claude Sonnet 4)
           requestForProvider = { ...sanitizedRequest, model: config.AI_MODEL };
         }
-        // Claude Code CLI: strip provider-specific model names, let CLI use its default
-        if (providerName === 'claude-code' && modelStr.includes('/')) {
+        if (providerName === 'claude-code') {
+          // Claude Code CLI: strip model names, let CLI use its default
           requestForProvider = { ...sanitizedRequest, model: undefined };
+        }
+        if (providerName === 'openrouter') {
+          if (!modelStr || modelStr === 'undefined') {
+            // OpenRouter fallback: use strong model (Claude Sonnet via OR, not free junk)
+            requestForProvider = { ...sanitizedRequest, model: config.OPENROUTER_DEFAULT_MODEL };
+          }
+          // Inject native OpenRouter fallback chain — lets OR handle model failover internally (faster than app-level retry)
+          if (!requestForProvider.fallbackModels?.length) {
+            const primaryModel = requestForProvider.model ?? config.OPENROUTER_DEFAULT_MODEL ?? '';
+            const fallbacks = STRONG_FALLBACK_CHAIN.filter(m => m !== primaryModel).slice(0, 2); // OpenRouter max 3 models total
+            requestForProvider = { ...requestForProvider, fallbackModels: fallbacks };
+          }
         }
 
         try {
@@ -658,6 +744,22 @@ export class AIClient {
           this.totalTokensUsed.output += response.usage.outputTokens;
           return response;
         } catch (error: any) {
+          // OpenRouter 402 (insufficient credits) — retry with free models before giving up
+          if (providerName === 'openrouter' && error?.status === 402) {
+            logger.warn('OpenRouter 402 (insufficient credits) — falling back to free models');
+            for (const freeModel of FREE_FALLBACK_MODELS) {
+              try {
+                const freeRequest = { ...requestForProvider, model: freeModel, fallbackModels: undefined };
+                const freeResponse = await provider.chat(freeRequest);
+                this.totalTokensUsed.input += freeResponse.usage.inputTokens;
+                this.totalTokensUsed.output += freeResponse.usage.outputTokens;
+                logger.info(`Free model fallback succeeded`, { model: freeModel });
+                return freeResponse;
+              } catch (freeError: any) {
+                logger.warn(`Free model ${freeModel} also failed`, { error: freeError.message });
+              }
+            }
+          }
           lastError = error;
           logger.warn(`Provider ${providerName} failed, trying next`, { error: error.message });
         }

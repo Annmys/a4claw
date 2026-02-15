@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { api } from '../api/client';
 
 export interface Message {
   id: string;
@@ -30,6 +31,7 @@ interface ChatState {
   conversations: Conversation[];
   activeConversationId: string | null;
   loadingConversationId: string | null;
+  synced: boolean;
 
   // Derived
   isLoading: boolean;
@@ -46,6 +48,8 @@ interface ChatState {
   setConversationLoading: (conversationId: string | null) => void;
   isConversationLoading: (conversationId: string) => boolean;
   clear: () => void;
+  syncWithServer: () => Promise<void>;
+  loadConversationFromServer: (id: string) => Promise<void>;
 }
 
 const STORAGE_KEY = 'clawdagent-conversations';
@@ -117,6 +121,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   conversations: initialConversations,
   activeConversationId: initialActive,
   loadingConversationId: null,
+  synced: false,
   isLoading: false,
 
   getMessages: () => {
@@ -132,33 +137,42 @@ export const useChatStore = create<ChatState>((set, get) => ({
       saveToStorage(updated);
       return { conversations: updated, activeConversationId: conv.id };
     });
+    // Sync to server in background (fire-and-forget)
+    api.createConversationOnServer(conv.id, 'New Chat').catch(() => {});
     return conv.id;
   },
 
   switchConversation: (id) => set(state => {
-    // Derive isLoading for the target conversation
     return {
       activeConversationId: id,
       isLoading: state.loadingConversationId === id,
     };
   }),
 
-  deleteConversation: (id) => set(state => {
-    const updated = state.conversations.filter(c => c.id !== id);
-    saveToStorage(updated);
-    const newActive = state.activeConversationId === id
-      ? (updated[0]?.id ?? null)
-      : state.activeConversationId;
-    return { conversations: updated, activeConversationId: newActive };
-  }),
+  deleteConversation: (id) => {
+    set(state => {
+      const updated = state.conversations.filter(c => c.id !== id);
+      saveToStorage(updated);
+      const newActive = state.activeConversationId === id
+        ? (updated[0]?.id ?? null)
+        : state.activeConversationId;
+      return { conversations: updated, activeConversationId: newActive };
+    });
+    // Sync delete to server
+    api.deleteConversationOnServer(id).catch(() => {});
+  },
 
-  renameConversation: (id, title) => set(state => {
-    const updated = state.conversations.map(c =>
-      c.id === id ? { ...c, title } : c
-    );
-    saveToStorage(updated);
-    return { conversations: updated };
-  }),
+  renameConversation: (id, title) => {
+    set(state => {
+      const updated = state.conversations.map(c =>
+        c.id === id ? { ...c, title } : c
+      );
+      saveToStorage(updated);
+      return { conversations: updated };
+    });
+    // Sync rename to server
+    api.renameConversationOnServer(id, title).catch(() => {});
+  },
 
   // Add message to active conversation
   addMessage: (msg) => set(state => {
@@ -169,10 +183,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const conv = createConversation();
       conversations = [conv, ...conversations];
       activeConversationId = conv.id;
+      // Sync new conversation to server
+      api.createConversationOnServer(conv.id, 'New Chat').catch(() => {});
     }
 
     const updated = addMessageToConversation(conversations, activeConversationId, msg);
     saveToStorage(updated);
+
+    // If first user message, sync the auto-generated title to server
+    const conv = updated.find(c => c.id === activeConversationId);
+    if (conv && conv.messages.length === 1 && msg.role === 'user') {
+      api.renameConversationOnServer(activeConversationId, conv.title).catch(() => {});
+    }
+
     return { conversations: updated, activeConversationId };
   }),
 
@@ -208,4 +231,86 @@ export const useChatStore = create<ChatState>((set, get) => ({
     saveToStorage(updated);
     return { conversations: updated };
   }),
+
+  // Sync conversations from server — merges with localStorage
+  syncWithServer: async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return; // Not logged in
+
+      const { conversations: serverConvs } = await api.getConversations({ limit: 100 });
+      const state = get();
+      const localConvs = state.conversations;
+
+      // Build a map of local conversations by ID
+      const localMap = new Map(localConvs.map(c => [c.id, c]));
+
+      // Merge: server conversations that don't exist locally get added (with empty messages — loaded on demand)
+      const newFromServer: Conversation[] = [];
+      for (const sc of serverConvs) {
+        if (!localMap.has(sc.id) && sc.messageCount > 0) {
+          newFromServer.push({
+            id: sc.id,
+            title: sc.title ?? (sc.lastMessage?.content.slice(0, 40) ?? 'Conversation'),
+            messages: [], // Loaded on demand when user switches to this conversation
+            createdAt: new Date(sc.createdAt),
+            updatedAt: new Date(sc.updatedAt),
+          });
+        }
+      }
+
+      if (newFromServer.length > 0) {
+        set(state => {
+          // Sort all by updatedAt desc
+          const merged = [...state.conversations, ...newFromServer]
+            .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+          saveToStorage(merged);
+          return { conversations: merged, synced: true };
+        });
+      } else {
+        set({ synced: true });
+      }
+
+      // Also sync local conversations that server doesn't know about
+      const serverIds = new Set(serverConvs.map(c => c.id));
+      for (const local of localConvs) {
+        if (!serverIds.has(local.id) && local.messages.length > 0) {
+          api.createConversationOnServer(local.id, local.title).catch(() => {});
+        }
+      }
+    } catch {
+      // Server not available — continue with localStorage only
+      set({ synced: true });
+    }
+  },
+
+  // Load messages for a conversation from server (when switching to a server-synced conv with empty messages)
+  loadConversationFromServer: async (id: string) => {
+    try {
+      const state = get();
+      const conv = state.conversations.find(c => c.id === id);
+      if (!conv || conv.messages.length > 0) return; // Already has messages
+
+      const data = await api.getConversation(id);
+      if (data.messages.length === 0) return;
+
+      const messages: Message[] = data.messages.map(m => ({
+        id: m.id,
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+        agent: m.agent,
+        timestamp: new Date(m.createdAt),
+      }));
+
+      set(state => {
+        const updated = state.conversations.map(c =>
+          c.id === id ? { ...c, messages } : c
+        );
+        saveToStorage(updated);
+        return { conversations: updated };
+      });
+    } catch {
+      // Silently fail — conversation might not exist on server
+    }
+  },
 }));

@@ -6,11 +6,13 @@ export const users = pgTable('users', {
   platform: varchar('platform', { length: 20 }).notNull(),
   name: varchar('name', { length: 200 }),
   role: varchar('role', { length: 20 }).default('user').notNull(),
+  masterUserId: uuid('master_user_id'),
   preferences: jsonb('preferences').default({}),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => [
   index('idx_users_platform').on(table.platform, table.platformId),
+  index('idx_users_master').on(table.masterUserId),
 ]);
 
 export const conversations = pgTable('conversations', {
@@ -271,6 +273,17 @@ export const experienceRecords = pgTable('experience_records', {
 }, (table) => [
   index('idx_experience_task_type').on(table.taskType),
   index('idx_experience_success').on(table.success),
+]);
+
+export const webCredentials = pgTable('web_credentials', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  username: varchar('username', { length: 100 }).notNull().unique(),
+  passwordHash: text('password_hash').notNull(),
+  role: varchar('role', { length: 20 }).default('user').notNull(),
+  lastLogin: timestamp('last_login'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => [
+  index('idx_web_credentials_username').on(table.username),
 ]);
 
 export const auditLog = pgTable('audit_log', {

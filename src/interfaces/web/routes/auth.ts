@@ -1,14 +1,12 @@
 import { Router, Request, Response } from 'express';
+import { eq } from 'drizzle-orm';
 import { generateToken, hashPassword, verifyPassword } from '../../../security/auth.js';
 import { audit } from '../../../security/audit-log.js';
+import { getDb } from '../../../memory/database.js';
+import { webCredentials } from '../../../memory/schema.js';
 import logger from '../../../utils/logger.js';
 
-// Persistent user store — survives restarts if DB is available, falls back to in-memory
-const users = new Map<string, { passwordHash: string; role: string; createdAt: number; lastLogin: number }>();
-let registrationEnabled = true;
-let firstUserCreated = false;
-
-// Failed login tracking for brute-force protection
+// Failed login tracking for brute-force protection (in-memory is fine for this)
 const failedAttempts = new Map<string, { count: number; lockedUntil: number }>();
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
@@ -22,12 +20,7 @@ function checkBruteForce(key: string): { allowed: boolean; waitSeconds?: number 
     return { allowed: false, waitSeconds };
   }
 
-  // Lockout expired, reset
-  if (Date.now() >= entry.lockedUntil) {
-    failedAttempts.delete(key);
-    return { allowed: true };
-  }
-
+  failedAttempts.delete(key);
   return { allowed: true };
 }
 
@@ -45,7 +38,6 @@ function clearFailedAttempts(key: string): void {
   failedAttempts.delete(key);
 }
 
-// Password strength validation
 function isStrongPassword(password: string): { valid: boolean; reason?: string } {
   if (password.length < 8) return { valid: false, reason: 'Password must be at least 8 characters' };
   if (!/[A-Z]/.test(password)) return { valid: false, reason: 'Password must contain an uppercase letter' };
@@ -57,102 +49,117 @@ function isStrongPassword(password: string): { valid: boolean; reason?: string }
 export function setupAuthRoutes(): Router {
   const router = Router();
 
-  // POST /register — First user becomes admin, subsequent require registration to be enabled
+  // POST /register — First user becomes admin, subsequent require admin token
   router.post('/register', async (req: Request, res: Response) => {
-    const { username, password } = req.body;
-    if (!username || !password) { res.status(400).json({ error: 'Username and password required' }); return; }
+    try {
+      const { username, password } = req.body;
+      if (!username || !password) { res.status(400).json({ error: 'Username and password required' }); return; }
 
-    // Validate username
-    if (!/^[a-zA-Z0-9_-]{3,30}$/.test(username)) {
-      res.status(400).json({ error: 'Username must be 3-30 characters (letters, numbers, _, -)' });
-      return;
+      if (!/^[a-zA-Z0-9_-]{3,30}$/.test(username)) {
+        res.status(400).json({ error: 'Username must be 3-30 characters (letters, numbers, _, -)' });
+        return;
+      }
+
+      const pwCheck = isStrongPassword(password);
+      if (!pwCheck.valid) { res.status(400).json({ error: pwCheck.reason }); return; }
+
+      const db = getDb();
+
+      // Check if user already exists
+      const existing = await db.select().from(webCredentials)
+        .where(eq(webCredentials.username, username)).limit(1);
+      if (existing.length > 0) { res.status(409).json({ error: 'User exists' }); return; }
+
+      // Check if any user exists (first user = admin)
+      const allUsers = await db.select().from(webCredentials).limit(1);
+      const isFirstUser = allUsers.length === 0;
+
+      if (!isFirstUser) {
+        // Only admin can register new users
+        const authHeader = req.headers.authorization;
+        if (!authHeader?.startsWith('Bearer ')) {
+          res.status(403).json({ error: 'Registration requires admin token' });
+          return;
+        }
+        try {
+          const { verifyToken } = await import('../../../security/auth.js');
+          const payload = verifyToken(authHeader.slice(7));
+          if (payload.role !== 'admin') { res.status(403).json({ error: 'Admin only' }); return; }
+        } catch {
+          res.status(403).json({ error: 'Invalid admin token' });
+          return;
+        }
+      }
+
+      const role = isFirstUser ? 'admin' : 'user';
+      const pwHash = await hashPassword(password);
+
+      await db.insert(webCredentials).values({
+        username,
+        passwordHash: pwHash,
+        role,
+        lastLogin: new Date(),
+      });
+
+      if (isFirstUser) {
+        logger.info('First web user registered as admin (persisted to DB)', { username });
+      }
+
+      await audit(username, 'user.register', { role, isFirstUser });
+      const token = generateToken({ userId: username, role, platform: 'web' });
+      res.json({ token, role });
+    } catch (err: any) {
+      logger.error('Registration failed', { error: err.message });
+      res.status(500).json({ error: 'Registration failed' });
     }
-
-    // Validate password strength
-    const pwCheck = isStrongPassword(password);
-    if (!pwCheck.valid) { res.status(400).json({ error: pwCheck.reason }); return; }
-
-    if (users.has(username)) { res.status(409).json({ error: 'User exists' }); return; }
-
-    // First user is always allowed and becomes admin
-    const isFirstUser = !firstUserCreated;
-    if (!isFirstUser && !registrationEnabled) {
-      res.status(403).json({ error: 'Registration is disabled. Contact admin.' });
-      return;
-    }
-
-    const role = isFirstUser ? 'admin' : 'user';
-    const passwordHash = await hashPassword(password);
-    users.set(username, { passwordHash, role, createdAt: Date.now(), lastLogin: Date.now() });
-    firstUserCreated = true;
-
-    // Disable open registration after first user (admin must re-enable)
-    if (isFirstUser) {
-      registrationEnabled = false;
-      logger.info('First user registered as admin, registration disabled', { username });
-    }
-
-    await audit(username, 'user.register', { role, isFirstUser });
-    const token = generateToken({ userId: username, role, platform: 'web' });
-    res.json({ token, role });
   });
 
   // POST /login — Authenticate with brute-force protection
   router.post('/login', async (req: Request, res: Response) => {
-    const { username, password } = req.body;
-    if (!username || !password) { res.status(400).json({ error: 'Username and password required' }); return; }
-
-    const ip = req.ip ?? req.socket.remoteAddress ?? 'unknown';
-    const bruteForceKey = `${ip}:${username}`;
-
-    // Check brute-force lockout
-    const bfCheck = checkBruteForce(bruteForceKey);
-    if (!bfCheck.allowed) {
-      await audit(username, 'user.login_locked', { ip, waitSeconds: bfCheck.waitSeconds });
-      res.status(429).json({ error: `Account locked. Try again in ${bfCheck.waitSeconds}s` });
-      return;
-    }
-
-    const user = users.get(username);
-    if (!user) {
-      recordFailedAttempt(bruteForceKey);
-      // Don't reveal whether user exists
-      res.status(401).json({ error: 'Invalid credentials' });
-      return;
-    }
-
-    const valid = await verifyPassword(password, user.passwordHash);
-    if (!valid) {
-      recordFailedAttempt(bruteForceKey);
-      await audit(username, 'user.login_failed', { ip });
-      res.status(401).json({ error: 'Invalid credentials' });
-      return;
-    }
-
-    // Success — clear failed attempts, update last login
-    clearFailedAttempts(bruteForceKey);
-    user.lastLogin = Date.now();
-    await audit(username, 'user.login', { ip, role: user.role });
-
-    const token = generateToken({ userId: username, role: user.role, platform: 'web' });
-    res.json({ token, role: user.role });
-  });
-
-  // POST /toggle-registration — Admin only: enable/disable registration
-  router.post('/toggle-registration', async (req: Request, res: Response) => {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) { res.status(401).json({ error: 'Unauthorized' }); return; }
-
     try {
-      const { verifyToken } = await import('../../../security/auth.js');
-      const payload = verifyToken(authHeader.slice(7));
-      if (payload.role !== 'admin') { res.status(403).json({ error: 'Admin only' }); return; }
+      const { username, password } = req.body;
+      if (!username || !password) { res.status(400).json({ error: 'Username and password required' }); return; }
 
-      registrationEnabled = !registrationEnabled;
-      await audit(payload.userId, 'admin.toggle_registration', { enabled: registrationEnabled });
-      res.json({ registrationEnabled });
-    } catch {
-      res.status(401).json({ error: 'Invalid token' });
+      const ip = req.ip ?? req.socket.remoteAddress ?? 'unknown';
+      const bruteForceKey = `${ip}:${username}`;
+
+      const bfCheck = checkBruteForce(bruteForceKey);
+      if (!bfCheck.allowed) {
+        await audit(username, 'user.login_locked', { ip, waitSeconds: bfCheck.waitSeconds });
+        res.status(429).json({ error: `Account locked. Try again in ${bfCheck.waitSeconds}s` });
+        return;
+      }
+
+      const db = getDb();
+      const [user] = await db.select().from(webCredentials)
+        .where(eq(webCredentials.username, username)).limit(1);
+
+      if (!user) {
+        recordFailedAttempt(bruteForceKey);
+        res.status(401).json({ error: 'Invalid credentials' });
+        return;
+      }
+
+      const valid = await verifyPassword(password, user.passwordHash);
+      if (!valid) {
+        recordFailedAttempt(bruteForceKey);
+        await audit(username, 'user.login_failed', { ip });
+        res.status(401).json({ error: 'Invalid credentials' });
+        return;
+      }
+
+      // Success
+      clearFailedAttempts(bruteForceKey);
+      await db.update(webCredentials)
+        .set({ lastLogin: new Date() })
+        .where(eq(webCredentials.id, user.id));
+
+      await audit(username, 'user.login', { ip, role: user.role });
+      const token = generateToken({ userId: username, role: user.role, platform: 'web' });
+      res.json({ token, role: user.role });
+    } catch (err: any) {
+      logger.error('Login failed', { error: err.message });
+      res.status(500).json({ error: 'Login failed' });
     }
   });
 
