@@ -6,7 +6,7 @@ dotenv.config({ override: true });
 const configSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.coerce.number().default(3000),
-  ANTHROPIC_API_KEY: z.string().min(1, 'ANTHROPIC_API_KEY is required'),
+  ANTHROPIC_API_KEY: z.string().optional().default(''),
   AI_MODEL: z.string().default('claude-sonnet-4-6'),
   AI_MAX_TOKENS: z.coerce.number().default(4096),
   TELEGRAM_BOT_TOKEN: z.string().optional(),

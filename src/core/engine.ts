@@ -343,7 +343,7 @@ export class Engine {
     }
 
     try {
-      incoming.onProgress?.({ type: 'status', message: 'Quick mode — fast response ⚡' });
+      incoming.onProgress?.({ type: 'status', message: '⚡ Quick mode — fast response' });
 
       // Load history (enough for conversation continuity)
       const rawHistory = this.getHistory ? await this.getHistory(incoming.userId, incoming.platform, 20, incoming.conversationId) : [];
@@ -367,9 +367,11 @@ export class Engine {
       const trimmedHistory = trimHistoryToFit(history, 8000);
       const messages: Message[] = [...trimmedHistory, { role: 'user', content: incoming.text }];
 
-      // Select provider (same logic but skip complexity classification)
+      // Select provider — for quick mode, prefer fast API providers over CLI
       const { resolved: resolvedMode } = this.ai.getProviderMode();
       const claudeCodeActive = this.ai.getAvailableProviders().includes('claude-code');
+      const hasOpenRouter = this.ai.getAvailableProviders().includes('openrouter');
+      const hasAnthropic = this.ai.getAvailableProviders().includes('anthropic');
       let selectedProvider: 'anthropic' | 'openrouter' | 'claude-code' | 'ollama' | undefined;
       let selectedModelId: string | undefined;
 
@@ -387,9 +389,15 @@ export class Engine {
       } else if (resolvedMode === 'local' && config.OLLAMA_ENABLED) {
         selectedProvider = 'ollama';
         selectedModelId = config.OLLAMA_DEFAULT_MODEL;
-      } else if (resolvedMode === 'max' && claudeCodeActive) {
-        selectedProvider = 'claude-code';
-        selectedModelId = undefined;
+      } else if (hasOpenRouter) {
+        // Quick mode: prefer OpenRouter API (fast ~2-3s) over CLI (slow ~10-15s)
+        selectedProvider = 'openrouter';
+        selectedModelId = config.OPENROUTER_DEFAULT_MODEL ?? 'anthropic/claude-sonnet-4.6';
+        incoming.onProgress?.({ type: 'status', message: `⚡ Fast API — ${selectedModelId}` });
+      } else if (hasAnthropic) {
+        selectedProvider = 'anthropic';
+        selectedModelId = 'claude-haiku-4-5-20251001';
+        incoming.onProgress?.({ type: 'status', message: '⚡ Fast API — Haiku' });
       } else if (claudeCodeActive) {
         selectedProvider = 'claude-code';
         selectedModelId = undefined;
@@ -531,10 +539,11 @@ export class Engine {
       });
 
       // 2. Classify intent (using history for context)
+      incoming.onProgress?.({ type: 'status', message: '🔀 Router — classifying intent...' });
       const contextSummary = history.slice(-6).map(m => `${m.role}: ${m.content.slice(0, 200)}`).join('\n');
       const routing = await this.router.classify(incoming.text, contextSummary);
       logger.info('Intent classified', { intent: routing.intent, confidence: routing.confidence, agent: routing.agentId });
-      incoming.onProgress?.({ type: 'status', message: `Classifying intent → ${routing.agentId} (${Math.round(routing.confidence * 100)}% confidence)` });
+      incoming.onProgress?.({ type: 'status', message: `🔀 Router → ${routing.agentId} (${Math.round(routing.confidence * 100)}%)` });
 
       // 2a. Desktop control — intercept before normal AI flow
       if (
@@ -902,7 +911,7 @@ If they want to check a running project, use "status" with projectName.`,
       const skipMeta = SIMPLE_INTENTS.has(routing.intent)
         || (effectiveMode === 'auto' && incoming.text.length < 300);  // auto mode skips meta for short messages
       if (!skipMeta) {
-        incoming.onProgress?.({ type: 'thinking', message: 'Thinking deeply about this...' });
+        incoming.onProgress?.({ type: 'thinking', message: '💭 Intelligence — meta-agent thinking...' });
         const thought = await this.meta.think(incoming.text, contextSummary);
         metaThinking = thought.situation ?? '';
         if (thought.plan?.length) {
@@ -916,7 +925,7 @@ If they want to check a running project, use "status" with projectName.`,
 
       // 3. Select agent
       const agent = getAgent(routing.agentId) ?? getAgent('general')!;
-      incoming.onProgress?.({ type: 'agent', message: `${agent.name} is handling this`, agent: agent.id });
+      incoming.onProgress?.({ type: 'agent', message: `🤖 ${agent.name} — handling request`, agent: agent.id });
 
       // 4. Match skills
       const matchedSkill = this.skills.matchSkill(incoming.text);
@@ -925,7 +934,7 @@ If they want to check a running project, use "status" with projectName.`,
       }
 
       // 5. Load full context (knowledge, tasks, servers, skills, cross-platform)
-      incoming.onProgress?.({ type: 'status', message: 'Loading context & memory...' });
+      incoming.onProgress?.({ type: 'status', message: '🧠 Engine — loading context & memory...' });
       const [knowledgeStr, tasksStr, serversStr, knowledgeCount, crossPlatformStr] = await Promise.all([
         this.getUserKnowledge ? this.getUserKnowledge(incoming.userId) : '',
         this.getUserTasks ? this.getUserTasks(incoming.userId) : '',
@@ -1164,8 +1173,8 @@ If they want to check a running project, use "status" with projectName.`,
         }
       }
 
-      const providerLabel = selectedProvider === 'claude-code' ? 'Claude Code' : selectedProvider === 'ollama' ? `Ollama (${selectedModelId ?? 'default'})` : selectedProvider ?? 'Anthropic';
-      incoming.onProgress?.({ type: 'status', message: `Generating response via ${providerLabel}${needsTools ? ` with ${toolDefs.length} tools` : ''}...` });
+      const providerLabel = selectedProvider === 'claude-code' ? 'Claude Code CLI' : selectedProvider === 'ollama' ? `Ollama (${selectedModelId ?? 'default'})` : selectedProvider === 'openrouter' ? `OpenRouter (${selectedModelId ?? 'default'})` : selectedProvider ?? 'Anthropic';
+      incoming.onProgress?.({ type: 'status', message: `⚙️ ${providerLabel} — generating response${needsTools ? ` with ${toolDefs.length} tools` : ''}...` });
       let response;
       if (toolDefs.length > 0) {
         // Agent HAS tools → use chatWithTools (tool execution loop)
@@ -1188,7 +1197,7 @@ If they want to check a running project, use "status" with projectName.`,
           },
           async (toolName, toolInput) => {
             const toolAction = toolInput?.action ? ` → ${toolInput.action}` : '';
-            incoming.onProgress?.({ type: 'tool', message: `Running ${toolName}${toolAction}...`, tool: toolName });
+            incoming.onProgress?.({ type: 'tool', message: `🔧 Tool: ${toolName}${toolAction}`, tool: toolName });
             if ((toolName === 'task' || toolName === 'db') && !toolInput.userId) {
               toolInput.userId = incoming.userId;
             }
@@ -1198,7 +1207,7 @@ If they want to check a running project, use "status" with projectName.`,
             const result = await executeTool(toolName, toolInput);
             const resultStr = String(result ?? '');
             const ok = resultStr.length > 0 && !resultStr.startsWith('Error');
-            incoming.onProgress?.({ type: 'status', message: `${toolName}${toolAction} ${ok ? 'done' : 'failed'}`, tool: toolName });
+            incoming.onProgress?.({ type: 'status', message: `🔧 Tool: ${toolName}${toolAction} — ${ok ? '✅ done' : '❌ failed'}`, tool: toolName });
             return result;
           },
         );
@@ -1228,6 +1237,31 @@ If they want to check a running project, use "status" with projectName.`,
       if (!response.content || response.content.trim().length === 0) {
         logger.warn('AI returned empty response, using fallback', { agent: agent.id, intent: routing.intent, provider: response.provider });
         response.content = `\u05E7\u05D9\u05D1\u05DC\u05EA\u05D9 \u05D0\u05EA \u05D4\u05D4\u05D5\u05D3\u05E2\u05D4 \u05E9\u05DC\u05DA \u05D0\u05D1\u05DC \u05DC\u05D0 \u05D4\u05E6\u05DC\u05D7\u05EA\u05D9 \u05DC\u05E2\u05D1\u05D3 \u05D0\u05D5\u05EA\u05D4. \u05E0\u05E1\u05D4 \u05E9\u05D5\u05D1 \u05D0\u05D5 \u05E0\u05E1\u05D7 \u05D0\u05D7\u05E8\u05EA \u{1F504}\n[\u05E1\u05D5\u05DB\u05DF: ${agent.name} | \u05DB\u05D5\u05D5\u05E0\u05D4: ${routing.intent}]`;
+      }
+
+      // ── Post-process: strip "tool approval" language from headless CLI responses ──
+      // Claude Code CLI's built-in system prompt tells the model to ask for permission
+      // before using tools. On our headless server there is no terminal/popup for approvals.
+      // Our system prompt override prevents most cases, but this filter catches any stragglers.
+      if (response.content) {
+        const approvalPatterns = [
+          /(?:you['']?ll?\s+need\s+to\s+)?(?:click|press|tap)\s+['"]?Allow['"]?\s*(?:on\s+the\s+(?:popup|dialog|prompt|terminal))?/gi,
+          /(?:pending|waiting\s+for)\s+tool\s+(?:request|approval|permission)s?/gi,
+          /(?:please\s+)?(?:approve|allow|accept|confirm)\s+(?:the\s+)?tool\s+(?:request|use|call|execution)s?/gi,
+          /I\s+(?:need|require)\s+(?:your\s+)?(?:permission|approval|authorization)\s+(?:to\s+(?:use|run|execute|access)\s+(?:the\s+)?(?:tool|command|search|browser))/gi,
+          /(?:the\s+tool\s+(?:request|call)\s+(?:is|was)\s+(?:pending|blocked|waiting))/gi,
+          /(?:you\s+(?:should|need\s+to|can)\s+(?:see|find)\s+a\s+(?:popup|dialog|prompt|notification)\s+(?:in\s+(?:the|your)\s+terminal))/gi,
+        ];
+        let cleaned = response.content;
+        for (const pattern of approvalPatterns) {
+          cleaned = cleaned.replace(pattern, '');
+        }
+        // Clean up orphaned punctuation and extra whitespace from removals
+        cleaned = cleaned.replace(/\.\s*\.\s*\./g, '.').replace(/\n{3,}/g, '\n\n').trim();
+        if (cleaned !== response.content) {
+          logger.info('Stripped tool-approval language from response', { agent: agent.id });
+          response.content = cleaned;
+        }
       }
 
       // Track usage for cost monitoring
@@ -1301,8 +1335,7 @@ If they want to check a running project, use "status" with projectName.`,
       pushActivity('response', `[${agent.id}] ${response.content.slice(0, 80)}${response.content.length > 80 ? '...' : ''}`, { agent: agent.id, platform: incoming.platform });
 
       // ── Social Engineering Detection (Gemini recommendation) ──
-      // Scan agent output for attempts to manipulate user into bypassing security
-      // High severity = block entirely (Claude's feedback: warn-only is not enough)
+      incoming.onProgress?.({ type: 'status', message: '🛡️ Security — scanning response...' });
       const seResult = detectSocialEngineering(response.content);
       if (seResult.detected && seResult.severity === 'high') {
         logger.error('HIGH social engineering BLOCKED in agent response', {

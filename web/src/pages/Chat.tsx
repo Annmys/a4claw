@@ -7,7 +7,7 @@ import {
   MessageSquare, WifiOff, Wifi, X, AlertCircle,
   Brain, ChevronDown, ChevronUp, Plus, PanelLeftClose, PanelLeft, MoreVertical,
   Paperclip, FileText, Image as ImageIcon, File as FileIcon,
-  Languages, Sparkles, Palette, Cpu, Wrench, Zap, QrCode,
+  Languages, Sparkles, Palette, Cpu, Wrench, Zap, QrCode, Shield, GitBranch, Cog,
 } from 'lucide-react';
 
 const RESPONSE_MODES = [
@@ -250,6 +250,20 @@ export default function Chat() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const modeMenuRef = useRef<HTMLDivElement>(null);
   const modelMenuRef = useRef<HTMLDivElement>(null);
+
+  // ── WhatsApp QR auto-poll: refresh status every 3s while popup shows a QR ──
+  useEffect(() => {
+    if (!showWhatsAppQR || !whatsappQR?.qrDataUrl || whatsappQR?.status === 'authenticated') return;
+    const interval = setInterval(async () => {
+      try {
+        const data = await api.whatsappQR();
+        if (data.status === 'authenticated') {
+          setWhatsappQR({ qrDataUrl: null, status: 'authenticated' });
+        }
+      } catch { /* ignore */ }
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [showWhatsAppQR, whatsappQR?.qrDataUrl, whatsappQR?.status]);
 
   // ── WebSocket lifecycle ──────────────────────────────────────────
   useEffect(() => {
@@ -932,7 +946,7 @@ export default function Chat() {
             </div>
           )}
 
-          {/* Live progress — narrative story view */}
+          {/* Live progress — pipeline stages with component badges */}
           {isLoading && (() => {
             // Filter: skip "Still working..." / "Working..." keepalive spam, keep real events
             const realEvents = progressLog.filter(ev =>
@@ -946,14 +960,65 @@ export default function Chat() {
             // Show only last 6 real events (newest at bottom)
             const visible = realEvents.slice(-6);
 
+            // Parse component label from message: "🔀 Router — classifying..." → { badge: "Router", action: "classifying..." }
+            const parseEvent = (msg: string) => {
+              // Match: emoji + space + ComponentName + " — " + action
+              const m = msg.match(/^[^\w]*\s*(\S+)\s*—\s*(.+)$/);
+              if (m) return { badge: m[1], action: m[2] };
+              // Match: emoji + space + Component: detail — action
+              const m2 = msg.match(/^[^\w]*\s*(\S+:\s*\S+)\s*—\s*(.+)$/);
+              if (m2) return { badge: m2[1], action: m2[2] };
+              return { badge: '', action: msg };
+            };
+
+            // Badge styling per component type
+            const badgeStyle = (badge: string, evType: string) => {
+              const b = badge.toLowerCase();
+              if (b.includes('router') || evType === 'status' && b.includes('router'))
+                return { bg: 'bg-violet-500/20 text-violet-300 border-violet-500/30', icon: <GitBranch className="w-2.5 h-2.5" /> };
+              if (b.includes('agent') || evType === 'agent' || b.includes('assistant') || b.includes('general') || b.includes('code'))
+                return { bg: 'bg-blue-500/20 text-blue-300 border-blue-500/30', icon: <Cpu className="w-2.5 h-2.5" /> };
+              if (b.includes('engine'))
+                return { bg: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30', icon: <Cog className="w-2.5 h-2.5" /> };
+              if (b.includes('tool') || evType === 'tool')
+                return { bg: 'bg-green-500/20 text-green-300 border-green-500/30', icon: <Wrench className="w-2.5 h-2.5" /> };
+              if (b.includes('intelligence') || b.includes('meta') || evType === 'thinking')
+                return { bg: 'bg-amber-500/20 text-amber-300 border-amber-500/30', icon: <Brain className="w-2.5 h-2.5" /> };
+              if (b.includes('security') || b.includes('safety'))
+                return { bg: 'bg-rose-500/20 text-rose-300 border-rose-500/30', icon: <Shield className="w-2.5 h-2.5" /> };
+              if (b.includes('fast') || b.includes('api') || b.includes('provider') || b.includes('claude') || b.includes('openrouter'))
+                return { bg: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30', icon: <Zap className="w-2.5 h-2.5" /> };
+              if (evType === 'error')
+                return { bg: 'bg-red-500/20 text-red-300 border-red-500/30', icon: <AlertCircle className="w-2.5 h-2.5" /> };
+              return { bg: 'bg-gray-500/20 text-gray-300 border-gray-500/30', icon: <Zap className="w-2.5 h-2.5" /> };
+            };
+
+            // Detect which pipeline stages have been hit
+            const stageHits = {
+              router: realEvents.some(e => e.message.toLowerCase().includes('router')),
+              agent: realEvents.some(e => e.type === 'agent' || e.message.toLowerCase().includes('agent') || e.message.toLowerCase().includes('assistant')),
+              engine: realEvents.some(e => e.message.toLowerCase().includes('engine')),
+              provider: realEvents.some(e => e.message.toLowerCase().includes('provider') || e.message.toLowerCase().includes('api') || e.message.toLowerCase().includes('claude') || e.message.toLowerCase().includes('openrouter')),
+              tool: realEvents.some(e => e.type === 'tool'),
+              security: realEvents.some(e => e.message.toLowerCase().includes('security')),
+            };
+            const lastEvent = realEvents[realEvents.length - 1];
+            const lastMsg = lastEvent?.message.toLowerCase() || '';
+            const activeStage = lastMsg.includes('security') ? 'security'
+              : lastMsg.includes('tool') || lastEvent?.type === 'tool' ? 'tool'
+              : lastMsg.includes('provider') || lastMsg.includes('api') || lastMsg.includes('claude') || lastMsg.includes('openrouter') || lastMsg.includes('generating') ? 'provider'
+              : lastMsg.includes('engine') ? 'engine'
+              : lastEvent?.type === 'agent' || lastMsg.includes('agent') || lastMsg.includes('assistant') ? 'agent'
+              : lastMsg.includes('router') ? 'router' : '';
+
             return (
               <div className="flex justify-start">
                 <div className="flex items-end gap-2 max-w-2xl w-full">
                   <div className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center bg-dark-800 border border-gray-700">
                     <Bot className="w-3.5 h-3.5 text-primary-400 animate-pulse" />
                   </div>
-                  <div className="bg-dark-800/80 border border-gray-800 rounded-2xl rounded-bl-md px-4 py-3 min-w-[260px] max-w-lg backdrop-blur-sm">
-                    {/* Header: agent name + elapsed time */}
+                  <div className="bg-dark-800/80 border border-gray-800 rounded-2xl rounded-bl-md px-4 py-3 min-w-[280px] max-w-lg backdrop-blur-sm">
+                    {/* Header: agent name + stats */}
                     <div className="flex items-center justify-between gap-3 mb-2 pb-1.5 border-b border-gray-800">
                       <div className="flex items-center gap-2">
                         <Loader2 className="w-3.5 h-3.5 text-primary-400 animate-spin shrink-0" />
@@ -968,35 +1033,78 @@ export default function Chat() {
                       </div>
                     </div>
 
-                    {/* Event log — narrative steps */}
+                    {/* Mini pipeline breadcrumb */}
+                    {realEvents.length > 0 && (
+                      <div className="flex items-center gap-1 mb-2 flex-wrap">
+                        {([
+                          { key: 'router', label: 'Router', icon: <GitBranch className="w-2.5 h-2.5" />,
+                            active: 'bg-violet-500/30 text-violet-200 border-violet-400/50',
+                            hit: 'bg-violet-500/10 text-violet-400/70 border-violet-500/20' },
+                          { key: 'agent', label: 'Agent', icon: <Cpu className="w-2.5 h-2.5" />,
+                            active: 'bg-blue-500/30 text-blue-200 border-blue-400/50',
+                            hit: 'bg-blue-500/10 text-blue-400/70 border-blue-500/20' },
+                          { key: 'engine', label: 'Engine', icon: <Cog className="w-2.5 h-2.5" />,
+                            active: 'bg-cyan-500/30 text-cyan-200 border-cyan-400/50',
+                            hit: 'bg-cyan-500/10 text-cyan-400/70 border-cyan-500/20' },
+                          { key: 'provider', label: 'LLM', icon: <Zap className="w-2.5 h-2.5" />,
+                            active: 'bg-yellow-500/30 text-yellow-200 border-yellow-400/50',
+                            hit: 'bg-yellow-500/10 text-yellow-400/70 border-yellow-500/20' },
+                          { key: 'tool', label: 'Tools', icon: <Wrench className="w-2.5 h-2.5" />,
+                            active: 'bg-green-500/30 text-green-200 border-green-400/50',
+                            hit: 'bg-green-500/10 text-green-400/70 border-green-500/20' },
+                          { key: 'security', label: 'Security', icon: <Shield className="w-2.5 h-2.5" />,
+                            active: 'bg-rose-500/30 text-rose-200 border-rose-400/50',
+                            hit: 'bg-rose-500/10 text-rose-400/70 border-rose-500/20' },
+                        ] as { key: string; label: string; icon: JSX.Element; active: string; hit: string }[]).map((stage, idx) => {
+                          const isHit = stageHits[stage.key as keyof typeof stageHits];
+                          const isActive = activeStage === stage.key;
+                          return (
+                            <span key={stage.key} className="flex items-center gap-0.5">
+                              {idx > 0 && <span className="text-gray-700 text-[9px] mx-0.5">›</span>}
+                              <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium border transition-all duration-300 ${
+                                isActive ? stage.active :
+                                isHit ? stage.hit :
+                                'bg-gray-800/50 text-gray-600 border-gray-700/50'
+                              }`}>
+                                {stage.icon}
+                                <span className="hidden sm:inline">{stage.label}</span>
+                              </span>
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Event log — with component badges */}
                     {visible.length === 0 ? (
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-gray-400 animate-pulse">{isRtl ? '...מתחיל לעבוד' : 'Starting...'}</span>
                       </div>
                     ) : (
-                      <div className="space-y-1">
+                      <div className="space-y-1.5">
                         {visible.map((ev, i) => {
                           const isLatest = i === visible.length - 1;
-                          const icon = ev.type === 'agent' ? <Cpu className="w-3 h-3" />
-                            : ev.type === 'tool' ? <Wrench className="w-3 h-3" />
-                            : ev.type === 'thinking' ? <Brain className="w-3 h-3" />
-                            : ev.type === 'error' ? <AlertCircle className="w-3 h-3" />
-                            : <Zap className="w-3 h-3" />;
-                          const color = ev.type === 'agent' ? 'text-blue-400'
-                            : ev.type === 'tool' ? 'text-green-400'
-                            : ev.type === 'thinking' ? 'text-amber-400'
-                            : ev.type === 'error' ? 'text-red-400'
-                            : 'text-primary-400';
+                          const { badge, action } = parseEvent(ev.message);
+                          const style = badgeStyle(badge, ev.type || 'status');
                           return (
-                            <div key={i} className={`flex items-center gap-2 transition-all duration-300 ${isLatest ? 'opacity-100' : 'opacity-50'}`}>
-                              <span className={`shrink-0 ${color}`}>{icon}</span>
-                              <span className={`text-[11px] ${isLatest ? 'text-gray-200' : 'text-gray-500'}`}>
-                                {ev.message}
+                            <div key={i} className={`flex items-start gap-1.5 transition-all duration-300 ${isLatest ? 'opacity-100' : 'opacity-40'}`}>
+                              {badge ? (
+                                <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold border shrink-0 mt-px ${style.bg} ${isLatest ? '' : 'opacity-60'}`}>
+                                  {style.icon}
+                                  {badge}
+                                </span>
+                              ) : (
+                                <span className={`shrink-0 mt-0.5 ${ev.type === 'error' ? 'text-red-400' : 'text-primary-400'}`}>
+                                  <Zap className="w-3 h-3" />
+                                </span>
+                              )}
+                              <span className={`text-[11px] leading-relaxed ${isLatest ? 'text-gray-200' : 'text-gray-500'}`}>
+                                {badge ? action : ev.message}
                               </span>
                             </div>
                           );
                         })}
-                        {/* Current action indicator */}
+                        {/* Current action spinner */}
                         {visible.length > 0 && (
                           <div className="flex items-center gap-2 mt-1 pt-1 border-t border-gray-800/50">
                             <Loader2 className="w-3 h-3 text-primary-400 animate-spin shrink-0" />

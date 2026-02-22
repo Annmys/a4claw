@@ -93,7 +93,8 @@ export function setupOpenClawRoutes(): Router {
    */
   router.get('/status', async (_req: Request, res: Response) => {
     try {
-      const result = await executeTool('openclaw', { action: 'status' });
+      // Use 'health' instead of 'status' — health works without operator.read scope
+      const result = await executeTool('openclaw', { action: 'health' });
       let data: any = null;
       if (result.output) {
         try {

@@ -132,8 +132,17 @@ export class OpenClawTool extends BaseTool {
     const keyFlag = config.DEFAULT_SSH_KEY_PATH ? `-i "${config.DEFAULT_SSH_KEY_PATH}" ` : '';
     const escaped = command.replace(/"/g, '\\"');
     const sshCmd = `ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 ${keyFlag}${server} "${escaped}"`;
-    const { stdout } = await execAsync(sshCmd, { timeout: timeoutMs, maxBuffer: 2 * 1024 * 1024 });
-    return stdout.trim();
+    try {
+      const { stdout } = await execAsync(sshCmd, { timeout: timeoutMs, maxBuffer: 2 * 1024 * 1024 });
+      return stdout.trim();
+    } catch (err: any) {
+      // Bridge returns exit code 1 for gateway errors but still outputs valid JSON on stdout.
+      // Extract stdout from the exec error so callGateway can parse the error response.
+      if (err.stdout && err.stdout.trim()) {
+        return err.stdout.trim();
+      }
+      throw err;
+    }
   }
 
   private async ensureDeployed(): Promise<void> {

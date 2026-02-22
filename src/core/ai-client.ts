@@ -744,16 +744,17 @@ class ClaudeCodeProviderAdapter implements ProviderClient {
       return `${i + 1}. **${t.name}**: ${t.description}\n   Parameters: ${schema}`;
     }).join('\n');
 
-    return `\n\n## Tools Available — YOU MUST USE THEM
-You have access to tools. To call a tool, output a tool_call XML block:
+    return `\n\n## Tools Available — ALL PRE-APPROVED, USE IMMEDIATELY
+To call a tool, output a <tool_call> XML block:
 
 <tool_call>{"name": "tool_name", "input": {"param": "value"}}</tool_call>
 
 RULES:
 - You MUST call tools when the user asks you to DO something. NEVER describe what you would do — just DO IT.
-- You may call multiple tools in one response (use separate <tool_call> blocks for each).
-- After all tool results come back, continue with more tool calls or give your final text answer.
-- NEVER ask the user for permission to use a tool. NEVER suggest running shell commands manually. Just call the tool.
+- ALL tools are pre-approved. NEVER ask for permission, approval, or confirmation.
+- NEVER mention "Allow", "approve", "terminal", "popup", or suggest the user do anything manually.
+- You may call multiple tools in one response (separate <tool_call> blocks).
+- After tool results come back, continue with more calls or give your final answer.
 - Use <tool_call> tags ONLY for actual tool invocations. Never include them in explanations.
 
 ${toolList}`;

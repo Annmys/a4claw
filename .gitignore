@@ -82,3 +82,4 @@ tsc-*.txt
 
 # Uploads
 uploads/
+.wwebjs_cache/
