@@ -86,7 +86,7 @@ Available intents:
 - settings: User wants to change bot settings
 - desktop_control: Control the computer — click, type, open apps, interact with the screen
 - desktop_screenshot: Take a screenshot or describe what's on screen
-- build_project: Build, scaffold, create, or deploy a new app/project/website
+- build_project: Build, scaffold, create, or deploy a new app/project/website/game (including browser games, arcade games, Phaser games)
 - schedule: Schedule recurring tasks, set up automations, cron jobs, periodic alerts (every day, every morning, כל בוקר)
 - email: Send email, check inbox, compose, שלח מייל, בדוק מיילים
 - document: Upload, analyze file, PDF, מסמך, העלה קובץ, ask about uploaded document
@@ -152,6 +152,10 @@ Hebrew examples:
 - "תנתח את האתר הזה" → site_analyze
 - "מה הטכנולוגיה של wix.com" → site_analyze
 - "תבנה לי אתר דומה ל..." → site_analyze
+- "בנה לי משחק" → build_project
+- "תבנה משחק יריות" → build_project
+- "build me a game" → build_project
+- "create a space shooter" → build_project
 - "תתחבר לשרת root@10.0.0.5" → server_manage
 - "הראה את כל השרתים" → server_manage
 - "מה הבריאות של השרתים" → server_health
@@ -349,6 +353,11 @@ export class IntentRouter {
     // MRR Strategy / Market Research / Revenue
     if (/\bMRR\b|mrr|trustmrr|revenue.*strategy|אסטרטגיית.*הכנסות|מחקר.*שוק.*saas|pricing.*strategy|תמחור|מודל.*עסקי|business.*model|competitive.*intelligence|מודיעין.*תחרותי|מתחרים.*saas|niche.*research|חקר.*נישה|revenue.*model|הכנסה.*חודשית|monthly.*recurring/i.test(message)) {
       return { intent: Intent.MRR_STRATEGY, confidence: 0.9, agentId: 'mrr-strategist', extractedParams: {} };
+    }
+
+    // Game / interactive app building — route to project-builder (needs file tool + high token limit)
+    if (/\b(game|games|משחק|משחקים|phaser|arcade|shooter|platformer|puzzle|snake|tetris|pong|breakout)\b|בנה.*משחק|תבנה.*משחק|צור.*משחק|build.*game|create.*game|make.*game/i.test(message)) {
+      return { intent: Intent.BUILD_PROJECT, confidence: 0.9, agentId: 'project-builder', extractedParams: {} };
     }
 
     // Code

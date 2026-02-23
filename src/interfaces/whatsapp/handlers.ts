@@ -3,6 +3,7 @@ type WAClient = InstanceType<typeof pkg.Client>;
 import { Engine, IncomingMessage } from '../../core/engine.js';
 import config from '../../config.js';
 import logger from '../../utils/logger.js';
+import { formatCostFooter } from '../../core/usage-tracker.js';
 
 export function setupHandlers(client: WAClient, engine: Engine) {
   const adminIds = config.WHATSAPP_ADMIN_IDS;
@@ -84,6 +85,7 @@ export function setupHandlers(client: WAClient, engine: Engine) {
     logger.debug('WhatsApp message', { from: msg.from, text: msg.body.slice(0, 50) });
 
     const response = await engine.process(incoming);
-    await msg.reply(response.text);
+    const costFooter = formatCostFooter(response.tokensUsed, response.provider, response.modelUsed, response.agentUsed, response.elapsed);
+    await msg.reply(response.text + costFooter);
   });
 }

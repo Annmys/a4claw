@@ -135,7 +135,10 @@
       "Bash(node:*)",
       "Bash(pm2 describe:*)",
       "Bash(git status:*)",
-      "Bash(git check-ignore:*)"
+      "Bash(git check-ignore:*)",
+      "WebFetch(domain:api.github.com)",
+      "Bash(pm2 list:*)",
+      "Read(//home/clickdrop-clawdagent/htdocs/clawdagent.clickdrop.online/**)"
     ],
     "deny": [
       "Bash(rm -rf /)",

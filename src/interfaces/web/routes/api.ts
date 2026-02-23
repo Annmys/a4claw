@@ -137,7 +137,9 @@ export function setupApiRoutes(engine: Engine): Router {
         thinking: response.thinking,
         agent: response.agentUsed,
         provider: response.provider,
+        model: response.modelUsed,
         tokens: response.tokensUsed,
+        elapsed: response.elapsed,
       });
     } catch (error: any) {
       logger.error('Chat API error', { error: error.message });

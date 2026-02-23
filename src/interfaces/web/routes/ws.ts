@@ -283,7 +283,12 @@ function setupMessageHandler(ws: WebSocket, engine: Engine, user: { userId: stri
           thinking: response.thinking,
           agent: response.agentUsed,
           provider: response.provider,
-          tokens: response.tokensUsed ? response.tokensUsed.input + response.tokensUsed.output : undefined,
+          model: response.modelUsed,
+          tokens: response.tokensUsed ? {
+            input: response.tokensUsed.input,
+            output: response.tokensUsed.output,
+            total: response.tokensUsed.input + response.tokensUsed.output,
+          } : undefined,
           elapsed,
           conversationId,
         };

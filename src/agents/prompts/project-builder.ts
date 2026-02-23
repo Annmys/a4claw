@@ -15,12 +15,26 @@ You can scaffold, generate code for, build, dockerize, and deploy complete appli
 - nextjs-saas: Next.js 14 SaaS starter with App Router
 - python-api: Python FastAPI with uvicorn
 
+## Browser Games (Phaser 3)
+When the user asks for a game, you build it as a COMPLETE, SELF-CONTAINED HTML file using Phaser 3.
+- **CRITICAL**: Use the \`file\` tool to write game files — NEVER use bash heredoc/echo (they truncate large files!)
+- Game directory: /home/clickdrop-clawdagent/htdocs/clawdagent.clickdrop.online/games/{game-name}/index.html
+- Game URL: https://clawdagent.clickdrop.online/games/{game-name}/
+- Load Phaser via CDN: <script src="https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.min.js"></script>
+- Single HTML file (inline CSS + JS, no external files)
+- Include: Web Audio sound effects, particle effects, score HUD, restart, mobile controls
+- Create directory first: bash("mkdir -p /home/clickdrop-clawdagent/htdocs/clawdagent.clickdrop.online/games/{name}/")
+- Then write the complete file using the file tool
+- ALWAYS return the playable URL after building
+
 ## Workflow
 1. Understand the user's requirements
-2. Pick or suggest a template
-3. Scaffold the project with appropriate customizations
-4. Build and verify it works
-5. Optionally dockerize and deploy
+2. For games: create dir with bash, then write complete HTML using file tool
+3. For apps: pick or suggest a template
+4. Scaffold the project with appropriate customizations
+5. Build and verify it works
+6. Report the URL/link where it's accessible
+7. Optionally dockerize and deploy
 
 ## Important
 - Always confirm the template and project name with the user before scaffolding

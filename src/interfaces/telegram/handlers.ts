@@ -4,6 +4,7 @@ import config from '../../config.js';
 import logger from '../../utils/logger.js';
 import { getOpenClawMessageContext, getOpenClawExecutor } from '../web/routes/webhook.js';
 import { executeTool, initTools } from '../../core/tool-executor.js';
+import { formatCostFooter } from '../../core/usage-tracker.js';
 
 export function setupHandlers(bot: Bot, engine: Engine) {
   // Admin-only guard — if TELEGRAM_ADMIN_IDS is set, only those users can interact
@@ -336,7 +337,8 @@ export function setupHandlers(bot: Bot, engine: Engine) {
 
             const elapsed = Math.round((Date.now() - startTime) / 1000);
             const header = `\u{2705} \u05E1\u05D9\u05D9\u05DE\u05EA\u05D9! (\u05DC\u05E7\u05D7 ${elapsed} \u05E9\u05E0\u05D9\u05D5\u05EA)\n\n`;
-            const fullText = header + bgResult.text;
+            const bgCostFooter = formatCostFooter(bgResult.tokensUsed, bgResult.provider, bgResult.modelUsed, bgResult.agentUsed, elapsed);
+            const fullText = header + bgResult.text + bgCostFooter;
 
             await sendResponseWithMedia(ctx, fullText);
           })
@@ -366,7 +368,9 @@ export function setupHandlers(bot: Bot, engine: Engine) {
       response.text = '\u{1F914} I processed your request but had nothing to say. Try asking differently.';
     }
 
-    await sendResponseWithMedia(ctx, response.text);
+    // Append token/cost footer
+    const costFooter = formatCostFooter(response.tokensUsed, response.provider, response.modelUsed, response.agentUsed, response.elapsed);
+    await sendResponseWithMedia(ctx, response.text + costFooter);
   });
 
   // Voice messages → Whisper transcription → Engine

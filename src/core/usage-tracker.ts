@@ -12,7 +12,7 @@ interface UsageRecord {
   timestamp: string;
 }
 
-const PRICING: Record<string, { input: number; output: number }> = {
+export const PRICING: Record<string, { input: number; output: number }> = {
   // 4.6 series (current — Feb 2026)
   'claude-opus-4-6': { input: 0.005, output: 0.025 },
   'claude-sonnet-4-6': { input: 0.003, output: 0.015 },
@@ -75,6 +75,43 @@ const PRICING: Record<string, { input: number; output: number }> = {
   'tts-1': { input: 0.015, output: 0 },
   'text-embedding-3-small': { input: 0.00002, output: 0 },
 };
+
+/** Calculate cost for a given token usage */
+export function calculateCost(
+  tokens: { input: number; output: number },
+  model?: string,
+): number {
+  const pricing = PRICING[model ?? ''] ?? { input: 0.001, output: 0.005 };
+  return (tokens.input / 1000) * pricing.input + (tokens.output / 1000) * pricing.output;
+}
+
+/** Format a cost footer for chat responses (Hebrew) */
+export function formatCostFooter(
+  tokens?: { input: number; output: number },
+  provider?: string,
+  model?: string,
+  agent?: string,
+  elapsed?: number,
+): string {
+  if (!tokens) return '';
+  const cost = calculateCost(tokens, model);
+  const totalTokens = tokens.input + tokens.output;
+  const costStr = cost === 0 ? 'חינם' : `$${cost.toFixed(4)}`;
+  const providerShort = provider === 'claude-code' ? 'CLI'
+    : provider === 'ollama' ? 'Local'
+    : provider === 'openrouter' ? 'OR'
+    : provider ?? '?';
+  const modelShort = model
+    ? model.replace(/^anthropic\//, '').replace(/^openai\//, '').replace(/^meta-llama\//, '').replace(/:free$/, ' (free)').split('/').pop()
+    : providerShort;
+  const parts = [
+    `💰 ${costStr}`,
+    `📊 ${totalTokens.toLocaleString()} tokens (${tokens.input.toLocaleString()}↓ ${tokens.output.toLocaleString()}↑)`,
+    `🤖 ${agent ?? '?'} · ${modelShort}`,
+  ];
+  if (elapsed) parts.push(`⏱️ ${elapsed}s`);
+  return '\n\n---\n' + parts.join(' | ');
+}
 
 export class UsageTracker {
   private records: UsageRecord[] = [];

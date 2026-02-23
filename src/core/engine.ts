@@ -87,7 +87,9 @@ export interface OutgoingMessage {
   agentUsed?: string;
   tokensUsed?: { input: number; output: number };
   provider?: string;
+  modelUsed?: string;
   skillUsed?: string;
+  elapsed?: number;
 }
 
 // ─── Response Mode System ──────────────────────────────────────────────────
@@ -117,6 +119,16 @@ function detectModeCommand(text: string): ResponseMode | null {
  */
 function autoDetectMode(text: string): ResponseMode {
   const len = text.length;
+
+  // BUILD / CREATE / GAME requests should NEVER be quick — they need tools and high token limits
+  // This catches short messages like "בנה לי משחק", "build a game", or even "Platformer" that would otherwise be quick
+  if (/\b(build|create|scaffold|deploy|generate|בנה|בנה לי|תבנה|צור|תיצור)\b.*\b(game|app|project|site|website|page|api|dashboard|משחק|אפליקציה|פרויקט|אתר|דף)\b/i.test(text)) {
+    return 'auto';
+  }
+  // Game-genre keywords — even without "build" these imply tool-heavy game creation
+  if (/\b(game|games|משחק|משחקים|platformer|shooter|arcade|runner|snake|tetris|pong|breakout|phaser|mario|pacman|puzzle.?game|space.?invader|galaxy|destroyer|flappy|racing|rpg|tower.?defense)\b|קפיצות.*מטבעות|מפלצות.*שלבים|סגנון\s+mario/i.test(text)) {
+    return 'auto';
+  }
 
   // Very short messages → always quick
   if (len < 60) return 'quick';
@@ -335,7 +347,7 @@ export class Engine {
    * Skips: intent classification (AI call), meta-agent think, crew detection, full context loading.
    * Only loads: recent history + sends directly to AI.
    */
-  private async processQuick(incoming: IncomingMessage, startTime: number): Promise<OutgoingMessage> {
+  private async processQuick(incoming: IncomingMessage, startTime: number): Promise<OutgoingMessage | null> {
     const _origSave = this.saveMessage;
     if (_origSave && incoming.conversationId) {
       this.saveMessage = async (userId, platform, role, content, metadata?) => {
@@ -365,6 +377,14 @@ export class Engine {
       const keywordRouting = (this.router as any).keywordClassify?.(incoming.text);
       const agentId = keywordRouting?.agentId ?? 'general';
       const agent = getAgent(agentId) ?? getAgent('general')!;
+
+      // Guard: tool-heavy agents (project-builder, code-assistant, server-manager, etc.)
+      // should NEVER run in quick mode — they need tool execution. Upgrade to auto.
+      const TOOL_HEAVY_AGENTS = ['project-builder', 'code-assistant', 'server-manager', 'web-agent', 'ai-app-builder', 'desktop-controller', 'device-controller', 'content-creator'];
+      if (TOOL_HEAVY_AGENTS.includes(agent.id)) {
+        logger.info('Quick mode upgrade → auto (tool-heavy agent)', { agent: agent.id });
+        return null; // Signal caller to re-process in auto mode
+      }
 
       // Minimal system prompt — no full context loading
       const lastMsgStr = incoming.text;
@@ -429,6 +449,18 @@ export class Engine {
         response.content = 'קיבלתי את ההודעה שלך אבל לא הצלחתי לעבד אותה. נסה שוב 🔄';
       }
 
+      // Safety net: strip raw <tool_call> blocks that leaked into text output
+      // This happens when the LLM tries to use tools but quick mode doesn't execute them
+      if (response.content.includes('<tool_call>') || response.content.includes('"name":') && response.content.includes('"arguments":')) {
+        response.content = response.content
+          .replace(/<tool_call>\s*\n?\{[\s\S]*?\}\s*\n?<\/tool_call>/g, '')
+          .replace(/<tool_result>[\s\S]*?<\/tool_result>/g, '')
+          .trim();
+        if (response.content.length < 20) {
+          response.content = 'מעבד את הבקשה שלך... הבקשה הזו דורשת כלים מיוחדים. שולח שוב במצב מלא. 🔧';
+        }
+      }
+
       // Save messages
       if (this.saveMessage) {
         if (incoming.text) {
@@ -472,6 +504,8 @@ export class Engine {
         agentUsed: `quick:${agent.id}`,
         tokensUsed: response.usage ? { input: response.usage.inputTokens, output: response.usage.outputTokens } : undefined,
         provider: response.provider,
+        modelUsed: response.modelUsed ?? selectedModelId,
+        elapsed: Math.round((Date.now() - startTime) / 1000),
       };
     } catch (error: any) {
       logger.error('Quick mode error', { error: error.message });
@@ -557,8 +591,12 @@ export class Engine {
 
     try {
       // ── QUICK MODE: Minimal processing — skip intent classification, meta-agent, crew ──
+      // processQuick returns null if the agent needs tools → fall through to auto mode
       if (effectiveMode === 'quick') {
-        return await this.processQuick(incoming, startTime);
+        const quickResult = await this.processQuick(incoming, startTime);
+        if (quickResult !== null) return quickResult;
+        logger.info('Quick mode escalated to auto — agent requires tool execution');
+        // Fall through to full auto processing below
       }
 
       // 1. Load conversation history (filter out empty messages that would cause API errors)
@@ -651,14 +689,18 @@ export class Engine {
           };
         }
 
-        const templates = this.projectBuilder.getTemplateList();
-        const templateList = templates.map(t => `- **${t.id}**: ${t.name} — ${t.description} (${t.stack})`).join('\n');
-        const projects = await this.projectBuilder.listProjects();
-        const projectList = projects.length > 0 ? `\n\nExisting projects: ${projects.join(', ')}` : '';
+        // Game requests → skip template system, go straight to agentic flow with tools
+        // The project-builder agent has file + bash tools and game-building instructions in its prompt
+        const isGameRequest = /\b(game|games|משחק|משחקים|phaser|arcade|shooter|platformer|puzzle|snake|tetris|pong|breakout|runner)\b/i.test(incoming.text);
+        if (!isGameRequest) {
+          const templates = this.projectBuilder.getTemplateList();
+          const templateList = templates.map(t => `- **${t.id}**: ${t.name} — ${t.description} (${t.stack})`).join('\n');
+          const projects = await this.projectBuilder.listProjects();
+          const projectList = projects.length > 0 ? `\n\nExisting projects: ${projects.join(', ')}` : '';
 
-        // Use AI to decide what to build based on user request
-        const planResponse = await this.ai.chat({
-          systemPrompt: `You are ClawdAgent's Project Builder. The user wants to build something. Analyze their request and respond with a JSON plan.
+          // Use AI to decide what to build based on user request
+          const planResponse = await this.ai.chat({
+            systemPrompt: `You are ClawdAgent's Project Builder. The user wants to build something. Analyze their request and respond with a JSON plan.
 
 Available templates:
 ${templateList}
@@ -669,44 +711,49 @@ Respond with ONLY valid JSON:
 
 If the user just wants to see templates or projects, use action "list".
 If they want to check a running project, use "status" with projectName.`,
-          messages: [{ role: 'user', content: incoming.text }],
-          maxTokens: 300,
-          temperature: 0.2,
-        });
+            messages: [{ role: 'user', content: incoming.text }],
+            maxTokens: 300,
+            temperature: 0.2,
+          });
 
-        try {
-          const plan = extractJSON(planResponse.content);
+          try {
+            const plan = extractJSON(planResponse.content);
 
-          let responseText: string;
-          if (plan.action === 'list') {
-            responseText = `**Available Templates:**\n${templateList}${projectList}`;
-          } else if (plan.action === 'status') {
-            const status = await this.projectBuilder.getStatus(plan.projectName);
-            responseText = `Project **${plan.projectName}**: ${status}`;
-          } else if (plan.action === 'logs') {
-            const logs = await this.projectBuilder.getLogs(plan.projectName);
-            responseText = `**Logs for ${plan.projectName}:**\n\`\`\`\n${logs}\n\`\`\``;
-          } else {
-            const result = await this.projectBuilder.fullPipeline(
-              plan.templateId, plan.projectName, plan.port ?? 3001,
-              { description: plan.description ?? '' },
-            );
-            const parts = [`**Scaffold:** ${result.scaffold.message}`];
-            if (result.install) parts.push(`**Install:** ${result.install.message}`);
-            if (result.build) parts.push(`**Build:** ${result.build.message}`);
-            if (result.docker) parts.push(`**Docker:** ${result.docker.message}`);
-            if (result.deploy) parts.push(`**Deploy:** ${result.deploy.message}`);
-            responseText = parts.join('\n');
+            let responseText: string;
+            if (plan.action === 'list') {
+              responseText = `**Available Templates:**\n${templateList}${projectList}`;
+            } else if (plan.action === 'status') {
+              const status = await this.projectBuilder.getStatus(plan.projectName);
+              responseText = `Project **${plan.projectName}**: ${status}`;
+            } else if (plan.action === 'logs') {
+              const logs = await this.projectBuilder.getLogs(plan.projectName);
+              responseText = `**Logs for ${plan.projectName}:**\n\`\`\`\n${logs}\n\`\`\``;
+            } else {
+              const result = await this.projectBuilder.fullPipeline(
+                plan.templateId, plan.projectName, plan.port ?? 3001,
+                { description: plan.description ?? '' },
+              );
+              const parts = [`**Scaffold:** ${result.scaffold.message}`];
+              if (result.install) parts.push(`**Install:** ${result.install.message}`);
+              if (result.build) parts.push(`**Build:** ${result.build.message}`);
+              if (result.docker) parts.push(`**Docker:** ${result.docker.message}`);
+              if (result.deploy) parts.push(`**Deploy:** ${result.deploy.message}`);
+              responseText = parts.join('\n');
+            }
+
+            if (this.saveMessage) {
+              await this.saveMessage(incoming.userId, incoming.platform, 'user', incoming.text, { intent: routing.intent });
+              await this.saveMessage(incoming.userId, incoming.platform, 'assistant', responseText, { agent: 'project-builder' });
+            }
+
+            return { text: responseText, format: 'markdown', agentUsed: 'project-builder', provider: 'local' };
+          } catch {
+            // Fall through to normal AI flow if JSON parsing fails
           }
-
-          if (this.saveMessage) {
-            await this.saveMessage(incoming.userId, incoming.platform, 'user', incoming.text, { intent: routing.intent });
-            await this.saveMessage(incoming.userId, incoming.platform, 'assistant', responseText, { agent: 'project-builder' });
-          }
-
-          return { text: responseText, format: 'markdown', agentUsed: 'project-builder', provider: 'local' };
-        } catch {
-          // Fall through to normal AI flow if JSON parsing fails
+        } else {
+          logger.info('Game build request — using agentic flow with file tool', { text: incoming.text.slice(0, 80) });
+          incoming.onProgress?.({ type: 'status', message: '🎮 Game Builder — preparing agentic flow with file tool...' });
+          // Fall through to normal AI flow — project-builder agent will use file tool
         }
       }
 
@@ -958,6 +1005,15 @@ If they want to check a running project, use "status" with projectName.`,
       const agent = getAgent(routing.agentId) ?? getAgent('general')!;
       incoming.onProgress?.({ type: 'agent', message: `🤖 ${agent.name} — handling request`, agent: agent.id });
 
+      // 3a. Deep mode — remove token limits, notify user with cost estimate
+      if (effectiveMode === 'deep') {
+        agent.maxTokens = 16384; // Maximum output for deep mode
+        if (agent.maxToolIterations) agent.maxToolIterations = 30; // More tool iterations
+        const estimatedCost = ((incoming.text.length / 4) / 1000) * 0.003 + (16384 / 1000) * 0.015; // Rough estimate based on Sonnet pricing
+        incoming.onProgress?.({ type: 'status', message: `🔬 Deep mode — max tokens: 16K, tools: ${agent.tools.length}, estimated max cost: ~$${estimatedCost.toFixed(3)}` });
+        logger.info('Deep mode activated', { agent: agent.id, maxTokens: 16384, tools: agent.tools.length, estimatedCost: estimatedCost.toFixed(4) });
+      }
+
       // 4. Match skills
       const matchedSkill = this.skills.matchSkill(incoming.text);
       if (matchedSkill) {
@@ -1034,7 +1090,8 @@ If they want to check a running project, use "status" with projectName.`,
         Intent.GENERAL_CHAT, Intent.HELP, Intent.SETTINGS,
         Intent.QUESTION_ANSWER, Intent.REMEMBER,
       ]);
-      const skipTools = TOOLLESS_INTENTS.has(routing.intent);
+      // Deep mode: NEVER skip tools — use all agent capabilities
+      const skipTools = effectiveMode === 'deep' ? false : TOOLLESS_INTENTS.has(routing.intent);
       const toolDefs = (!skipTools && agentTools.length > 0) ? getToolDefinitions(agentTools) : [];
       if (skipTools && agentTools.length > 0) {
         logger.info('Skipping tools for simple intent', { intent: routing.intent, agentTools: agentTools.length });
@@ -1403,7 +1460,9 @@ If they want to check a running project, use "status" with projectName.`,
         agentUsed: agent.id,
         tokensUsed: response.usage ? { input: response.usage.inputTokens, output: response.usage.outputTokens } : undefined,
         provider: response.provider,
+        modelUsed: response.modelUsed ?? selectedModelId,
         skillUsed: matchedSkill?.id,
+        elapsed: Math.round((Date.now() - startTime) / 1000),
       };
 
     } catch (error: any) {
