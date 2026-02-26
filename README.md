@@ -4,7 +4,7 @@
 
 ### The Autonomous AI Octopus
 
-**v6.1 — 28,500+ lines of TypeScript. 51 core modules. 18 agents. 29 tools. 74 skills. 5 platforms. 3 protocols. 1 brain.**
+**v6.1 — 45,000+ lines of TypeScript. 57 core modules. 18 agents. 29 tools. 90 skills. 5 platforms. 3 protocols. 1 brain.**
 
 An open-source autonomous AI agent that thinks, learns, evolves, and never stops.
 
@@ -22,7 +22,7 @@ An open-source autonomous AI agent that thinks, learns, evolves, and never stops
 
 ## What is ClawdAgent?
 
-ClawdAgent is the **most comprehensive autonomous AI agent system** ever built as open-source. It runs 24/7 across multiple platforms, with **12-layer security**, **9 intelligence subsystems**, **18 specialized agents**, **29 tools**, and **74 skills** — all connected through a unified brain.
+ClawdAgent is the **most comprehensive autonomous AI agent system** ever built as open-source. It runs 24/7 across multiple platforms, with **14-layer security**, **9 intelligence subsystems**, **18 specialized agents**, **29 tools**, and **90 skills** — all connected through a unified brain.
 
 It doesn't just respond to commands — it **thinks proactively**, **learns from interactions**, **evolves its own capabilities**, **secures itself against attacks**, and **manages complex multi-step workflows** autonomously.
 
@@ -83,7 +83,7 @@ Most AI agents are **reactive** — you ask, they answer. ClawdAgent is **autono
 - **It creates its own tools** — Need a new capability? ClawdAgent builds it at runtime. No waiting for the next release.
 - **It spawns its own agents** — The Meta Agent creates new specialized agents on demand. Need a "Legal Document Analyzer"? Ask once and it exists forever.
 - **It evolves itself** — The Evolution Engine runs improvement cycles: learns from failures, optimizes prompts, merges redundant agents, discovers new patterns.
-- **It secures itself** — 12 layers of Zero Trust defense. Every memory entry is SHA-256 checksummed. Every tool is hash-pinned. Every command is sandboxed. Every security check fails closed.
+- **It secures itself** — 14 layers of Zero Trust defense. Every memory entry is SHA-256 checksummed. Every tool is hash-pinned. Every command is sandboxed. Every security check fails closed.
 - **It runs your business** — Not just chat. Crypto trading with 5 strategies. Social publishing to 9 platforms. Server management with auto-repair. Email, calendar, browser automation, mobile control.
 - **It speaks every protocol** — MCP (Anthropic), A2A (Google), ACP (IBM). Your agent can talk to any other compliant agent on the internet.
 - **It runs anywhere** — Linux VPS, Mac, Windows, Docker, Raspberry Pi. Local models (Ollama) for full privacy. No cloud dependency.
@@ -92,23 +92,26 @@ Most AI agents are **reactive** — you ask, they answer. ClawdAgent is **autono
 
 | Metric | Count |
 |--------|-------|
-| Lines of TypeScript | **28,500+** |
-| Core Modules | **51** |
-| Specialized Agents | **18** |
-| Integrated Tools | **29** |
-| Pre-loaded Skills | **74** |
-| Security Layers | **12** |
+| Lines of TypeScript | **45,000+** |
+| TypeScript Files | **282** |
+| Core Modules | **57** |
+| Specialized Agents | **18** (+ 17 dev agents) |
+| Integrated Tools | **29** + Dynamic Tool Creator |
+| Pre-loaded Skills | **90** across 23 categories |
+| Security Layers | **14+** |
 | Intelligence Subsystems | **9** |
 | Communication Platforms | **5** |
+| Dashboard Pages | **18** |
+| API Routes | **19** |
+| Database Tables | **19** |
 | Agent Protocols | **3** (MCP + A2A + ACP) |
 | AI Providers | **4** (Anthropic + OpenRouter + Ollama + Claude Code) |
-| AI Models Available | **400+** (via OpenRouter) |
+| AI Models Configured | **29+** (400+ via OpenRouter) |
 | Social Platforms | **9** |
 | Crypto Exchanges | **100+** (via CCXT) |
 | Trading Strategies | **5** |
 | Heartbeat Alert Types | **9** |
 | Self-Repair Patterns | **9** |
-| Dashboard Pages | **16** |
 | Injection Detection Patterns | **20+** |
 | Skill Scanner Patterns | **25+** |
 | Intent Classifications | **45+** |
@@ -127,7 +130,7 @@ Most AI agents are **reactive** — you ask, they answer. ClawdAgent is **autono
 | Self-Evolution | No | No | No | No | No | **Evolution Engine + Self-Repair + Auto-Learn** |
 | Proactive Thinking | No | No | No | No | No | **Autonomous: spots problems, sends alerts** |
 | Multi-Platform Chat | No | No | No | No | No | **Telegram + Discord + WhatsApp + Web** |
-| Web Dashboard | Basic | No | LangSmith | No | Browser | **Full React Dashboard (16 pages)** |
+| Web Dashboard | Basic | No | LangSmith | No | Browser | **Full React Dashboard (18 pages)** |
 | Dynamic Tool Creation | No | No | No | No | No | **Creates new tools at runtime** |
 | Multi-Agent Teams | No | Yes | No | Yes | No | **Crew Orchestrator + Meta Agent + Factory** |
 | Agent-to-Agent Protocols | No | No | No | No | No | **A2A + ACP + MCP (full compliance)** |
@@ -136,7 +139,7 @@ Most AI agents are **reactive** — you ask, they answer. ClawdAgent is **autono
 
 | Security Feature | AutoGPT | CrewAI | LangChain | MetaGPT | OpenDevin | **ClawdAgent** |
 |-----------------|---------|--------|-----------|---------|-----------|----------------|
-| Defense Layers | 1 | 1 | 2 | 1 | 2 | **12-layer defense-in-depth** |
+| Defense Layers | 1 | 1 | 2 | 1 | 2 | **14-layer defense-in-depth** |
 | Prompt Injection Guard | No | No | Basic | No | No | **20+ regex patterns + AI detection** |
 | Social Engineering Detection | No | No | No | No | No | **15 patterns, auto-block** |
 | Memory Integrity | No | No | No | No | No | **SHA-256 checksums + tamper quarantine** |
@@ -171,7 +174,7 @@ Most AI agents are **reactive** — you ask, they answer. ClawdAgent is **autono
 | Category | AutoGPT | CrewAI | LangChain | MetaGPT | OpenDevin | **ClawdAgent** |
 |----------|---------|--------|-----------|---------|-----------|----------------|
 | Built-in Tools | 5-10 | 5-8 | Via plugins | 5-10 | 10-15 | **29 integrated tools** |
-| Pre-loaded Skills | No | No | No | No | No | **74 skills, extensible at runtime** |
+| Pre-loaded Skills | No | No | No | No | No | **90 skills across 23 categories, extensible at runtime** |
 | Server Management | No | No | No | No | No | **Multi-server SSH + Docker + health monitoring** |
 | Browser Automation | Via plugins | No | Via plugins | No | Built-in | **Playwright headless + AI vision** |
 | Content Creation | No | No | No | No | No | **AI video/image/music (Kie.ai 60+ models + fal.ai)** |
@@ -221,7 +224,7 @@ Most AI agents are **reactive** — you ask, they answer. ClawdAgent is **autono
 
 | Security Feature | OpenClaw | **ClawdAgent** |
 |-----------------|----------|----------------|
-| Defense Architecture | Sandboxed execution | **12-layer defense-in-depth (Zero Trust)** |
+| Defense Architecture | Sandboxed execution | **14-layer defense-in-depth (Zero Trust)** |
 | Prompt Injection Guard | Basic filtering | **20+ regex patterns + AI detection + pre-AI message guard** |
 | Social Engineering Detection | No | **15 patterns, auto-block on high severity** |
 | Memory Integrity | No | **SHA-256 checksums on every entry, tamper quarantine** |
@@ -243,7 +246,7 @@ Most AI agents are **reactive** — you ask, they answer. ClawdAgent is **autono
 | WhatsApp | Yes | **Yes (WhatsApp Web + QR pairing from dashboard)** |
 | Telegram | Yes | **Yes (full bot: keyboards, media, voice, inline)** |
 | Discord | Yes | **Yes (slash commands, embeds, reactions)** |
-| Web Dashboard | No (terminal only) | **Full React Dashboard: 16 pages, real-time WebSocket, charts** |
+| Web Dashboard | No (terminal only) | **Full React Dashboard: 18 pages, real-time WebSocket, charts** |
 | Slack | Yes | Roadmap |
 | Signal | Yes | Roadmap |
 | iMessage | Yes (macOS) | Roadmap |
@@ -271,7 +274,7 @@ Most AI agents are **reactive** — you ask, they answer. ClawdAgent is **autono
 | Capability | OpenClaw | **ClawdAgent** |
 |-----------|----------|----------------|
 | Built-in Tools | ~15 | **29 integrated tools** |
-| Pre-loaded Skills | Community-driven | **74 skills out of the box (crypto, dev, security, docs, research, AI)** |
+| Pre-loaded Skills | Community-driven | **90 skills across 23 categories (ML, crypto, security, RAG, fine-tuning, inference, agents)** |
 | Browser Automation | Yes (Playwright) | **Yes (headless Playwright + AI vision)** |
 | Server Management | Shell commands | **Multi-server SSH + Docker ops + health monitoring + auto-discovery** |
 | Crypto Trading | No | **5 strategies (DCA, Scalping, Swing, Day Trading, Custom) + TA engine + risk manager** |
@@ -301,7 +304,7 @@ Most AI agents are **reactive** — you ask, they answer. ClawdAgent is **autono
 | Self-Repair | No | **9 known fix patterns + AI diagnosis** |
 | Config Management | .env + YAML | **Zod-validated .env + YAML hot-reload + Web UI settings** |
 | Scaling | Single instance | **Horizontal via Docker + queue workers** |
-| API Endpoints | Webhooks | **Full REST API (17 routes) + WebSocket + A2A + ACP** |
+| API Endpoints | Webhooks | **Full REST API (19 routes) + WebSocket + A2A + ACP** |
 
 #### Community & Ecosystem
 
@@ -309,8 +312,8 @@ Most AI agents are **reactive** — you ask, they answer. ClawdAgent is **autono
 |--------|----------|----------------|
 | License | MIT | **Apache 2.0 (patent + trademark protection)** |
 | Age | ~2 months | **6 months (v6.1)** |
-| Codebase | ~10K lines | **28,500+ lines TypeScript** |
-| Modules | ~20 | **51 core modules** |
+| Codebase | ~10K lines | **45,000+ lines TypeScript (282 files)** |
+| Modules | ~20 | **57 core modules** |
 | Protocol Support | MCP (partial) | **MCP + A2A + ACP (full compliance)** |
 | Target User | Mac power users | **Developers, DevOps, traders, teams, enterprises** |
 | Self-Hosting | Required | **Required (+ Docker one-command)** |
@@ -322,7 +325,7 @@ Most AI agents are **reactive** — you ask, they answer. ClawdAgent is **autono
 
 ## Features
 
-### Core Intelligence — 51 Modules
+### Core Intelligence — 57 Modules
 - **Multi-Model AI** — Claude 4.6 (Anthropic), 400+ models via OpenRouter, local Ollama models, Claude Code CLI (free with Max)
 - **Smart Model Router** — Picks the best model per task (complexity, cost, budget) with 5 provider modes
 - **Extended Thinking** — Up to 32K thinking tokens for complex reasoning
@@ -370,7 +373,7 @@ Most AI agents are **reactive** — you ask, they answer. ClawdAgent is **autono
 - **RAG Engine** — Retrieval-augmented generation for document Q&A
 - **Heartbeat System** — 9 alert types: server down, overdue tasks, morning briefing, evening summary, self-repair alerts, proactive tips, goal updates
 
-### Security — 12-Layer Defense in Depth
+### Security — 14-Layer Defense in Depth
 - **Content Guard** — 20+ regex patterns blocking prompt injection before storage
 - **Social Engineering Detection** — 15 patterns detecting manipulation attempts
 - **Memory Integrity** — SHA-256 checksums, tampered entries quarantined and deleted
@@ -383,12 +386,14 @@ Most AI agents are **reactive** — you ask, they answer. ClawdAgent is **autono
 - **Key Rotation** — Automatic key rotation with configurable intervals
 - **Kill Switch** — Emergency stop for runaway agents (records cost + failure data)
 - **Approval Gate** — Human-in-the-loop for critical/irreversible actions (trading, social posting)
+- **Cisco AI Defense** — Enterprise AI security integration
+- **Skill Scanner** — 25+ static analysis patterns with severity scoring and reputation tracking
 
 ### Communication Platforms — 5 Interfaces
 - **Telegram** — Full bot with keyboards, media, voice, inline queries
 - **Discord** — Bot with slash commands, embeds, reactions
 - **WhatsApp** — WhatsApp Web integration with QR pairing
-- **Web Dashboard** — React app with real-time WebSocket (Dashboard, Chat, Agents, Tasks, Cron, Servers, Trading, Skills, Knowledge, Intelligence, Graph, Logs, Costs, Settings, History, OpenClaw)
+- **Web Dashboard** — React app with real-time WebSocket (Dashboard, Chat, Agents, Tasks, Cron, Servers, Trading, Skills, Knowledge, Intelligence, Evolution, Graph, Logs, Costs, Settings, History, OpenClaw, Login)
 - **Agent Protocols** — A2A + ACP for agent-to-agent communication
 
 ### What ClawdAgent Connects To — 60+ Integrations
@@ -424,7 +429,7 @@ ClawdAgent connects to virtually everything. Every integration is built-in or on
 - **Evolution Engine** — Autonomous capability improvement cycles
 - **Self-Repair** — 9 known fix patterns + AI-powered diagnosis
 - **Capability Learner** — Discovers and acquires new capabilities from the web
-- **Skill Engine** — 74 pre-loaded skills, dynamically extensible at runtime
+- **Skill Engine** — 90 pre-loaded skills across 23 categories, dynamically extensible at runtime
 - **Dynamic Tool Creation** — Creates new tools at runtime based on needs
 - **Feedback Loop** — Pattern recognition, prompt optimization, agent merge candidates
 - **Agent Factory** — Spawns new specialized agents on demand (Meta Agent)
@@ -636,7 +641,7 @@ This starts ClawdAgent + PostgreSQL + Redis in one command.
   │                                                                               │
   │   ┌──────────────────────┐  ┌──────────────────────┐  ┌──────────────────┐   │
   │   │ 🧬 Meta Agent       │  │ 👥 Crew Orchestrator │  │ ⚡ Skills Engine │   │
-  │   │ (spawns new agents)  │  │ (multi-agent teams)  │  │ (74 skills)      │   │
+  │   │ (spawns new agents)  │  │ (multi-agent teams)  │  │ (90 skills)      │   │
   │   └──────────────────────┘  └──────────────────────┘  └──────────────────┘   │
   └──────────────────────────────────┬────────────────────────────────────────────┘
                                      │
@@ -667,7 +672,7 @@ This starts ClawdAgent + PostgreSQL + Redis in one command.
 src/
   index.ts              — Entry point
   config.ts             — Zod-validated environment config
-  core/                 — Engine, AI client, memory, evolution (51 modules)
+  core/                 — Engine, AI client, memory, evolution (57 modules)
   agents/
     prompts/            — 18 agent system prompts
     tools/              — 29 tool implementations
@@ -682,7 +687,7 @@ src/
   actions/              — Browser, SSH, desktop, calendar, phone
   services/             — SSH tunnel, OpenClaw sync
 
-web/                    — React dashboard (Vite + Tailwind, 16 pages)
+web/                    — React dashboard (Vite + Tailwind, 18 pages)
 config/                 — YAML configurations
 plugins/                — Plugin directory
 ```
