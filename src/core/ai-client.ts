@@ -849,6 +849,9 @@ ${toolList}`;
 }
 
 // ── Free OpenRouter models for 402 (insufficient credits) fallback ───
+/** Track if OpenRouter has no credits — skip entirely until restart */
+let openRouterNoCredits = false;
+
 const FREE_FALLBACK_MODELS = [
   'z-ai/glm-4.5-air',                                    // NEW: best free agentic model
   'meta-llama/llama-4-scout:free',                      // 10M context, tools, vision
@@ -1037,10 +1040,16 @@ export class AIClient {
       for (const providerName of providersToTry) {
         const provider = this.providers.get(providerName);
         if (!provider) continue;
-        
+
         // Skip provider if it's marked as unavailable (e.g., Claude Code CLI with no tokens)
         if ('available' in provider && provider.available === false) {
           logger.debug(`Skipping ${providerName} - marked as unavailable`);
+          continue;
+        }
+
+        // Skip OpenRouter entirely when we know it has no credits (paid + free both failed)
+        if (providerName === 'openrouter' && openRouterNoCredits) {
+          logger.debug('Skipping openrouter — no credits (cached)');
           continue;
         }
 
@@ -1122,8 +1131,9 @@ export class AIClient {
                 logger.warn(`Free model ${freeModel} also failed`, { error: freeError.message });
               }
             }
-            // If all free models failed, continue to next provider
-            logger.warn('All OpenRouter free models failed, trying next provider');
+            // If all free models failed — mark OpenRouter as broken (no credits at all)
+            logger.warn('All OpenRouter free models failed — disabling OpenRouter until restart');
+            openRouterNoCredits = true;
             lastError = error;
             continue;
           }
@@ -1133,7 +1143,13 @@ export class AIClient {
         }
       }
 
-      throw lastError ?? new ExternalServiceError('AI', 'No providers available');
+      // Build a clear error message for the user
+      const failedProviders = providersToTry.filter(p => this.providers.has(p));
+      const reasons: string[] = [];
+      if (openRouterNoCredits) reasons.push('OpenRouter: אין קרדיטים');
+      if (lastError?.message?.includes('timed out')) reasons.push('Claude Code CLI: timeout (יותר מדי sessions פעילים?)');
+      const detail = reasons.length > 0 ? ` (${reasons.join(', ')})` : '';
+      throw lastError ?? new ExternalServiceError('AI', `No providers available${detail}. Set ANTHROPIC_API_KEY for direct API access.`);
     }, {
       maxRetries: 2,
       retryOn: (error: any) => error?.status === 429 || error?.status >= 500,

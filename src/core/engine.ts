@@ -401,6 +401,7 @@ export class Engine {
       const claudeCodeActive = this.ai.getAvailableProviders().includes('claude-code');
       const hasOpenRouter = this.ai.getAvailableProviders().includes('openrouter');
       const hasAnthropic = this.ai.getAvailableProviders().includes('anthropic');
+      logger.info('Quick mode provider selection', { resolvedMode, claudeCodeActive, hasOpenRouter, hasAnthropic, providers: this.ai.getAvailableProviders() });
       let selectedProvider: 'anthropic' | 'openrouter' | 'claude-code' | 'ollama' | undefined;
       let selectedModelId: string | undefined;
 
@@ -539,7 +540,18 @@ export class Engine {
       };
     } catch (error: any) {
       logger.error('Quick mode error', { error: error.message });
-      return { text: `❌ שגיאה: ${error.message?.slice(0, 150)}`, format: 'text' };
+      const msg = error.message ?? '';
+      // User-friendly error messages in Hebrew
+      if (msg.includes('timed out') || msg.includes('timeout')) {
+        return { text: '⏰ Claude Code CLI עמוס מדי (timeout). נסה שוב בעוד רגע, או הגדר ANTHROPIC_API_KEY ב-.env לגישה ישירה.', format: 'text' };
+      }
+      if (msg.includes('402') || msg.includes('Insufficient credits')) {
+        return { text: '💳 אין קרדיטים ב-OpenRouter ו-Claude Code CLI לא זמין. הגדר ANTHROPIC_API_KEY ב-.env.', format: 'text' };
+      }
+      if (msg.includes('No providers available')) {
+        return { text: '🔌 אין providers זמינים. הגדר ANTHROPIC_API_KEY ב-.env או טען קרדיטים ב-OpenRouter.', format: 'text' };
+      }
+      return { text: `❌ שגיאה: ${msg.slice(0, 150)}`, format: 'text' };
     } finally {
       if (_origSave) this.saveMessage = _origSave;
     }
@@ -1142,6 +1154,7 @@ If they want to check a running project, use "status" with projectName.`,
       const { resolved: resolvedMode } = this.ai.getProviderMode();
       const claudeCodeActive = this.ai.getAvailableProviders().includes('claude-code');
       const needsTools = toolDefs.length > 0;
+      logger.info('Main mode provider selection', { resolvedMode, claudeCodeActive, providers: this.ai.getAvailableProviders(), userModel: incoming.model });
 
       if (incoming.model === 'claude-code-cli') {
         // Special: user explicitly selected Claude Code CLI
