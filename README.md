@@ -4,7 +4,7 @@
 
 ### The Autonomous AI Octopus
 
-**v6.3 — 48,000+ lines of TypeScript. 60 core modules. 18 agents. 29 tools. 90 skills. 5 platforms. 3 protocols. 1 brain.**
+**v6.3 — 73,000+ lines of TypeScript. 60 core modules. 20 agents. 35 tools. 67 skills. 6 platforms. 3 protocols. 1 brain.**
 
 An open-source autonomous AI agent that thinks, learns, evolves, and never stops.
 
@@ -22,7 +22,7 @@ An open-source autonomous AI agent that thinks, learns, evolves, and never stops
 
 ## What is ClawdAgent?
 
-ClawdAgent is the **most comprehensive autonomous AI agent system** ever built as open-source. It runs 24/7 across multiple platforms, with **14-layer security**, **9 intelligence subsystems**, **18 specialized agents**, **29 tools**, and **90 skills** — all connected through a unified brain. It can **autonomously manage Facebook accounts**, **browse the web visually** with VNC streaming, and **publish to 9 social platforms** on a daily schedule with AI-generated content.
+ClawdAgent is the **most comprehensive autonomous AI agent system** ever built as open-source. It runs 24/7 across multiple platforms, with **14-layer security**, **9 intelligence subsystems**, **20 specialized agents**, **35 tools**, and **67 skills** — all connected through a unified brain. It can **autonomously manage Facebook, LinkedIn, Twitter, and TikTok accounts**, **browse the web visually** with VNC streaming, **make phone calls via Twilio + OpenAI Realtime**, and **publish to 9 social platforms** on a daily schedule with AI-generated content.
 
 It doesn't just respond to commands — it **thinks proactively**, **learns from interactions**, **evolves its own capabilities**, **secures itself against attacks**, and **manages complex multi-step workflows** autonomously.
 
@@ -92,17 +92,17 @@ Most AI agents are **reactive** — you ask, they answer. ClawdAgent is **autono
 
 | Metric | Count |
 |--------|-------|
-| Lines of TypeScript | **47,000+** |
-| TypeScript Files | **328** |
+| Lines of TypeScript | **73,000+** |
+| TypeScript Files | **335** |
 | Core Modules | **60** |
-| Specialized Agents | **18** (+ 17 dev agents) |
-| Integrated Tools | **29** + Dynamic Tool Creator |
-| Pre-loaded Skills | **90** across 23 categories |
+| Specialized Agents | **20** (+ 17 dev agents) |
+| Integrated Tools | **35** + Dynamic Tool Creator |
+| Pre-loaded Skills | **67** across 23 categories |
 | Security Layers | **14+** |
 | Intelligence Subsystems | **9** |
-| Communication Platforms | **5** |
-| Dashboard Pages | **18** |
-| API Routes | **19** |
+| Communication Platforms | **6** (Web, Telegram, Discord, WhatsApp, Voice/Phone, Protocols) |
+| Dashboard Pages | **26** |
+| API Routes | **32** |
 | Database Tables | **19** |
 | Agent Protocols | **3** (MCP + A2A + ACP) |
 | AI Providers | **4** (Anthropic + OpenRouter + Ollama + Claude Code) |
@@ -129,8 +129,8 @@ Most AI agents are **reactive** — you ask, they answer. ClawdAgent is **autono
 | Persistent Memory | Limited | No | Via plugins | Partial | Session | **PostgreSQL + Redis + Memory Hierarchy** |
 | Self-Evolution | No | No | No | No | No | **Evolution Engine + Self-Repair + Auto-Learn** |
 | Proactive Thinking | No | No | No | No | No | **Autonomous: spots problems, sends alerts** |
-| Multi-Platform Chat | No | No | No | No | No | **Telegram + Discord + WhatsApp + Web** |
-| Web Dashboard | Basic | No | LangSmith | No | Browser | **Full React Dashboard (18 pages)** |
+| Multi-Platform Chat | No | No | No | No | No | **Telegram + Discord + WhatsApp + Web + Voice/Phone** |
+| Web Dashboard | Basic | No | LangSmith | No | Browser | **Full React Dashboard (26 pages)** |
 | Dynamic Tool Creation | No | No | No | No | No | **Creates new tools at runtime** |
 | Multi-Agent Teams | No | Yes | No | Yes | No | **Crew Orchestrator + Meta Agent + Factory** |
 | Agent-to-Agent Protocols | No | No | No | No | No | **A2A + ACP + MCP (full compliance)** |
@@ -173,8 +173,8 @@ Most AI agents are **reactive** — you ask, they answer. ClawdAgent is **autono
 
 | Category | AutoGPT | CrewAI | LangChain | MetaGPT | OpenDevin | **ClawdAgent** |
 |----------|---------|--------|-----------|---------|-----------|----------------|
-| Built-in Tools | 5-10 | 5-8 | Via plugins | 5-10 | 10-15 | **29 integrated tools** |
-| Pre-loaded Skills | No | No | No | No | No | **90 skills across 23 categories, extensible at runtime** |
+| Built-in Tools | 5-10 | 5-8 | Via plugins | 5-10 | 10-15 | **35 integrated tools** |
+| Pre-loaded Skills | No | No | No | No | No | **67 skills across 23 categories, extensible at runtime** |
 | Server Management | No | No | No | No | No | **Multi-server SSH + Docker + health monitoring** |
 | Browser Automation | Via plugins | No | Via plugins | No | Built-in | **Playwright headless + AI vision** |
 | Content Creation | No | No | No | No | No | **AI video/image/music (Kie.ai 60+ models + fal.ai)** |
@@ -183,7 +183,7 @@ Most AI agents are **reactive** — you ask, they answer. ClawdAgent is **autono
 | Mobile Automation | No | No | No | No | No | **Android via ADB/Appium** |
 | Desktop Control | No | No | No | No | No | **AI vision + mouse/keyboard** |
 | Email Integration | No | No | No | No | No | **Gmail API + SMTP** |
-| Voice (TTS/STT) | No | No | No | No | No | **ElevenLabs integration** |
+| Voice (TTS/STT) | No | No | No | No | No | **ElevenLabs + Twilio + OpenAI Realtime (phone calls)** |
 | Remote Agent Bridge | No | No | No | No | No | **OpenClaw (Ed25519 device auth)** |
 
 ### Deployment & Operations
@@ -207,7 +207,7 @@ Most AI agents are **reactive** — you ask, they answer. ClawdAgent is **autono
 
 | Feature | OpenClaw | **ClawdAgent** |
 |---------|----------|----------------|
-| Architecture | Single agent + skills | **18 specialized agents + Meta Agent + Crew Orchestrator** |
+| Architecture | Single agent + skills | **20 specialized agents + Meta Agent + Crew Orchestrator** |
 | Agent Brain | Single LLM call | **Intelligence Bridge: 9 subsystems (scoring, memory, governance, cost, routing, observability, goals, safety, feedback)** |
 | Multi-Agent Orchestration | No (single thread) | **Crew Orchestrator + Agent Factory + dynamic spawn** |
 | Agent Self-Creation | No | **Meta Agent creates new agents at runtime based on need** |
@@ -246,7 +246,7 @@ Most AI agents are **reactive** — you ask, they answer. ClawdAgent is **autono
 | WhatsApp | Yes | **Yes (WhatsApp Web + QR pairing from dashboard)** |
 | Telegram | Yes | **Yes (full bot: keyboards, media, voice, inline)** |
 | Discord | Yes | **Yes (slash commands, embeds, reactions)** |
-| Web Dashboard | No (terminal only) | **Full React Dashboard: 18 pages, real-time WebSocket, charts** |
+| Web Dashboard | No (terminal only) | **Full React Dashboard: 26 pages, real-time WebSocket, charts** |
 | Slack | Yes | Roadmap |
 | Signal | Yes | Roadmap |
 | iMessage | Yes (macOS) | Roadmap |
@@ -273,8 +273,8 @@ Most AI agents are **reactive** — you ask, they answer. ClawdAgent is **autono
 
 | Capability | OpenClaw | **ClawdAgent** |
 |-----------|----------|----------------|
-| Built-in Tools | ~15 | **29 integrated tools** |
-| Pre-loaded Skills | Community-driven | **90 skills across 23 categories (ML, crypto, security, RAG, fine-tuning, inference, agents)** |
+| Built-in Tools | ~15 | **35 integrated tools** |
+| Pre-loaded Skills | Community-driven | **67 skills across 23 categories (ML, crypto, security, RAG, fine-tuning, inference, agents)** |
 | Browser Automation | Yes (Playwright) | **Yes (headless Playwright + AI vision)** |
 | Server Management | Shell commands | **Multi-server SSH + Docker ops + health monitoring + auto-discovery** |
 | Crypto Trading | No | **5 strategies (DCA, Scalping, Swing, Day Trading, Custom) + TA engine + risk manager** |
@@ -284,7 +284,7 @@ Most AI agents are **reactive** — you ask, they answer. ClawdAgent is **autono
 | Desktop Control | Mac (Accessibility) | **AI vision + mouse/keyboard (cross-platform)** |
 | Mobile Automation | No | **Android via ADB/Appium with pre-built recipes** |
 | Email | Gmail via skill | **Gmail API + SMTP dual integration (native)** |
-| Voice (TTS/STT) | ElevenLabs | **ElevenLabs (native integration)** |
+| Voice (TTS/STT) | ElevenLabs | **ElevenLabs + Twilio + OpenAI Realtime (native, phone calls)** |
 | Calendar | Google Calendar | **Google Calendar (native integration)** |
 | Code Execution | Claude Code sessions | **Bash tool + GitHub tool + Code Assistant agent** |
 | RAG (Document Q&A) | No | **Vector embeddings + keyword hybrid search** |
@@ -304,16 +304,16 @@ Most AI agents are **reactive** — you ask, they answer. ClawdAgent is **autono
 | Self-Repair | No | **9 known fix patterns + AI diagnosis** |
 | Config Management | .env + YAML | **Zod-validated .env + YAML hot-reload + Web UI settings** |
 | Scaling | Single instance | **Horizontal via Docker + queue workers** |
-| API Endpoints | Webhooks | **Full REST API (19 routes) + WebSocket + A2A + ACP** |
+| API Endpoints | Webhooks | **Full REST API (32 routes) + WebSocket + A2A + ACP** |
 
 #### Community & Ecosystem
 
 | Metric | OpenClaw | **ClawdAgent** |
 |--------|----------|----------------|
 | License | MIT | **Apache 2.0 (patent + trademark protection)** |
-| Age | ~2 months | **6 months (v6.2)** |
-| Codebase | ~10K lines | **45,000+ lines TypeScript (282 files)** |
-| Modules | ~20 | **57 core modules** |
+| Age | ~2 months | **6 months (v6.3)** |
+| Codebase | ~10K lines | **73,000+ lines TypeScript (335 files)** |
+| Modules | ~20 | **60 core modules** |
 | Protocol Support | MCP (partial) | **MCP + A2A + ACP (full compliance)** |
 | Target User | Mac power users | **Developers, DevOps, traders, teams, enterprises** |
 | Self-Hosting | Required | **Required (+ Docker one-command)** |
@@ -338,7 +338,7 @@ Most AI agents are **reactive** — you ask, they answer. ClawdAgent is **autono
 - **Behavior Engine** — Multi-language personality variants, adaptive interaction styles
 - **OpenClaw Bridge** — Cryptographic device auth (Ed25519), remote agent execution, cron management
 
-### Agent System — 18 Specialized Agents
+### Agent System — 20 Specialized Agents
 | Agent | Purpose |
 |-------|---------|
 | General Assistant | Chat, help, daily tasks |
@@ -349,7 +349,7 @@ Most AI agents are **reactive** — you ask, they answer. ClawdAgent is **autono
 | Security Guard | Command review, threat detection |
 | Desktop Controller | AI vision + mouse/keyboard control |
 | Project Builder | Scaffold and build full-stack apps |
-| Web Agent | Browser automation, form filling, scraping |
+| Web Agent | Browser automation, Facebook/LinkedIn/Twitter/TikTok agents, VNC |
 | Content Creator | AI images/video/music generation |
 | Orchestrator | Multi-system coordination |
 | Device Controller | Android phone automation |
@@ -359,9 +359,11 @@ Most AI agents are **reactive** — you ask, they answer. ClawdAgent is **autono
 | Strategy Lab | Backtest and optimize strategies |
 | AI App Builder | Build and deploy AI applications |
 | MRR Strategist | SaaS revenue optimization |
+| Voice Agent | Phone calls via Twilio + OpenAI Realtime API |
+| General (Fallback) | General-purpose fallback for unclassified requests |
 
-### Tool Ecosystem — 29 Integrated Tools
-`bash` `file` `search` `github` `task` `db` `browser` `kie` `social` `openclaw` `cron` `memory` `auto` `email` `workflow` `analytics` `claude-code` `device` `elevenlabs` `firecrawl` `rapidapi` `apify` `ssh` `trading` `rag` `whatsapp` `tikvid` `fal-ai` `auto-tool`
+### Tool Ecosystem — 35 Integrated Tools
+`bash` `file` `search` `github` `task` `db` `browser` `browser-ai` `kie` `social` `openclaw` `cron` `memory` `auto` `email` `workflow` `analytics` `claude-code` `device` `elevenlabs` `firecrawl` `rapidapi` `apify` `ssh` `trading` `rag` `whatsapp` `tikvid` `fal-ai` `auto-tool` `facebook` `linkedin` `twitter` `tiktok` `voice` `deploy`
 
 ### Memory & Learning — 11 Repositories
 - **PostgreSQL** — Persistent storage for conversations, knowledge, tasks, users, servers
@@ -389,11 +391,12 @@ Most AI agents are **reactive** — you ask, they answer. ClawdAgent is **autono
 - **Cisco AI Defense** — Enterprise AI security integration
 - **Skill Scanner** — 25+ static analysis patterns with severity scoring and reputation tracking
 
-### Communication Platforms — 5 Interfaces
+### Communication Platforms — 6 Interfaces
 - **Telegram** — Full bot with keyboards, media, voice, inline queries
 - **Discord** — Bot with slash commands, embeds, reactions
 - **WhatsApp** — WhatsApp Web integration with QR pairing
-- **Web Dashboard** — React app with real-time WebSocket (Dashboard, Chat, Agents, Tasks, Cron, Servers, Trading, Skills, Knowledge, Intelligence, Evolution, Graph, Logs, Costs, Settings, History, OpenClaw, Login)
+- **Voice/Phone** — Inbound & outbound calls via Twilio + OpenAI Realtime API with AI voice
+- **Web Dashboard** — React app with real-time WebSocket (26 pages: Dashboard, Chat, Agents, Tasks, Cron, Servers, Trading, Skills, Knowledge, Intelligence, Evolution, Graph, Logs, Costs, Settings, History, OpenClaw, Browser, Facebook, LinkedIn, Twitter, TikTok, Mobile, Voice, Terminal, Login)
 - **Agent Protocols** — A2A + ACP for agent-to-agent communication
 
 ### What ClawdAgent Connects To — 60+ Integrations
@@ -402,7 +405,7 @@ ClawdAgent connects to virtually everything. Every integration is built-in or on
 
 | Category | Services & Platforms |
 |----------|---------------------|
-| **Chat Platforms** | Telegram, Discord, WhatsApp, Web Dashboard (+ A2A/ACP for any agent) |
+| **Chat Platforms** | Telegram, Discord, WhatsApp, Web Dashboard, Voice/Phone (+ A2A/ACP for any agent) |
 | **AI Providers** | Anthropic Claude 4.6, OpenRouter (400+ models), Ollama (local), Claude Code CLI, DeepSeek, Gemini, GPT-4o, Mistral, Llama, Qwen |
 | **Social Media** | Twitter/X, Instagram, TikTok, LinkedIn, YouTube, Facebook, Threads, BlueSky, Pinterest (via Blotato) |
 | **AI Generation** | fal.ai (FLUX, Stable Diffusion, Kling, Wan), Kie.ai (60+ models: video, image, music, voice) |
@@ -410,7 +413,7 @@ ClawdAgent connects to virtually everything. Every integration is built-in or on
 | **Databases** | PostgreSQL, Redis, SQLite, any SQL via Drizzle ORM |
 | **Email** | Gmail API, SMTP (any provider), Nodemailer |
 | **Calendar** | Google Calendar (events, scheduling, reminders) |
-| **Voice** | ElevenLabs (TTS, STT, voice cloning) |
+| **Voice** | ElevenLabs (TTS, STT, voice cloning), Twilio (phone calls), OpenAI Realtime API (live AI voice) |
 | **Browser** | Playwright (headless automation, form filling, scraping, screenshots) |
 | **Crypto** | Binance, Bybit, Coinbase, Kraken, KuCoin + 100 exchanges via CCXT |
 | **Search** | Brave Search, Firecrawl (web scraping), Apify (data extraction), RapidAPI (1000s of APIs) |
@@ -429,7 +432,7 @@ ClawdAgent connects to virtually everything. Every integration is built-in or on
 - **Evolution Engine** — Autonomous capability improvement cycles
 - **Self-Repair** — 9 known fix patterns + AI-powered diagnosis
 - **Capability Learner** — Discovers and acquires new capabilities from the web
-- **Skill Engine** — 90 pre-loaded skills across 23 categories, dynamically extensible at runtime
+- **Skill Engine** — 67 pre-loaded skills across 23 categories, dynamically extensible at runtime
 - **Dynamic Tool Creation** — Creates new tools at runtime based on needs
 - **Feedback Loop** — Pattern recognition, prompt optimization, agent merge candidates
 - **Agent Factory** — Spawns new specialized agents on demand (Meta Agent)
@@ -446,7 +449,7 @@ ClawdAgent connects to virtually everything. Every integration is built-in or on
 - **Content Creation** — AI video, images, music via Kie.ai (60+ models)
 - **Social Publishing** — 9 platforms via Blotato (Twitter, Instagram, TikTok, LinkedIn, YouTube, Facebook, Threads, BlueSky, Pinterest)
 - **Email** — Gmail API + SMTP dual integration
-- **Voice** — Text-to-Speech + Speech-to-Text via ElevenLabs
+- **Voice** — Text-to-Speech + Speech-to-Text via ElevenLabs + AI phone calls via Twilio + OpenAI Realtime
 - **Calendar** — Google Calendar integration
 - **Plugin System** — Manifest-based extensibility (tools, behaviors, prompts, config)
 - **MCP Support** — Model Context Protocol for external tools (9 servers)
@@ -470,7 +473,7 @@ ClawdAgent speaks the industry-standard agent protocols, enabling seamless commu
 | **MCP** (Model Context Protocol) | Anthropic | Deep integration | 9 MCP servers, JSON-RPC 2.0 |
 | **A2A** (Agent-to-Agent) | Google / Linux Foundation | Full support | Agent Card, Tasks, SSE streaming |
 | **ACP** (Agent Communication Protocol) | IBM BeeAI / Linux Foundation | Full support | REST runs, agent descriptor |
-| **Tool Use** | Anthropic Claude | Native | 29 integrated tools |
+| **Tool Use** | Anthropic Claude | Native | 35 integrated tools |
 
 #### A2A Endpoints
 ```
@@ -618,7 +621,7 @@ This starts ClawdAgent + PostgreSQL + Redis in one command.
   │   └────────────┘  └──────────────┘  └────────────────┘  └───────────────┘    │
   │                                                                               │
   │   ┌─────────────────────────────────────────────────────────────────────┐     │
-  │   │                    18 SPECIALIZED AGENTS                            │     │
+  │   │                    20 SPECIALIZED AGENTS                            │     │
   │   │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌──────────┐ ┌────────────┐  │     │
   │   │  │ Server  │ │  Code   │ │   Web   │ │ Content  │ │  Crypto    │  │     │
   │   │  │ Manager │ │ Assist  │ │  Agent  │ │ Creator  │ │  Trader    │  │     │
@@ -627,21 +630,22 @@ This starts ClawdAgent + PostgreSQL + Redis in one command.
   │   │  │Research │ │  Task   │ │ Desktop │ │ Project  │ │ Orchestr-  │  │     │
   │   │  │   er    │ │ Planner │ │ Control │ │ Builder  │ │   ator     │  │     │
   │   │  └─────────┘ └─────────┘ └─────────┘ └──────────┘ └────────────┘  │     │
-  │   │  + Security Guard · Device Controller · Crypto Analyst             │     │
+  │   │  + Security Guard · Device Controller · Crypto Analyst · Voice      │     │
   │   │  + Market Maker · Strategy Lab · AI App Builder · MRR Strategist   │     │
   │   └─────────────────────────────────┬───────────────────────────────────┘     │
   │                                     │                                         │
   │   ┌─────────────────────────────────┴───────────────────────────────────┐     │
-  │   │                      29 INTEGRATED TOOLS                            │     │
-  │   │  bash · file · ssh · browser · github · db · cron · email · rag    │     │
-  │   │  search · trading · kie · social · elevenlabs · firecrawl · apify  │     │
-  │   │  rapidapi · device · memory · workflow · analytics · claude-code   │     │
-  │   │  whatsapp · openclaw · docker · auto · tikvid · auto-tool          │     │
+  │   │                      35 INTEGRATED TOOLS                            │     │
+  │   │  bash · file · ssh · browser · browser-ai · github · db · cron     │     │
+  │   │  email · rag · search · trading · kie · social · elevenlabs        │     │
+  │   │  firecrawl · apify · rapidapi · device · memory · workflow         │     │
+  │   │  analytics · claude-code · whatsapp · openclaw · auto · tikvid     │     │
+  │   │  fal-ai · facebook · linkedin · twitter · tiktok · voice · deploy  │     │
   │   └─────────────────────────────────────────────────────────────────────┘     │
   │                                                                               │
   │   ┌──────────────────────┐  ┌──────────────────────┐  ┌──────────────────┐   │
   │   │ 🧬 Meta Agent       │  │ 👥 Crew Orchestrator │  │ ⚡ Skills Engine │   │
-  │   │ (spawns new agents)  │  │ (multi-agent teams)  │  │ (90 skills)      │   │
+  │   │ (spawns new agents)  │  │ (multi-agent teams)  │  │ (67 skills)      │   │
   │   └──────────────────────┘  └──────────────────────┘  └──────────────────┘   │
   └──────────────────────────────────┬────────────────────────────────────────────┘
                                      │
@@ -672,24 +676,36 @@ This starts ClawdAgent + PostgreSQL + Redis in one command.
 src/
   index.ts              — Entry point
   config.ts             — Zod-validated environment config
-  core/                 — Engine, AI client, memory, evolution (57 modules)
+  core/                 — Engine, AI client, memory, evolution (60 modules)
   agents/
-    prompts/            — 18 agent system prompts
-    tools/              — 29 tool implementations
+    prompts/            — 20 agent system prompts
+    tools/              — 35 tool implementations
   interfaces/
     telegram/           — Telegram bot
     discord/            — Discord bot
     whatsapp/           — WhatsApp Web integration
-    web/                — Express + React dashboard (17 API routes)
-  security/             — Content guard, audit, RBAC, encryption
+    web/                — Express + React dashboard (32 API routes)
+      routes/           — All REST API route handlers
+  security/             — Content guard, audit, RBAC, encryption (12 modules)
   memory/               — Database schema, repositories, migrations
   queue/                — BullMQ worker, scheduler, jobs
-  actions/              — Browser, SSH, desktop, calendar, phone
+  actions/
+    browser/            — Facebook, LinkedIn, Twitter, TikTok agents + VNC
+    voice/              — Twilio voice agent + TTS/STT
+    mobile/             — Android automation via Appium
+    trading/            — 5 crypto trading strategies
+    rag/                — Vector embeddings + document Q&A
+    desktop/            — AI vision + mouse/keyboard
+    ssh/                — Multi-server session management
+    github/             — PRs, issues, repos, webhooks
+    email/              — Gmail API + SMTP
   services/             — SSH tunnel, OpenClaw sync
+  protocols/            — A2A + ACP agent protocols
 
-web/                    — React dashboard (Vite + Tailwind, 18 pages)
+web/                    — React dashboard (Vite + Tailwind, 26 pages)
 config/                 — YAML configurations
 plugins/                — Plugin directory
+data/skills/            — 67 skill JSON definitions
 ```
 
 ---
@@ -701,21 +717,31 @@ The web dashboard provides full control over ClawdAgent:
 | Page | Description |
 |------|-------------|
 | **Dashboard** | System overview, stats, quick actions, activity feed |
-| **Chat** | Real-time AI chat with WebSocket streaming |
-| **Agents** | View and manage all 18 agents + agent stats |
+| **Chat** | Real-time AI chat with syntax highlighting, code copy, markdown tables, export |
+| **Agents** | View and manage all 20 agents + agent stats |
 | **Tasks** | Create and track tasks with status |
 | **Cron** | Schedule recurring jobs with cron expressions |
 | **Servers** | SSH server management + health monitoring |
 | **Trading** | Crypto trading interface + portfolio |
-| **Skills** | Browse 74+ skills, search and filter |
-| **Knowledge** | Knowledge base explorer + memory search |
+| **Browser View** | Visual browser with VNC live streaming + AI actions |
+| **Facebook** | Autonomous Facebook agent — accounts, sessions, action logs |
+| **LinkedIn** | Autonomous LinkedIn agent — engagement, posting, networking |
+| **Twitter/X** | Autonomous Twitter agent — tweets, replies, likes, follows |
+| **TikTok** | Autonomous TikTok agent — likes, comments, follows, scroll |
+| **Voice Agent** | Phone call center — inbound/outbound via Twilio + OpenAI Realtime |
+| **Mobile Agent** | Android device control via Appium — app automation |
+| **Terminal** | Web-based terminal for remote command execution |
+| **Skills** | Browse 67 skills, search and filter |
+| **Knowledge** | Knowledge base explorer + RAG document Q&A |
 | **Intelligence** | Intelligence subsystem visualization + metrics |
+| **Evolution** | Self-evolution engine status + trigger cycles |
 | **Graph** | System relationship graph visualization |
 | **History** | Conversation history browser |
 | **Logs** | System logs viewer with filtering |
 | **Costs** | API cost tracking + budget visualization |
 | **OpenClaw** | OpenClaw integration management |
 | **Settings** | Full configuration UI + model selector |
+| **Login** | JWT authentication with role-based access |
 
 ---
 
@@ -741,6 +767,10 @@ See [`.env.example`](.env.example) for the complete list. Key variables:
 | `BLOTATO_API_KEY` | No | Social media publishing (9 platforms) |
 | `ELEVENLABS_API_KEY` | No | Text-to-Speech + voice cloning |
 | `BRAVE_API_KEY` | No | Web search |
+| `TWILIO_ACCOUNT_SID` | No | Twilio voice calls (SID) |
+| `TWILIO_AUTH_TOKEN` | No | Twilio voice calls (auth) |
+| `TWILIO_PHONE_NUMBER` | No | Twilio outbound phone number |
+| `OPENAI_API_KEY` | No | OpenAI Realtime API for voice AI |
 | `OPENCLAW_GATEWAY_TOKEN` | No | OpenClaw remote agent bridge |
 
 ---
@@ -764,6 +794,18 @@ See [SECURITY.md](SECURITY.md) for vulnerability reporting.
 
 ## What's New in v6.3
 
+### Autonomous Social Media Agents
+- **LinkedIn Agent** — Fully autonomous LinkedIn engagement: like posts, comment with AI-generated text, follow users, send connection requests, publish posts. Cookie-based auth with stealth browser. 1,464 lines of automation code
+- **Twitter/X Agent** — Autonomous Twitter engagement: tweet, reply, retweet, like, follow. Cookie-based auth with anti-detection. Full dashboard page with account management, action logs, and configuration
+- **TikTok Agent** — Autonomous TikTok engagement: like, comment, follow, scroll, share. Stealth browser with human-like delays. Dashboard page with real-time status
+- **Mobile Agent** — Autonomous Android app automation via Appium: control TikTok, Twitter, Facebook natively on real devices. SSH tunnel to Appium server, pre-built app recipes
+
+### Voice Agent (Twilio + OpenAI Realtime)
+- **AI Phone Calls** — Inbound and outbound phone calls with AI voice powered by Twilio + OpenAI Realtime API
+- **Call Dashboard** — Voice Agent page with call history, status monitoring, and configuration
+- **PostgreSQL Call History** — All calls logged with transcription, duration, and outcome
+- **Configurable Voice** — Choose voice, language, and customize AI instructions per call
+
 ### Chat Experience Overhaul
 - **Syntax Highlighting** — Code blocks now feature full syntax highlighting via highlight.js (40+ languages: JS, TS, Python, Bash, SQL, YAML, and more) with a dark theme optimized for readability
 - **One-Click Code Copy** — Every code block has a copy button with visual "Copied" feedback — no more manual selection
@@ -772,6 +814,16 @@ See [SECURITY.md](SECURITY.md) for vulnerability reporting.
 - **Conversation Export** — Export any conversation as Markdown (human-readable) or JSON (structured data) with one click
 - **Message Actions** — Hover over any assistant message to copy its text or retry the previous prompt
 - **Mobile-First Sidebar** — Conversation sidebar overlays on mobile instead of pushing content, fully responsive
+
+### New Dashboard Pages
+- **Browser View** — Visual browser with live VNC streaming + AI instruction panel
+- **Facebook Tab** — Autonomous Facebook agent management with account, sessions, and logs
+- **LinkedIn Tab** — LinkedIn agent dashboard with engagement config
+- **Twitter/X Tab** — Twitter agent dashboard with posting and engagement controls
+- **TikTok Tab** — TikTok agent dashboard with scroll and engagement automation
+- **Mobile Agent Tab** — Android device automation via Appium
+- **Voice Agent Tab** — Phone call center with call history and configuration
+- **Terminal Tab** — Web-based terminal for remote command execution
 
 ### Bug Fixes & Stability
 - **Streaming Race Condition** — Fixed stale streaming text bleeding between conversations
@@ -834,6 +886,10 @@ ClawdAgent isn't a toy — it's a production system. Here's what people use it f
 | **Mobile Automation** | Control Android apps, automate workflows, handle SMS/calls, manage notifications |
 | **Browser Automation** | Fill forms, scrape data, take screenshots, navigate workflows — with VNC streaming so you watch in real-time |
 | **Facebook Automation** | Autonomous agent posts, comments, sends friend requests, joins groups — all with human-like delays and safety limits |
+| **LinkedIn Automation** | Autonomous networking: like posts, comment with AI-generated insights, follow people, send connection requests, publish articles |
+| **Twitter/X Automation** | Autonomous engagement: tweet, reply, retweet, like, follow — with anti-detection and human-like timing |
+| **TikTok Automation** | Autonomous engagement: like, comment, follow, scroll feed, share content — with stealth browser |
+| **AI Phone Calls** | Inbound and outbound calls with AI voice via Twilio + OpenAI Realtime — call center in a box |
 | **Business Intelligence** | Cost tracking, ROI analysis, budget forecasting, agent performance metrics |
 | **Team Coordination** | Multi-agent crews collaborate on complex tasks, with governance and approval gates |
 
@@ -888,7 +944,7 @@ pm2 save
 | **Cache/Queue** | Redis 7+, BullMQ |
 | **Web** | Express 5, React, Vite, Tailwind CSS |
 | **Automation** | Playwright (stealth mode), Xvfb + VNC, ADB/Appium |
-| **Communication** | grammy (Telegram), discord.js, whatsapp-web.js |
+| **Communication** | grammy (Telegram), discord.js, whatsapp-web.js, Twilio (phone) |
 | **Security** | Helmet, bcrypt, JWT, Zod validation |
 | **DevOps** | Docker, PM2, GitHub Actions |
 
@@ -907,7 +963,7 @@ pm2 save
 - [ ] Hosted SaaS version (ClawdAgent Cloud)
 - [ ] Team collaboration (multi-user workspaces)
 - [ ] Fine-tuned agent models
-- [ ] Voice-first interface (real-time conversation)
+- [x] ~~Voice-first interface (real-time conversation)~~ **Done in v6.3** — Twilio + OpenAI Realtime
 - [ ] Kubernetes operator for scaling
 
 ### Long Term
