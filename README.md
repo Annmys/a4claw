@@ -1,6 +1,6 @@
 <div align="center">
 
-# ClawdAgent
+# a4claw
 
 ### The Autonomous AI Octopus
 
@@ -122,9 +122,9 @@ pnpm start
 
 ---
 
-## What is ClawdAgent?
+## What is a4claw?
 
-ClawdAgent is the **most comprehensive autonomous AI agent system** ever built as open-source. It runs 24/7 across multiple platforms, with **14-layer security**, **9 intelligence subsystems**, **20 specialized agents**, **35 tools**, and **67 skills** — all connected through a unified brain. It can **autonomously manage Facebook, LinkedIn, Twitter, and TikTok accounts**, **browse the web visually** with VNC streaming, **make phone calls via Twilio + OpenAI Realtime**, and **publish to 9 social platforms** on a daily schedule with AI-generated content.
+a4claw is the **most comprehensive autonomous AI agent system** ever built as open-source. It runs 24/7 across multiple platforms, with **14-layer security**, **9 intelligence subsystems**, **20 specialized agents**, **35 tools**, and **67 skills** — all connected through a unified brain. It can **autonomously manage Facebook, LinkedIn, Twitter, and TikTok accounts**, **browse the web visually** with VNC streaming, **make phone calls via Twilio + OpenAI Realtime**, and **publish to 9 social platforms** on a daily schedule with AI-generated content.
 
 It doesn't just respond to commands — it **thinks proactively**, **learns from interactions**, **evolves its own capabilities**, **secures itself against attacks**, and **manages complex multi-step workflows** autonomously.
 
@@ -132,7 +132,7 @@ Think of it as your personal AI operations center: it manages your servers, writ
 
 ```
 You: "Check my servers, fix anything broken, and send me a summary on Telegram"
-ClawdAgent: ✅ SSH'd into 3 servers → found nginx down on VPS2 → restarted it
+a4claw: ✅ SSH'd into 3 servers → found nginx down on VPS2 → restarted it
             → checked SSL certs (2 expiring soon) → renewed them
             → generated AI image for the report header
             → sent you a full report on Telegram with recommendations
@@ -142,7 +142,7 @@ ClawdAgent: ✅ SSH'd into 3 servers → found nginx down on VPS2 → restarted 
 
 ```
 You: "Create a marketing video about our product and publish it everywhere"
-ClawdAgent: ✅ Generated script with AI → created video via Kie.ai
+a4claw: ✅ Generated script with AI → created video via Kie.ai
             → generated thumbnail via fal.ai (FLUX)
             → published to Twitter, Instagram, TikTok, LinkedIn, YouTube, Facebook
             → scheduled follow-up posts for peak engagement times
@@ -151,7 +151,7 @@ ClawdAgent: ✅ Generated script with AI → created video via Kie.ai
 
 ```
 You: "Set up DCA trading on Bitcoin — $50 daily, stop if it drops 20%"
-ClawdAgent: ✅ Connected to Binance → configured DCA strategy → set risk limits
+a4claw: ✅ Connected to Binance → configured DCA strategy → set risk limits
             → placed first buy order ($50 USDT → 0.00052 BTC)
             → scheduled daily recurring buys via cron
             → set 20% drawdown kill switch → activated portfolio tracker
@@ -160,7 +160,7 @@ ClawdAgent: ✅ Connected to Binance → configured DCA strategy → set risk li
 
 ```
 You: "Research the top 5 competitors in our space and email me a report"
-ClawdAgent: ✅ Searched Brave + scraped competitor websites with Playwright
+a4claw: ✅ Searched Brave + scraped competitor websites with Playwright
             → analyzed pricing, features, tech stacks of 5 companies
             → generated a detailed comparison report (3 pages)
             → created competitive positioning matrix
@@ -170,19 +170,19 @@ ClawdAgent: ✅ Searched Brave + scraped competitor websites with Playwright
 
 ```
 You: "My phone isn't syncing emails, fix it"
-ClawdAgent: ✅ Connected to your Android via ADB → checked Gmail app status
+a4claw: ✅ Connected to your Android via ADB → checked Gmail app status
             → found sync disabled after last OS update → re-enabled sync
             → cleared app cache (was 2.1 GB) → force-synced inbox
             → verified 47 new emails loaded → sent you confirmation on Telegram
             → created a skill "fix-email-sync" for next time
 ```
 
-### What Makes ClawdAgent Different
+### What Makes a4claw Different
 
-Most AI agents are **reactive** — you ask, they answer. ClawdAgent is **autonomous**:
+Most AI agents are **reactive** — you ask, they answer. a4claw is **autonomous**:
 
-- **It thinks on its own** — The Proactive Thinker spots problems before you do. Server going down? SSL cert expiring? Budget running low? ClawdAgent alerts you before it becomes a crisis.
-- **It creates its own tools** — Need a new capability? ClawdAgent builds it at runtime. No waiting for the next release.
+- **It thinks on its own** — The Proactive Thinker spots problems before you do. Server going down? SSL cert expiring? Budget running low? a4claw alerts you before it becomes a crisis.
+- **It creates its own tools** — Need a new capability? a4claw builds it at runtime. No waiting for the next release.
 - **It spawns its own agents** — The Meta Agent creates new specialized agents on demand. Need a "Legal Document Analyzer"? Ask once and it exists forever.
 - **It evolves itself** — The Evolution Engine runs improvement cycles: learns from failures, optimizes prompts, merges redundant agents, discovers new patterns.
 - **It secures itself** — 14 layers of Zero Trust defense. Every memory entry is SHA-256 checksummed. Every tool is hash-pinned. Every command is sandboxed. Every security check fails closed.
@@ -221,11 +221,11 @@ Most AI agents are **reactive** — you ask, they answer. ClawdAgent is **autono
 
 ---
 
-## Why ClawdAgent?
+## Why a4claw?
 
 ### Core Capabilities
 
-| Capability | AutoGPT | CrewAI | LangChain | MetaGPT | OpenDevin | **ClawdAgent** |
+| Capability | AutoGPT | CrewAI | LangChain | MetaGPT | OpenDevin | **a4claw** |
 |-----------|---------|--------|-----------|---------|-----------|----------------|
 | Autonomous Execution | Partial | Task-based | Chain-based | Workflow | IDE-focused | **Full 24/7 autonomy** |
 | Persistent Memory | Limited | No | Via plugins | Partial | Session | **PostgreSQL + Redis + Memory Hierarchy** |
@@ -239,7 +239,7 @@ Most AI agents are **reactive** — you ask, they answer. ClawdAgent is **autono
 
 ### Security Comparison
 
-| Security Feature | AutoGPT | CrewAI | LangChain | MetaGPT | OpenDevin | **ClawdAgent** |
+| Security Feature | AutoGPT | CrewAI | LangChain | MetaGPT | OpenDevin | **a4claw** |
 |-----------------|---------|--------|-----------|---------|-----------|----------------|
 | Defense Layers | 1 | 1 | 2 | 1 | 2 | **14-layer defense-in-depth** |
 | Prompt Injection Guard | No | No | Basic | No | No | **20+ regex patterns + AI detection** |
@@ -258,7 +258,7 @@ Most AI agents are **reactive** — you ask, they answer. ClawdAgent is **autono
 
 ### Intelligence & AGI Readiness
 
-| Intelligence Feature | AutoGPT | CrewAI | LangChain | MetaGPT | OpenDevin | **ClawdAgent** |
+| Intelligence Feature | AutoGPT | CrewAI | LangChain | MetaGPT | OpenDevin | **a4claw** |
 |---------------------|---------|--------|-----------|---------|-----------|----------------|
 | Multi-Model Support | GPT only | Multiple | Multiple | GPT-focused | Multiple | **Claude 4.6 + OpenRouter (400+) + Ollama + Claude Code** |
 | Smart Model Routing | No | No | No | No | No | **Auto-routes by complexity, cost, budget** |
@@ -273,7 +273,7 @@ Most AI agents are **reactive** — you ask, they answer. ClawdAgent is **autono
 
 ### Tools & Integrations
 
-| Category | AutoGPT | CrewAI | LangChain | MetaGPT | OpenDevin | **ClawdAgent** |
+| Category | AutoGPT | CrewAI | LangChain | MetaGPT | OpenDevin | **a4claw** |
 |----------|---------|--------|-----------|---------|-----------|----------------|
 | Built-in Tools | 5-10 | 5-8 | Via plugins | 5-10 | 10-15 | **35 integrated tools** |
 | Pre-loaded Skills | No | No | No | No | No | **67 skills across 23 categories, extensible at runtime** |
@@ -290,7 +290,7 @@ Most AI agents are **reactive** — you ask, they answer. ClawdAgent is **autono
 
 ### Deployment & Operations
 
-| Feature | AutoGPT | CrewAI | LangChain | MetaGPT | OpenDevin | **ClawdAgent** |
+| Feature | AutoGPT | CrewAI | LangChain | MetaGPT | OpenDevin | **a4claw** |
 |---------|---------|--------|-----------|---------|-----------|----------------|
 | Production-Ready | Partial | Library | Library | Prototype | Beta | **PM2 + Docker + nginx production stack** |
 | One-Command Install | No | pip | pip | pip | Docker | **`bash install.sh` (interactive wizard)** |
@@ -301,13 +301,13 @@ Most AI agents are **reactive** — you ask, they answer. ClawdAgent is **autono
 | Config Management | .env | Code | Code | Code | Docker | **Zod-validated .env + YAML hot-reload + Web UI** |
 | Open Source | Yes | Yes | Yes | Yes | Yes | **Apache 2.0 (patent + trademark protection)** |
 
-### ClawdAgent vs OpenClaw — The Definitive Comparison
+### a4claw vs OpenClaw — The Definitive Comparison
 
-[OpenClaw](https://openclaw.ai) (by Peter Steinberger) is the most well-known personal AI assistant. Here's how ClawdAgent compares on every dimension:
+[OpenClaw](https://openclaw.ai) (by Peter Steinberger) is the most well-known personal AI assistant. Here's how a4claw compares on every dimension:
 
 #### Architecture & Intelligence
 
-| Feature | OpenClaw | **ClawdAgent** |
+| Feature | OpenClaw | **a4claw** |
 |---------|----------|----------------|
 | Architecture | Single agent + skills | **20 specialized agents + Meta Agent + Crew Orchestrator** |
 | Agent Brain | Single LLM call | **Intelligence Bridge: 9 subsystems (scoring, memory, governance, cost, routing, observability, goals, safety, feedback)** |
@@ -324,7 +324,7 @@ Most AI agents are **reactive** — you ask, they answer. ClawdAgent is **autono
 
 #### Security & Trust
 
-| Security Feature | OpenClaw | **ClawdAgent** |
+| Security Feature | OpenClaw | **a4claw** |
 |-----------------|----------|----------------|
 | Defense Architecture | Sandboxed execution | **14-layer defense-in-depth (Zero Trust)** |
 | Prompt Injection Guard | Basic filtering | **20+ regex patterns + AI detection + pre-AI message guard** |
@@ -343,7 +343,7 @@ Most AI agents are **reactive** — you ask, they answer. ClawdAgent is **autono
 
 #### Platform & Communication
 
-| Platform | OpenClaw | **ClawdAgent** |
+| Platform | OpenClaw | **a4claw** |
 |----------|----------|----------------|
 | WhatsApp | Yes | **Yes (WhatsApp Web + QR pairing from dashboard)** |
 | Telegram | Yes | **Yes (full bot: keyboards, media, voice, inline)** |
@@ -358,7 +358,7 @@ Most AI agents are **reactive** — you ask, they answer. ClawdAgent is **autono
 
 #### AI Models & Providers
 
-| Provider | OpenClaw | **ClawdAgent** |
+| Provider | OpenClaw | **a4claw** |
 |----------|----------|----------------|
 | Anthropic (Claude) | Yes | **Yes (Claude 4.6, direct API)** |
 | OpenAI (GPT) | Yes | **Yes (via OpenRouter)** |
@@ -373,7 +373,7 @@ Most AI agents are **reactive** — you ask, they answer. ClawdAgent is **autono
 
 #### Tools & Capabilities
 
-| Capability | OpenClaw | **ClawdAgent** |
+| Capability | OpenClaw | **a4claw** |
 |-----------|----------|----------------|
 | Built-in Tools | ~15 | **35 integrated tools** |
 | Pre-loaded Skills | Community-driven | **67 skills across 23 categories (ML, crypto, security, RAG, fine-tuning, inference, agents)** |
@@ -395,7 +395,7 @@ Most AI agents are **reactive** — you ask, they answer. ClawdAgent is **autono
 
 #### Deployment & Operations
 
-| Feature | OpenClaw | **ClawdAgent** |
+| Feature | OpenClaw | **a4claw** |
 |---------|----------|----------------|
 | Install Complexity | 1-liner (npm) | **1-liner (`bash install.sh`) + interactive wizard** |
 | OS Support | Mac, Windows, Linux | **Mac, Windows, Linux (+ Docker)** |
@@ -410,7 +410,7 @@ Most AI agents are **reactive** — you ask, they answer. ClawdAgent is **autono
 
 #### Community & Ecosystem
 
-| Metric | OpenClaw | **ClawdAgent** |
+| Metric | OpenClaw | **a4claw** |
 |--------|----------|----------------|
 | License | MIT | **Apache 2.0 (patent + trademark protection)** |
 | Age | ~2 months | **6 months (v6.3)** |
@@ -421,7 +421,7 @@ Most AI agents are **reactive** — you ask, they answer. ClawdAgent is **autono
 | Self-Hosting | Required | **Required (+ Docker one-command)** |
 | Extensibility | Skills (JavaScript) | **Skills (JSON) + Plugins (manifest) + Tools (TypeScript) + Agents (prompt)** |
 
-> **Bottom line**: OpenClaw is an excellent personal AI assistant for Mac users who want quick automation via chat. ClawdAgent is an **autonomous AI operations center** — a full-stack, multi-agent, self-evolving system with enterprise-grade security, crypto trading, social publishing, 4 AI providers, 3 agent protocols, and a complete React dashboard. If OpenClaw is a smart personal assistant, ClawdAgent is an **AI department**.
+> **Bottom line**: OpenClaw is an excellent personal AI assistant for Mac users who want quick automation via chat. a4claw is an **autonomous AI operations center** — a full-stack, multi-agent, self-evolving system with enterprise-grade security, crypto trading, social publishing, 4 AI providers, 3 agent protocols, and a complete React dashboard. If OpenClaw is a smart personal assistant, a4claw is an **AI department**.
 
 ---
 
@@ -501,9 +501,9 @@ Most AI agents are **reactive** — you ask, they answer. ClawdAgent is **autono
 - **Web Dashboard** — React app with real-time WebSocket (26 pages: Dashboard, Chat, Agents, Tasks, Cron, Servers, Trading, Skills, Knowledge, Intelligence, Evolution, Graph, Logs, Costs, Settings, History, OpenClaw, Browser, Facebook, LinkedIn, Twitter, TikTok, Mobile, Voice, Terminal, Login)
 - **Agent Protocols** — A2A + ACP for agent-to-agent communication
 
-### What ClawdAgent Connects To — 60+ Integrations
+### What a4claw Connects To — 60+ Integrations
 
-ClawdAgent connects to virtually everything. Every integration is built-in or one config line away:
+a4claw connects to virtually everything. Every integration is built-in or one config line away:
 
 | Category | Services & Platforms |
 |----------|---------------------|
@@ -528,7 +528,7 @@ ClawdAgent connects to virtually everything. Every integration is built-in or on
 | **Scheduling** | node-cron (timezone-aware), BullMQ (delayed jobs), recurring workflows |
 | **Security** | Helmet, bcrypt, JWT, Zod validation, SHA-256 integrity, AES encryption |
 
-> **If it has an API, ClawdAgent can talk to it.** And if it doesn't have a tool yet, ClawdAgent can **create one at runtime**.
+> **If it has an API, a4claw can talk to it.** And if it doesn't have a tool yet, a4claw can **create one at runtime**.
 
 ### Self-Evolution — The Agent That Improves Itself
 - **Evolution Engine** — Autonomous capability improvement cycles
@@ -568,7 +568,7 @@ ClawdAgent connects to virtually everything. Every integration is built-in or on
 
 ### Agent Interoperability Protocols
 
-ClawdAgent speaks the industry-standard agent protocols, enabling seamless communication with any compliant AI agent:
+a4claw speaks the industry-standard agent protocols, enabling seamless communication with any compliant AI agent:
 
 | Protocol | Standard | Status | Endpoints |
 |----------|----------|--------|-----------|
@@ -603,8 +603,8 @@ POST /acp/runs/:id/cancel          — Cancel run
 ### One-Command Install
 
 ```bash
-git clone https://github.com/liortesta/ClawdAgent.git
-cd ClawdAgent
+git clone https://github.com/Annmys/a4claw.git
+cd a4claw
 bash install.sh
 ```
 
@@ -620,8 +620,8 @@ The interactive installer handles everything: prerequisites check, dependencies,
 
 ```bash
 # 1. Clone
-git clone https://github.com/liortesta/ClawdAgent.git
-cd ClawdAgent
+git clone https://github.com/Annmys/a4claw.git
+cd a4claw
 
 # 2. Install dependencies
 pnpm install && cd web && npm install && cd ..
@@ -650,7 +650,7 @@ Open `http://localhost:3000` to see the dashboard.
 
 Only need a database and one AI provider:
 ```env
-DATABASE_URL=postgresql://user:pass@localhost:5432/clawdagent
+DATABASE_URL=postgresql://user:pass@localhost:5432/a4claw
 JWT_SECRET=<generate with: openssl rand -hex 32>
 ENCRYPTION_KEY=<generate with: openssl rand -hex 32>
 
@@ -672,7 +672,7 @@ OLLAMA_URL=http://localhost:11434
 
 ```bash
 pnpm run build
-pm2 start dist/index.js --name clawdagent --max-memory-restart 8G
+pm2 start dist/index.js --name a4claw --max-memory-restart 8G
 pm2 save
 ```
 
@@ -682,7 +682,7 @@ pm2 save
 docker compose up -d
 ```
 
-This starts ClawdAgent + PostgreSQL + Redis in one command.
+This starts a4claw + PostgreSQL + Redis in one command.
 
 ---
 
@@ -814,7 +814,7 @@ data/skills/            — 67 skill JSON definitions
 
 ## Web Dashboard
 
-The web dashboard provides full control over ClawdAgent:
+The web dashboard provides full control over a4claw:
 
 | Page | Description |
 |------|-------------|
@@ -879,7 +879,7 @@ See [`.env.example`](.env.example) for the complete list. Key variables:
 
 ## Security
 
-ClawdAgent implements **Zero Trust AI Architecture** — no component trusts another:
+a4claw implements **Zero Trust AI Architecture** — no component trusts another:
 
 1. **Input** → Content Guard sanitizes all input (20+ injection patterns)
 2. **Processing** → Social engineering detection (15 patterns, auto-block on high severity)
@@ -973,7 +973,7 @@ See [SECURITY.md](SECURITY.md) for vulnerability reporting.
 
 ## Real-World Use Cases
 
-ClawdAgent isn't a toy — it's a production system. Here's what people use it for:
+a4claw isn't a toy — it's a production system. Here's what people use it for:
 
 | Use Case | How It Works |
 |----------|-------------|
@@ -1013,7 +1013,7 @@ pnpm run build
 cd web && npm run build && cd ..
 
 # Start with PM2
-pm2 start dist/index.js --name clawdagent --max-memory-restart 8G
+pm2 start dist/index.js --name a4claw --max-memory-restart 8G
 pm2 save
 ```
 
@@ -1062,7 +1062,7 @@ pm2 save
 - [ ] Mobile companion app (React Native)
 
 ### Medium Term
-- [ ] Hosted SaaS version (ClawdAgent Cloud)
+- [ ] Hosted SaaS version (a4claw Cloud)
 - [ ] Team collaboration (multi-user workspaces)
 - [ ] Fine-tuned agent models
 - [x] ~~Voice-first interface (real-time conversation)~~ **Done in v6.3** — Twilio + OpenAI Realtime
@@ -1126,8 +1126,8 @@ Apache 2.0 protects both users and contributors with explicit patent grants and 
 
 **Built with Claude by [Lior Testa - TestaMind](https://github.com/liortesta)**
 
-If ClawdAgent helps you, please **give it a star** and mention it in your projects!
+If a4claw helps you, please **give it a star** and mention it in your projects!
 
-[![Star on GitHub](https://img.shields.io/github/stars/liortesta/ClawdAgent?style=social)](https://github.com/liortesta/ClawdAgent)
+[![Star on GitHub](https://img.shields.io/github/stars/Annmys/a4claw?style=social)](https://github.com/Annmys/a4claw)
 
 </div>
