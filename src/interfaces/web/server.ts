@@ -42,6 +42,8 @@ import { setupVoiceAgentRoutes } from './routes/voice-agent-api.js';
 import { setupMobileAgentRoutes } from './routes/mobile-agent-api.js';
 import { setupTerminalRoutes } from './routes/terminal-api.js';
 import { setupDeployRoutes } from './routes/deploy-api.js';
+import { setupUsersRoutes } from './routes/users-api.js';
+import { setupFilesRoutes } from './routes/files-api.js';
 import { BrowserSessionManager } from '../../actions/browser/session-manager.js';
 import { getAllModels } from '../../core/model-router.js';
 import { resolve as resolvePath } from 'path';
@@ -147,6 +149,8 @@ export class WebServer extends BaseInterface {
           objectSrc: ["'none'"],
           frameSrc: ["'self'"],          // Allow noVNC iframes
           frameAncestors: ["'self'"],    // Allow embedding in our own pages (noVNC iframe)
+          // Keep LAN HTTP access working (don't auto-upgrade to HTTPS on :3000).
+          upgradeInsecureRequests: null,
         },
       },
       crossOriginEmbedderPolicy: false,
@@ -232,12 +236,14 @@ export class WebServer extends BaseInterface {
     }));
     // Specific API routes (all require auth) — register before the catch-all
     this.app.use('/api/settings', authMiddleware, setupSettingsRoutes());
+    this.app.use('/api/users', authMiddleware, setupUsersRoutes());
     this.app.use('/api/skills', authMiddleware, setupSkillsRoutes());
     this.app.use('/api/servers', authMiddleware, setupServersRoutes());
     this.app.use('/api/logs', authMiddleware, setupLogsRoutes());
     this.app.use('/api/costs', authMiddleware, setupCostsRoutes(this.engine));
     this.app.use('/api/cron', authMiddleware, setupCronRoutes(this.engine));
     this.app.use('/api/history', authMiddleware, setupHistoryRoutes());
+    this.app.use('/api/files', authMiddleware, setupFilesRoutes());
     this.app.use('/api/whatsapp', authMiddleware, setupWhatsAppQRRoutes());
     this.app.use('/api/trading', authMiddleware, setupTradingRoutes());
     this.app.use('/api/cli', authMiddleware, setupCLIRoutes(this.engine));

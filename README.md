@@ -20,6 +20,108 @@ An open-source autonomous AI agent that thinks, learns, evolves, and never stops
 
 ---
 
+## 中文文档（目录分类 / 安装 / 启动 / 注意事项）
+
+### 1. 项目目录分类（核心）
+
+| 目录 | 功能说明 |
+|---|---|
+| `src/` | 后端核心代码（引擎、路由、工具、安全、内存系统） |
+| `web/` | 前端控制台（React + Vite） |
+| `docs/` | 项目文档与设计说明 |
+| `config/` | 配置模板与运行配置文件 |
+| `plugins/` | 插件扩展 |
+| `scripts/` | 运维/构建辅助脚本 |
+| `tests/` | 自动化测试 |
+| `apps/` | 子应用与扩展入口 |
+| `data/skills/` | 可随仓库分发的技能数据 |
+| `dist/` | 后端构建产物（由 `npm run build` 生成） |
+
+更详细目录说明见：
+[`docs/FOLDER_STRUCTURE.md`](docs/FOLDER_STRUCTURE.md)
+
+### 2. 主要文件功能
+
+| 文件 | 功能说明 |
+|---|---|
+| `src/index.ts` | 后端启动入口 |
+| `src/config.ts` | 环境变量解析与校验（Zod） |
+| `src/core/engine.ts` | 主调度引擎（路由、模型调用、工具链） |
+| `src/interfaces/web/server.ts` | Web 服务与 API 路由注册 |
+| `web/src/main.tsx` | 前端入口 |
+| `web/src/App.tsx` | 前端路由与页面主框架 |
+| `.env.example` | 环境变量模板 |
+| `docker-compose.yml` | 容器化部署入口 |
+
+### 3. 安装方式
+
+#### 方式 A：本机安装（推荐开发）
+
+1. 安装依赖：Node.js `>=18`、`pnpm >=8`、PostgreSQL、（可选）Redis  
+2. 克隆项目并安装依赖：
+   ```bash
+   git clone https://github.com/Annmys/a4claw.git
+   cd a4claw
+   pnpm install
+   cd web && pnpm install && cd ..
+   ```
+3. 配置环境变量：
+   ```bash
+   cp .env.example .env
+   # 按实际修改 DATABASE_URL、JWT_SECRET、ENCRYPTION_KEY、AI Key 等
+   ```
+4. 初始化数据库（如首次）：
+   ```bash
+   pnpm db:migrate
+   ```
+
+#### 方式 B：Docker
+
+```bash
+docker compose up -d
+```
+
+### 4. 启动方式
+
+#### 开发模式
+
+后端：
+```bash
+pnpm dev
+```
+
+前端（新终端）：
+```bash
+cd web
+pnpm dev
+```
+
+#### 生产模式
+
+构建：
+```bash
+pnpm build
+cd web && pnpm build && cd ..
+```
+
+启动：
+```bash
+pnpm start
+```
+
+默认端口：`3000`
+
+### 5. 注意事项
+
+1. `.env` 不会被提交到仓库，必须在部署机器单独配置。  
+2. 生产环境必须设置高强度 `JWT_SECRET` 与 `ENCRYPTION_KEY`（至少 32 字符）。  
+3. `BIND_HOST=0.0.0.0` 表示允许内网/公网访问；只本机访问请设为 `127.0.0.1`。  
+4. `logs/`、`uploads/`、运行时 `data/*` 默认不进仓库。  
+5. 若启用文件共享回传，请保证共享目录（默认 `/data/gongxiang`）有写权限。  
+6. 没有 Redis 时系统可运行，但队列能力会降级为无缓存模式。  
+
+---
+
 ## What is ClawdAgent?
 
 ClawdAgent is the **most comprehensive autonomous AI agent system** ever built as open-source. It runs 24/7 across multiple platforms, with **14-layer security**, **9 intelligence subsystems**, **20 specialized agents**, **35 tools**, and **67 skills** — all connected through a unified brain. It can **autonomously manage Facebook, LinkedIn, Twitter, and TikTok accounts**, **browse the web visually** with VNC streaming, **make phone calls via Twilio + OpenAI Realtime**, and **publish to 9 social platforms** on a daily schedule with AI-generated content.

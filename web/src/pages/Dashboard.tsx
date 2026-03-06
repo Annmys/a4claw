@@ -1,6 +1,8 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
+import { useAuthStore } from '../stores/auth';
+import { isAdminRole } from '../utils/auth-role';
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
@@ -82,7 +84,7 @@ function StatCard({ label, value, icon: Icon, gradient, glow, suffix, pulse }: {
 }) {
   const numValue = typeof value === 'number' ? value : parseFloat(value) || 0;
   const animated = useAnimatedValue(numValue);
-  const isNumber = typeof value === 'number' || (typeof value === 'string' && !isNaN(parseFloat(value)) && value !== 'Online' && value !== 'Offline' && !value.includes('h') && !value.includes('m') && !value.includes('d'));
+  const isNumber = typeof value === 'number' || (typeof value === 'string' && /^-?\d+(\.\d+)?$/.test(value.trim()));
 
   return (
     <div className={`card-gradient rounded-xl p-5 transition-all duration-300 hover:scale-[1.02] ${glow}`}>
@@ -108,9 +110,9 @@ function generateTokenData() {
   const data = [];
   const now = new Date();
   for (let i = 23; i >= 0; i--) {
-    const h = new Date(now.getTime() - i * 3600_000);
-    data.push({
-      hour: h.toLocaleTimeString('en-US', { hour: '2-digit', hour12: false }),
+      const h = new Date(now.getTime() - i * 3600_000);
+      data.push({
+      hour: h.toLocaleTimeString('zh-CN', { hour: '2-digit', hour12: false }),
       tokens: i > 18 || i < 6 ? Math.floor(Math.random() * 500) : Math.floor(Math.random() * 5000 + 1000),
     });
   }
@@ -119,7 +121,7 @@ function generateTokenData() {
 
 function generateCostData() {
   const data = [];
-  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const days = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
   const now = new Date();
   for (let i = 6; i >= 0; i--) {
     const d = new Date(now.getTime() - i * 86400_000);
@@ -139,14 +141,14 @@ function ChartTooltip({ active, payload, label, valueKey, prefix }: any) {
       <p className="text-[11px] text-gray-400 mb-0.5">{label}</p>
       <p className="text-sm font-semibold text-white">
         {prefix}{typeof payload[0].value === 'number' && payload[0].value % 1 !== 0 ? payload[0].value.toFixed(4) : payload[0].value?.toLocaleString()}
-        {valueKey === 'tokens' && ' tokens'}
+        {valueKey === 'tokens' && ' 个令牌'}
       </p>
     </div>
   );
 }
 
 // ── Activity Heatmap (GitHub-style) ────────────────────────────────
-const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DAYS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
 const HEAT_COLORS = [
   'bg-dark-800',                           // 0
   'bg-emerald-900/60',                     // low
@@ -173,9 +175,9 @@ function ActivityHeatmap({ grid }: { grid: number[][] }) {
     <div className="card-gradient rounded-xl p-5">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm font-semibold text-gray-200 flex items-center gap-2">
-          <Flame className="w-4 h-4 text-orange-400" /> Activity Heatmap
+          <Flame className="w-4 h-4 text-orange-400" /> 活动热力图
         </h2>
-        <span className="text-[10px] text-gray-500 font-mono">{total.toLocaleString()} actions · 4 weeks</span>
+        <span className="text-[10px] text-gray-500 font-mono">{total.toLocaleString()} 次操作 · 近4周</span>
       </div>
 
       <div className="overflow-x-auto">
@@ -218,11 +220,11 @@ function ActivityHeatmap({ grid }: { grid: number[][] }) {
       {/* Legend */}
       <div className="flex items-center justify-between mt-3">
         <div className="flex items-center gap-1.5">
-          <span className="text-[10px] text-gray-500">Less</span>
+          <span className="text-[10px] text-gray-500">少</span>
           {HEAT_COLORS.map((c, i) => (
             <div key={i} className={`w-3 h-3 rounded-[2px] ${c}`} />
           ))}
-          <span className="text-[10px] text-gray-500">More</span>
+          <span className="text-[10px] text-gray-500">多</span>
         </div>
       </div>
 
@@ -233,7 +235,7 @@ function ActivityHeatmap({ grid }: { grid: number[][] }) {
           style={{ left: tooltip.x, top: tooltip.y - 40, transform: 'translateX(-50%)' }}
         >
           <p className="text-[11px] text-gray-400">{DAYS[tooltip.day]} {String(tooltip.hour).padStart(2, '0')}:00</p>
-          <p className="text-sm font-semibold text-white">{(grid[tooltip.day]?.[tooltip.hour] ?? 0).toLocaleString()} actions</p>
+          <p className="text-sm font-semibold text-white">{(grid[tooltip.day]?.[tooltip.hour] ?? 0).toLocaleString()} 次操作</p>
         </div>
       )}
     </div>
@@ -242,9 +244,9 @@ function ActivityHeatmap({ grid }: { grid: number[][] }) {
 
 // ── Kanban Task Board ─────────────────────────────────────────────
 const KANBAN_COLS: Array<{ key: string; label: string; color: string; dot: string }> = [
-  { key: 'pending', label: 'Pending', color: 'text-amber-400', dot: 'bg-amber-400' },
-  { key: 'in-progress', label: 'In Progress', color: 'text-blue-400', dot: 'bg-blue-400' },
-  { key: 'done', label: 'Done', color: 'text-green-400', dot: 'bg-green-400' },
+  { key: 'pending', label: '待处理', color: 'text-amber-400', dot: 'bg-amber-400' },
+  { key: 'in-progress', label: '进行中', color: 'text-blue-400', dot: 'bg-blue-400' },
+  { key: 'done', label: '已完成', color: 'text-green-400', dot: 'bg-green-400' },
 ];
 
 const PRIORITY_BADGE: Record<string, string> = {
@@ -259,10 +261,10 @@ function KanbanBoard({ columns }: { columns: Record<string, any[]> }) {
     <div className="card-gradient rounded-xl p-5">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm font-semibold text-gray-200 flex items-center gap-2">
-          <Activity className="w-4 h-4 text-blue-400" /> Task Board
+          <Activity className="w-4 h-4 text-blue-400" /> 任务看板
         </h2>
         <span className="text-[10px] text-gray-500 font-mono">
-          {Object.values(columns).reduce((s, c) => s + c.length, 0)} tasks
+          {Object.values(columns).reduce((s, c) => s + c.length, 0)} 项任务
         </span>
       </div>
 
@@ -278,7 +280,7 @@ function KanbanBoard({ columns }: { columns: Record<string, any[]> }) {
               </div>
               <div className="space-y-1.5">
                 {items.length === 0 ? (
-                  <div className="text-[10px] text-gray-700 text-center py-4">No tasks</div>
+                  <div className="text-[10px] text-gray-700 text-center py-4">暂无任务</div>
                 ) : (
                   items.slice(0, 5).map((task: any) => (
                     <div key={task.id} className="bg-dark-800/80 border border-gray-800/50 rounded-lg px-3 py-2 hover:border-gray-700 transition-colors">
@@ -297,7 +299,7 @@ function KanbanBoard({ columns }: { columns: Record<string, any[]> }) {
                   ))
                 )}
                 {items.length > 5 && (
-                  <p className="text-[10px] text-gray-600 text-center">+{items.length - 5} more</p>
+                  <p className="text-[10px] text-gray-600 text-center">+{items.length - 5} 更多</p>
                 )}
               </div>
             </div>
@@ -310,12 +312,12 @@ function KanbanBoard({ columns }: { columns: Record<string, any[]> }) {
 
 // ── Agents data ────────────────────────────────────────────────────
 const AGENTS = [
-  { id: 'orchestrator', name: 'Orchestrator', status: 'active', color: 'bg-blue-500' },
-  { id: 'code-assistant', name: 'Code Assistant', status: 'idle', color: 'bg-purple-500' },
-  { id: 'researcher', name: 'Researcher', status: 'idle', color: 'bg-cyan-500' },
-  { id: 'server-manager', name: 'Server Manager', status: 'idle', color: 'bg-orange-500' },
-  { id: 'task-planner', name: 'Task Planner', status: 'idle', color: 'bg-green-500' },
-  { id: 'general', name: 'General', status: 'active', color: 'bg-pink-500' },
+  { id: 'orchestrator', name: '协调器', status: 'active', color: 'bg-blue-500' },
+  { id: 'code-assistant', name: '代码助手', status: 'idle', color: 'bg-purple-500' },
+  { id: 'researcher', name: '研究助手', status: 'idle', color: 'bg-cyan-500' },
+  { id: 'server-manager', name: '服务器管理', status: 'idle', color: 'bg-orange-500' },
+  { id: 'task-planner', name: '任务规划', status: 'idle', color: 'bg-green-500' },
+  { id: 'general', name: '通用助手', status: 'active', color: 'bg-pink-500' },
 ];
 
 // ── Main Dashboard ─────────────────────────────────────────────────
@@ -325,6 +327,8 @@ export default function Dashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [tokenData] = useState(generateTokenData);
   const [costData] = useState(generateCostData);
+  const token = useAuthStore((s) => s.token);
+  const isAdmin = isAdminRole(token);
   const navigate = useNavigate();
 
   const loadDashboard = async (showRefresh = false) => {
@@ -351,7 +355,7 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    document.title = 'ClawdAgent | Dashboard';
+    document.title = 'a4claw | 仪表盘';
   }, []);
 
   if (loading) {
@@ -386,8 +390,8 @@ export default function Dashboard() {
               <Waves className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-bold tracking-tight">Dashboard</h1>
-              <p className="text-[11px] text-gray-500">Real-time system overview</p>
+              <h1 className="text-xl font-bold tracking-tight">仪表盘</h1>
+              <p className="text-[11px] text-gray-500">实时系统概览</p>
             </div>
           </div>
           <button
@@ -396,52 +400,54 @@ export default function Dashboard() {
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs text-gray-400 hover:text-white hover:bg-dark-800 transition-colors disabled:opacity-50"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-            Refresh
+            刷新
           </button>
         </div>
 
         {/* ── Stat Cards ─────────────────────────────────────── */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+        <div className={`grid grid-cols-2 md:grid-cols-3 ${isAdmin ? 'lg:grid-cols-6' : 'lg:grid-cols-5'} gap-4 mb-6`}>
           <StatCard
-            label="Status"
-            value={status?.status === 'online' ? 'Online' : 'Offline'}
+            label="状态"
+            value={status?.status === 'online' ? '在线' : '离线'}
             icon={Activity}
             gradient="from-green-500 to-emerald-600"
             glow="hover:glow-green"
             pulse={status?.status === 'online'}
           />
           <StatCard
-            label="Uptime"
+            label="运行时长"
             value={status?.uptime ? formatUptime(status.uptime) : '--'}
             icon={Clock}
             gradient="from-blue-500 to-blue-600"
             glow="hover:glow-blue"
           />
           <StatCard
-            label="Memory"
+            label="内存"
             value={status?.memory?.heapUsed ? `${status.memory.heapUsed}` : '--'}
             icon={Cpu}
             gradient="from-purple-500 to-purple-600"
             glow="hover:glow-purple"
             suffix="MB"
           />
+          {isAdmin && (
+            <StatCard
+              label="今日成本"
+              value={costs?.totalCost != null ? costs.totalCost.toFixed(4) : '0.00'}
+              icon={DollarSign}
+              gradient="from-amber-500 to-orange-600"
+              glow="hover:glow-amber"
+              suffix="$"
+            />
+          )}
           <StatCard
-            label="Today Cost"
-            value={costs?.totalCost != null ? costs.totalCost.toFixed(4) : '0.00'}
-            icon={DollarSign}
-            gradient="from-amber-500 to-orange-600"
-            glow="hover:glow-amber"
-            suffix="$"
-          />
-          <StatCard
-            label="API Calls"
+            label="API 调用"
             value={costs?.totalCalls ?? 0}
             icon={TrendingUp}
             gradient="from-cyan-500 to-cyan-600"
             glow="hover:glow-blue"
           />
           <StatCard
-            label="Cron Tasks"
+            label="定时任务"
             value={cronCount}
             icon={Zap}
             gradient="from-orange-500 to-red-600"
@@ -450,13 +456,13 @@ export default function Dashboard() {
         </div>
 
         {/* ── Charts Row ─────────────────────────────────────── */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div className={`grid grid-cols-1 ${isAdmin ? 'lg:grid-cols-2' : ''} gap-6 mb-6`}>
           {/* Token Usage Chart */}
           <div className="card-gradient rounded-xl p-5">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold text-gray-200">Token Usage (24h)</h2>
+              <h2 className="text-sm font-semibold text-gray-200">令牌使用量（24小时）</h2>
               <span className="text-[10px] text-gray-500 font-mono">
-                {tokenData.reduce((a: number, d: any) => a + d.tokens, 0).toLocaleString()} total
+                {tokenData.reduce((a: number, d: any) => a + d.tokens, 0).toLocaleString()} 总计
               </span>
             </div>
             <ResponsiveContainer width="100%" height={200}>
@@ -477,29 +483,31 @@ export default function Dashboard() {
           </div>
 
           {/* Costs Chart */}
-          <div className="card-gradient rounded-xl p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold text-gray-200">Costs (7 days)</h2>
-              <span className="text-[10px] text-gray-500 font-mono">
-                ${costData.reduce((a: number, d: any) => a + d.cost, 0).toFixed(2)} total
-              </span>
+          {isAdmin && (
+            <div className="card-gradient rounded-xl p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-semibold text-gray-200">成本（7天）</h2>
+                <span className="text-[10px] text-gray-500 font-mono">
+                  ${costData.reduce((a: number, d: any) => a + d.cost, 0).toFixed(2)} 总计
+                </span>
+              </div>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={costData}>
+                  <defs>
+                    <linearGradient id="costGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.9} />
+                      <stop offset="100%" stopColor="#f59e0b" stopOpacity={0.3} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(51,65,85,0.3)" />
+                  <XAxis dataKey="day" tick={{ fill: '#64748b', fontSize: 10 }} tickLine={false} axisLine={false} />
+                  <YAxis tick={{ fill: '#64748b', fontSize: 10 }} tickLine={false} axisLine={false} width={40} tickFormatter={(v: number) => `$${v}`} />
+                  <Tooltip content={<ChartTooltip prefix="$" />} />
+                  <Bar dataKey="cost" fill="url(#costGrad)" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={costData}>
-                <defs>
-                  <linearGradient id="costGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.9} />
-                    <stop offset="100%" stopColor="#f59e0b" stopOpacity={0.3} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(51,65,85,0.3)" />
-                <XAxis dataKey="day" tick={{ fill: '#64748b', fontSize: 10 }} tickLine={false} axisLine={false} />
-                <YAxis tick={{ fill: '#64748b', fontSize: 10 }} tickLine={false} axisLine={false} width={40} tickFormatter={(v: number) => `$${v}`} />
-                <Tooltip content={<ChartTooltip prefix="$" />} />
-                <Bar dataKey="cost" fill="url(#costGrad)" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          )}
         </div>
 
         {/* ── Activity Heatmap ─────────────────────────────────── */}
@@ -518,14 +526,14 @@ export default function Dashboard() {
 
         {/* ── Bottom Widgets ──────────────────────────────────── */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-          {/* Active Agents */}
+          {/* 活跃智能体 */}
           <div className="card-gradient rounded-xl p-5">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-semibold text-gray-200 flex items-center gap-2">
-                <Bot className="w-4 h-4 text-primary-400" /> Active Agents
+                <Bot className="w-4 h-4 text-primary-400" /> 活跃智能体
               </h2>
               <button onClick={() => navigate('/agents')} className="text-[10px] text-primary-400 hover:text-primary-300 flex items-center gap-0.5">
-                View all <ArrowRight className="w-3 h-3" />
+                查看全部 <ArrowRight className="w-3 h-3" />
               </button>
             </div>
             <div className="space-y-2">
@@ -540,49 +548,49 @@ export default function Dashboard() {
                       ? 'bg-green-500/10 text-green-400'
                       : 'bg-gray-800 text-gray-500'
                   }`}>
-                    {agent.status}
+                    {agent.status === 'active' ? '活跃' : '空闲'}
                   </span>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Server Health */}
+          {/* 系统健康 */}
           <div className="card-gradient rounded-xl p-5">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-semibold text-gray-200 flex items-center gap-2">
-                <Server className="w-4 h-4 text-purple-400" /> System Health
+                <Server className="w-4 h-4 text-purple-400" /> 系统健康
               </h2>
             </div>
             <div className="space-y-4">
               <HealthBar label="CPU" value={status?.system?.cpuPercent ?? 0} color="from-blue-500 to-cyan-400" />
               <HealthBar label="RAM" value={status?.system?.memPercent ?? 0} color="from-purple-500 to-pink-400" />
-              <HealthBar label="Heap" value={status?.memory ? Math.round((status.memory.heapUsed / status.memory.heapTotal) * 100) : 0} color="from-amber-500 to-orange-400" />
+              <HealthBar label="堆内存" value={status?.memory ? Math.round((status.memory.heapUsed / status.memory.heapTotal) * 100) : 0} color="from-amber-500 to-orange-400" />
               <div className="pt-2 border-t border-gray-800/50 text-[11px] text-gray-500 space-y-1">
                 <div className="flex justify-between">
-                  <span>Host</span>
+                  <span>主机</span>
                   <span className="font-mono text-gray-400">{status?.system?.hostname ?? '--'}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Platform</span>
+                  <span>平台</span>
                   <span className="font-mono text-gray-400">{status?.system?.platform ?? '--'}</span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Recent Activity */}
+          {/* 最近活动 */}
           <div className="card-gradient rounded-xl p-5">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-semibold text-gray-200 flex items-center gap-2">
-                <MessageSquare className="w-4 h-4 text-cyan-400" /> Recent Activity
+                <MessageSquare className="w-4 h-4 text-cyan-400" /> 最近活动
               </h2>
             </div>
             <div className="space-y-2.5">
               {activity.length === 0 ? (
                 <div className="text-center py-6 text-gray-600">
                   <Activity className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                  <p className="text-xs">Send a message to see activity</p>
+                  <p className="text-xs">发送消息后可查看活动</p>
                 </div>
               ) : (
                 activity.slice(0, 6).map((item: any, i: number) => (
@@ -595,7 +603,7 @@ export default function Dashboard() {
                       <p className="text-xs text-gray-300 truncate">{item.message}</p>
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className="text-[10px] text-gray-600">
-                          {new Date(item.time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}
+                          {new Date(item.time).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })}
                         </span>
                         {item.platform && (
                           <span className="text-[9px] px-1.5 py-0.5 rounded bg-dark-800 text-gray-500">{item.platform}</span>
@@ -611,33 +619,33 @@ export default function Dashboard() {
 
         {/* ── Quick Actions ──────────────────────────────────── */}
         <div className="card-gradient rounded-xl p-5 mb-6">
-          <h2 className="text-sm font-semibold text-gray-200 mb-3">Quick Actions</h2>
+          <h2 className="text-sm font-semibold text-gray-200 mb-3">快捷操作</h2>
           <div className="flex flex-wrap gap-2">
-            <QuickAction label="Chat" icon={MessageSquare} onClick={() => navigate('/')} />
-            <QuickAction label="Search" icon={Search} onClick={() => navigate('/')} />
-            <QuickAction label="Agents" icon={Bot} onClick={() => navigate('/agents')} />
-            <QuickAction label="Costs" icon={DollarSign} onClick={() => navigate('/costs')} />
-            <QuickAction label="Settings" icon={Zap} onClick={() => navigate('/settings')} />
+            <QuickAction label="聊天" icon={MessageSquare} onClick={() => navigate('/')} />
+            <QuickAction label="搜索" icon={Search} onClick={() => navigate('/')} />
+            <QuickAction label="智能体" icon={Bot} onClick={() => navigate('/agents')} />
+            {isAdmin && <QuickAction label="成本" icon={DollarSign} onClick={() => navigate('/costs')} />}
+            <QuickAction label="设置" icon={Zap} onClick={() => navigate('/settings')} />
           </div>
         </div>
 
         {/* ── Model Usage Table ───────────────────────────────── */}
-        {costs?.byModel && Object.keys(costs.byModel).length > 0 && (
+        {isAdmin && costs?.byModel && Object.keys(costs.byModel).length > 0 && (
           <div className="card-gradient rounded-xl p-5 mb-6">
             <h2 className="text-sm font-semibold text-gray-200 mb-4 flex items-center gap-2">
-              <Bot className="w-4 h-4 text-gray-400" /> Model Usage Today
+              <Bot className="w-4 h-4 text-gray-400" /> 今日模型用量
             </h2>
             <div className="divide-y divide-gray-800/50">
               {Object.entries(costs.byModel).map(([model, d]: [string, any]) => (
                 <div key={model} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
                   <div>
                     <p className="text-xs font-medium text-gray-200">{model}</p>
-                    <p className="text-[10px] text-gray-500 mt-0.5">{d.calls ?? 0} calls</p>
+                    <p className="text-[10px] text-gray-500 mt-0.5">{d.calls ?? 0} 次调用</p>
                   </div>
                   <div className="text-right">
                     <p className="text-xs font-mono text-amber-400">${(d.cost ?? 0).toFixed(4)}</p>
                     <p className="text-[10px] text-gray-500">
-                      {(d.inputTokens ?? 0).toLocaleString()} in / {(d.outputTokens ?? 0).toLocaleString()} out
+                      输入 {(d.inputTokens ?? 0).toLocaleString()} / 输出 {(d.outputTokens ?? 0).toLocaleString()}
                     </p>
                   </div>
                 </div>
@@ -686,6 +694,6 @@ function QuickAction({ label, icon: Icon, onClick }: { label: string; icon: any;
 function formatUptime(seconds: number) {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
-  if (h > 24) return `${Math.floor(h / 24)}d ${h % 24}h`;
-  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  if (h > 24) return `${Math.floor(h / 24)}天 ${h % 24}小时`;
+  return h > 0 ? `${h}小时 ${m}分` : `${m}分`;
 }

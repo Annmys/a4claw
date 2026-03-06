@@ -9,12 +9,12 @@ import { useNotificationsStore, type SystemNotification } from '../../stores/not
 function timeAgo(ts: number): string {
   const diff = Date.now() - ts;
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'now';
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1) return '刚刚';
+  if (mins < 60) return `${mins} 分钟前`;
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
+  if (hrs < 24) return `${hrs} 小时前`;
   const days = Math.floor(hrs / 24);
-  return `${days}d ago`;
+  return `${days} 天前`;
 }
 
 const severityColors: Record<string, string> = {
@@ -69,18 +69,18 @@ function getActionUrl(n: SystemNotification): string | undefined {
 /** Readable type label */
 function typeLabel(type: string): string {
   switch (type) {
-    case 'cron_publish': return 'Cron';
-    case 'model_new': return 'Model';
-    case 'model_deprecated': return 'Model';
-    case 'ecosystem_discovery': return 'Discovery';
-    case 'self_repair': return 'Repair';
-    case 'evolution_complete': return 'Evolution';
-    case 'security_alert': return 'Security';
-    case 'skill_installed': return 'Skill';
-    case 'agent_created': return 'Agent';
-    case 'update_available': return 'Update';
-    case 'price_change': return 'Pricing';
-    default: return 'System';
+    case 'cron_publish': return '定时任务';
+    case 'model_new': return '模型';
+    case 'model_deprecated': return '模型';
+    case 'ecosystem_discovery': return '发现';
+    case 'self_repair': return '修复';
+    case 'evolution_complete': return '进化';
+    case 'security_alert': return '安全';
+    case 'skill_installed': return '技能';
+    case 'agent_created': return '智能体';
+    case 'update_available': return '更新';
+    case 'price_change': return '价格';
+    default: return '系统';
   }
 }
 
@@ -121,7 +121,7 @@ function DetailModal({ notification, onClose, onNavigate }: {
           {/* Metadata display for cron_publish */}
           {meta && Array.isArray(meta.platforms) && (
             <div className="mt-4 pt-3 border-t border-gray-800">
-              <p className="text-xs text-gray-500 mb-2">Platforms</p>
+              <p className="text-xs text-gray-500 mb-2">平台</p>
               <div className="flex gap-1.5 flex-wrap">
                 {(meta.platforms as string[]).map((p: string) => (
                   <span key={p} className="text-xs px-2 py-0.5 rounded bg-primary-500/20 text-primary-300">{p}</span>
@@ -133,7 +133,7 @@ function DetailModal({ notification, onClose, onNavigate }: {
           {meta && typeof meta.fullContent === 'string' && meta.fullContent.length > 150 && (
             <details className="mt-4 pt-3 border-t border-gray-800">
               <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-300 transition-colors">
-                Full content ({String(meta.fullContent).length} chars)
+                完整内容（{String(meta.fullContent).length} 字符）
               </summary>
               <pre className="mt-2 text-xs text-gray-400 whitespace-pre-wrap font-sans bg-dark-800 rounded-lg p-3 max-h-[200px] overflow-y-auto">
                 {String(meta.fullContent)}
@@ -150,7 +150,7 @@ function DetailModal({ notification, onClose, onNavigate }: {
               className="flex items-center gap-2 text-sm text-primary-400 hover:text-primary-300 transition-colors"
             >
               <ExternalLink className="w-3.5 h-3.5" />
-              Open in {url.replace('/', '').replace('-', ' ')}
+              打开 {url.replace('/', '').replace('-', ' ')}
               <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -204,7 +204,7 @@ export default function NotificationBell() {
       <button
         onClick={() => setOpen(o => !o)}
         className="relative flex items-center justify-center w-9 h-9 rounded-lg bg-dark-800 border border-gray-700 hover:bg-dark-700 transition-colors"
-        title="Notifications"
+        title="通知"
       >
         <Bell className="w-4 h-4 text-gray-400" />
         {unreadCount > 0 && (
@@ -218,16 +218,16 @@ export default function NotificationBell() {
         <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-96 max-h-[480px] flex flex-col bg-dark-900 border border-gray-700 rounded-xl shadow-2xl z-50 overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800">
-            <span className="text-sm font-semibold text-gray-200">Notifications</span>
+            <span className="text-sm font-semibold text-gray-200">通知</span>
             <div className="flex items-center gap-2">
               {unreadCount > 0 && (
                 <button
                   onClick={() => markAllRead()}
                   className="flex items-center gap-1 text-xs text-primary-400 hover:text-primary-300 transition-colors"
-                  title="Mark all read"
+                  title="全部标记为已读"
                 >
                   <CheckCheck className="w-3.5 h-3.5" />
-                  Read all
+                  全部已读
                 </button>
               )}
               <button onClick={() => setOpen(false)} className="text-gray-500 hover:text-gray-300">
@@ -241,7 +241,7 @@ export default function NotificationBell() {
             {notifications.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-10 text-gray-500">
                 <Bell className="w-8 h-8 mb-2 opacity-40" />
-                <p className="text-sm">No notifications</p>
+                <p className="text-sm">暂无通知</p>
               </div>
             ) : (
               notifications.map(n => (
@@ -281,7 +281,7 @@ export default function NotificationBell() {
               onClick={() => { setOpen(false); navigate('/evolution'); }}
               className="w-full px-4 py-2.5 text-xs text-center text-primary-400 hover:text-primary-300 border-t border-gray-800 hover:bg-dark-800 transition-colors"
             >
-              View all notifications
+              查看全部通知
             </button>
           )}
         </div>

@@ -23,7 +23,7 @@ interface CallRecord {
 interface CallStats {
   totalCalls: number;
   completedCalls: number;
-  avgDuration: number;
+  avg时长: number;
   activeCalls: number;
   todayCalls: number;
 }
@@ -37,7 +37,7 @@ interface ActiveCall {
   streamSid: string | null;
 }
 
-interface VoiceConfig {
+interface 语音Config {
   instructions: string;
   voice: string;
   language: string;
@@ -46,18 +46,18 @@ interface VoiceConfig {
 
 // ── Component ──────────────────────────────────────────────────────
 
-export default function VoiceAgent() {
+export default function 语音Agent() {
   const token = useAuthStore((s) => s.token);
   const [stats, setStats] = useState<CallStats | null>(null);
   const [calls, setCalls] = useState<CallRecord[]>([]);
   const [activeCalls, setActiveCalls] = useState<ActiveCall[]>([]);
-  const [config, setConfig] = useState<VoiceConfig | null>(null);
+  const [config, setConfig] = useState<语音Config | null>(null);
   const [loading, setLoading] = useState(true);
   const [phoneNumber, setPhoneNumber] = useState('');
   const [calling, setCalling] = useState(false);
   const [showConfig, setShowConfig] = useState(false);
-  const [editInstructions, setEditInstructions] = useState('');
-  const [editVoice, setEditVoice] = useState('');
+  const [edit指令, setEdit指令] = useState('');
+  const [edit语音, setEdit语音] = useState('');
   const [savingConfig, setSavingConfig] = useState(false);
 
   const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
@@ -77,8 +77,8 @@ export default function VoiceAgent() {
       if (configRes.ok) {
         const cfg = await configRes.json();
         setConfig(cfg);
-        setEditInstructions(cfg.instructions);
-        setEditVoice(cfg.voice);
+        setEdit指令(cfg.instructions);
+        setEdit语音(cfg.voice);
       }
     } catch {
       /* silently fail — will retry */
@@ -124,7 +124,7 @@ export default function VoiceAgent() {
       await fetch('/api/voice-agent/config', {
         method: 'PUT',
         headers,
-        body: JSON.stringify({ instructions: editInstructions, voice: editVoice }),
+        body: JSON.stringify({ instructions: edit指令, voice: edit语音 }),
       });
       await fetchAll();
     } finally {
@@ -132,12 +132,12 @@ export default function VoiceAgent() {
     }
   };
 
-  const formatDuration = (s: number) => {
+  const format时长 = (s: number) => {
     if (s < 60) return `${s}s`;
     return `${Math.floor(s / 60)}m ${s % 60}s`;
   };
 
-  const formatTime = (iso: string) => {
+  const format时间 = (iso: string) => {
     try {
       return new Date(iso).toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem', hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
     } catch { return iso; }
@@ -169,8 +169,8 @@ export default function VoiceAgent() {
             <Phone className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-white">Voice Agent</h1>
-            <p className="text-xs text-gray-500">Twilio + OpenAI Realtime</p>
+            <h1 className="text-xl font-bold text-white">语音助手</h1>
+            <p className="text-xs text-gray-500">Twilio + OpenAI 实时语音</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -178,7 +178,7 @@ export default function VoiceAgent() {
             <Settings2 className="w-4 h-4" /> Config
           </button>
           <button onClick={fetchAll} className="px-3 py-1.5 rounded-lg bg-dark-800 text-gray-300 hover:bg-dark-700 text-sm flex items-center gap-1.5">
-            <RefreshCw className="w-4 h-4" /> Refresh
+            <RefreshCw className="w-4 h-4" /> 刷新
           </button>
         </div>
       </div>
@@ -186,9 +186,9 @@ export default function VoiceAgent() {
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         {[
-          { label: 'Total Calls', value: stats?.totalCalls ?? 0, icon: Phone, color: 'text-blue-400' },
+          { label: '总计 Calls', value: stats?.totalCalls ?? 0, icon: Phone, color: 'text-blue-400' },
           { label: 'Completed', value: stats?.completedCalls ?? 0, icon: PhoneOff, color: 'text-green-400' },
-          { label: 'Avg Duration', value: formatDuration(stats?.avgDuration ?? 0), icon: Clock, color: 'text-yellow-400' },
+          { label: 'Avg 时长', value: format时长(stats?.avg时长 ?? 0), icon: Clock, color: 'text-yellow-400' },
           { label: 'Active Now', value: stats?.activeCalls ?? 0, icon: PhoneCall, color: activeCalls.length > 0 ? 'text-red-400 animate-pulse' : 'text-gray-400' },
           { label: 'Today', value: stats?.todayCalls ?? 0, icon: BarChart3, color: 'text-purple-400' },
         ].map((s) => (
@@ -241,7 +241,7 @@ export default function VoiceAgent() {
                   {c.direction === 'inbound' ? <PhoneIncoming className="w-4 h-4 text-blue-400" /> : <PhoneOutgoing className="w-4 h-4 text-green-400" />}
                   <div>
                     <p className="text-sm text-white">{c.from || '?'} → {c.to || '?'}</p>
-                    <p className="text-xs text-gray-500">Started {formatTime(c.startedAt)}</p>
+                    <p className="text-xs text-gray-500">Started {format时间(c.startedAt)}</p>
                   </div>
                 </div>
                 <button onClick={() => hangup(c.callSid)} className="px-3 py-1.5 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600/30 text-xs font-medium flex items-center gap-1">
@@ -257,14 +257,14 @@ export default function VoiceAgent() {
       {showConfig && config && (
         <div className="bg-dark-900 border border-gray-800/50 rounded-xl p-4">
           <h2 className="text-sm font-semibold text-gray-300 mb-3 flex items-center gap-2">
-            <Mic className="w-4 h-4 text-purple-400" /> Voice Agent Configuration
+            <Mic className="w-4 h-4 text-purple-400" /> 语音 智能体配置
           </h2>
           <div className="space-y-4">
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Voice</label>
+              <label className="block text-xs text-gray-500 mb-1">语音</label>
               <select
-                value={editVoice}
-                onChange={(e) => setEditVoice(e.target.value)}
+                value={edit语音}
+                onChange={(e) => setEdit语音(e.target.value)}
                 className="w-full px-3 py-2 rounded-lg bg-dark-800 border border-gray-700/50 text-white text-sm focus:outline-none focus:border-purple-500/50"
               >
                 {['alloy', 'ash', 'ballad', 'coral', 'echo', 'sage', 'shimmer', 'verse'].map((v) => (
@@ -273,14 +273,14 @@ export default function VoiceAgent() {
               </select>
             </div>
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Language: {config.language}</label>
+              <label className="block text-xs text-gray-500 mb-1">语言: {config.language}</label>
               <label className="block text-xs text-gray-500 mb-1">Model: {config.model}</label>
             </div>
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Instructions</label>
+              <label className="block text-xs text-gray-500 mb-1">指令</label>
               <textarea
-                value={editInstructions}
-                onChange={(e) => setEditInstructions(e.target.value)}
+                value={edit指令}
+                onChange={(e) => setEdit指令(e.target.value)}
                 rows={6}
                 className="w-full px-3 py-2 rounded-lg bg-dark-800 border border-gray-700/50 text-white text-sm focus:outline-none focus:border-purple-500/50 resize-y"
               />
@@ -305,24 +305,24 @@ export default function VoiceAgent() {
           </h2>
         </div>
         {calls.length === 0 ? (
-          <div className="p-8 text-center text-gray-500 text-sm">No calls yet. Make your first call above.</div>
+          <div className="p-8 text-center text-gray-500 text-sm">暂无通话记录，请先在上方发起一次通话。</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-xs text-gray-500 border-b border-gray-800/50">
-                  <th className="px-4 py-3">Time</th>
-                  <th className="px-4 py-3">Dir</th>
-                  <th className="px-4 py-3">From</th>
-                  <th className="px-4 py-3">To</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Duration</th>
+                  <th className="px-4 py-3">时间</th>
+                  <th className="px-4 py-3">方向</th>
+                  <th className="px-4 py-3">来源</th>
+                  <th className="px-4 py-3">目标</th>
+                  <th className="px-4 py-3">状态</th>
+                  <th className="px-4 py-3">时长</th>
                 </tr>
               </thead>
               <tbody>
                 {calls.map((c) => (
                   <tr key={c.id} className="border-b border-gray-800/30 hover:bg-dark-800/30">
-                    <td className="px-4 py-3 text-gray-400">{formatTime(c.created_at)}</td>
+                    <td className="px-4 py-3 text-gray-400">{format时间(c.created_at)}</td>
                     <td className="px-4 py-3">
                       {c.direction === 'inbound' ? (
                         <PhoneIncoming className="w-4 h-4 text-blue-400" />
@@ -333,7 +333,7 @@ export default function VoiceAgent() {
                     <td className="px-4 py-3 text-gray-300 font-mono text-xs" dir="ltr">{c.from_number}</td>
                     <td className="px-4 py-3 text-gray-300 font-mono text-xs" dir="ltr">{c.to_number}</td>
                     <td className={`px-4 py-3 font-medium ${statusColor(c.status)}`}>{c.status}</td>
-                    <td className="px-4 py-3 text-gray-400">{c.duration > 0 ? formatDuration(c.duration) : '-'}</td>
+                    <td className="px-4 py-3 text-gray-400">{c.duration > 0 ? format时长(c.duration) : '-'}</td>
                   </tr>
                 ))}
               </tbody>

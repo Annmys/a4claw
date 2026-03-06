@@ -9,7 +9,13 @@ export async function getOrCreateConversation(userId: string, platform: string, 
   if (conversationId) {
     const byId = await db.select().from(conversations)
       .where(eq(conversations.id, conversationId)).limit(1);
-    if (byId.length > 0) return byId[0];
+    if (byId.length > 0) {
+      // Security: never allow cross-user conversation ID reuse.
+      if (byId[0].userId !== userId) {
+        throw new Error('Conversation access denied');
+      }
+      return byId[0];
+    }
     // Create with the provided ID
     const [created] = await db.insert(conversations).values({ id: conversationId, userId, platform }).returning();
     return created;
@@ -91,6 +97,31 @@ export async function softDeleteConversation(conversationId: string) {
   await db.update(conversations)
     .set({ isActive: false, updatedAt: new Date() })
     .where(eq(conversations.id, conversationId));
+}
+
+/** Get a conversation by ID, scoped to a specific user. */
+export async function getConversationByIdForUser(conversationId: string, userId: string) {
+  const db = getDb();
+  const [conv] = await db.select().from(conversations)
+    .where(and(eq(conversations.id, conversationId), eq(conversations.userId, userId)))
+    .limit(1);
+  return conv ?? null;
+}
+
+/** Update conversation title only if it belongs to the user. */
+export async function updateConversationTitleForUser(conversationId: string, userId: string, title: string) {
+  const db = getDb();
+  await db.update(conversations)
+    .set({ title, updatedAt: new Date() })
+    .where(and(eq(conversations.id, conversationId), eq(conversations.userId, userId)));
+}
+
+/** Soft-delete conversation only if it belongs to the user. */
+export async function softDeleteConversationForUser(conversationId: string, userId: string) {
+  const db = getDb();
+  await db.update(conversations)
+    .set({ isActive: false, updatedAt: new Date() })
+    .where(and(eq(conversations.id, conversationId), eq(conversations.userId, userId)));
 }
 
 /** Get recent activity from platforms OTHER than the current one. */

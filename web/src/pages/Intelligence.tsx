@@ -53,9 +53,9 @@ export default function Intelligence() {
     <div className="p-6">
       <div className="bg-dark-800 rounded-xl p-8 text-center border border-gray-800/50">
         <Brain className="w-12 h-12 mx-auto mb-4 text-gray-600" />
-        <h2 className="text-lg font-semibold text-gray-400">Intelligence Bridge Not Ready</h2>
-        <p className="text-sm text-gray-500 mt-2">The intelligence subsystems are initializing. This usually takes a few seconds after startup.</p>
-        <button onClick={fetchData} className="mt-4 px-4 py-2 bg-primary-600 rounded-lg text-sm hover:bg-primary-500 transition">Retry</button>
+        <h2 className="text-lg font-semibold text-gray-400">智能桥接尚未就绪</h2>
+        <p className="text-sm text-gray-500 mt-2">智能子系统正在初始化，通常在启动后几秒内完成。</p>
+        <button onClick={fetchData} className="mt-4 px-4 py-2 bg-primary-600 rounded-lg text-sm hover:bg-primary-500 transition">重试</button>
       </div>
     </div>
   );
@@ -65,12 +65,12 @@ export default function Intelligence() {
   const scoreBarColor = score > 70 ? 'bg-green-500' : score > 40 ? 'bg-yellow-500' : 'bg-red-500';
 
   const tabs = [
-    { id: 'overview', label: 'Overview', icon: Eye },
-    { id: 'agents', label: 'Agents & Tools', icon: Cpu },
-    { id: 'costs', label: 'Costs', icon: DollarSign },
-    { id: 'safety', label: 'Safety', icon: Shield },
-    { id: 'memory', label: 'Memory', icon: Database },
-    { id: 'goals', label: 'Goals', icon: Target },
+    { id: 'overview', label: '概览', icon: Eye },
+    { id: 'agents', label: '智能体与工具', icon: Cpu },
+    { id: 'costs', label: '成本', icon: DollarSign },
+    { id: 'safety', label: '安全', icon: Shield },
+    { id: 'memory', label: '记忆', icon: Database },
+    { id: 'goals', label: '目标', icon: Target },
   ] as const;
 
   return (
@@ -82,31 +82,31 @@ export default function Intelligence() {
             <Brain className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-xl font-bold">Intelligence Command Center</h1>
-            <p className="text-xs text-gray-500">9 Subsystems Live</p>
+            <h1 className="text-xl font-bold">智能指挥中心</h1>
+            <p className="text-xs text-gray-500">9 个子系统在线</p>
           </div>
         </div>
         <button onClick={fetchData} className="flex items-center gap-2 px-3 py-1.5 text-xs bg-dark-800 border border-gray-700 rounded-lg hover:bg-dark-700 transition">
-          <RefreshCw className="w-3.5 h-3.5" /> Refresh
+          <RefreshCw className="w-3.5 h-3.5" /> 刷新
         </button>
       </div>
 
       {/* Top Metrics */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
-        <MetricCard label="Health" value={`${score}`} sub="/100" icon={Activity} color={scoreColor} />
-        <MetricCard label="Cost Today" value={`$${(data.costReport?.totalCost ?? 0).toFixed(4)}`} icon={DollarSign} color="text-green-400" />
-        <MetricCard label="Budget" value={`$${(data.governanceBudget?.spentToday ?? 0).toFixed(2)}`} sub={`/$${(data.governanceBudget?.dailyBudgetUsd ?? 10).toFixed(0)}`} icon={Shield} color="text-cyan-400" />
-        <MetricCard label="Goals" value={`${data.goalSummary?.activeGoals ?? 0}`} icon={Target} color="text-pink-400" />
-        <MetricCard label="Tasks" value={`${data.goalSummary?.pendingTasks ?? 0}`} icon={Zap} color="text-yellow-400" />
-        <MetricCard label="Patterns" value={`${data.feedbackReport?.totalPatterns ?? 0}`} icon={GitBranch} color="text-purple-400" />
-        <MetricCard label="Anomalies" value={`${(data.costReport?.anomalies ?? []).length}`} icon={AlertTriangle} color="text-red-400" />
-        <MetricCard label="Disabled" value={`${((data.scorerReport?.disabled?.tools ?? []).length + (data.scorerReport?.disabled?.agents ?? []).length)}`} icon={XCircle} color="text-red-300" />
+        <MetricCard label="健康度" value={`${score}`} sub="/100" icon={Activity} color={scoreColor} />
+        <MetricCard label="今日成本" value={`$${(data.costReport?.totalCost ?? 0).toFixed(4)}`} icon={DollarSign} color="text-green-400" />
+        <MetricCard label="预算" value={`$${(data.governanceBudget?.spentToday ?? 0).toFixed(2)}`} sub={`/$${(data.governanceBudget?.dailyBudgetUsd ?? 10).toFixed(0)}`} icon={Shield} color="text-cyan-400" />
+        <MetricCard label="目标" value={`${data.goalSummary?.activeGoals ?? 0}`} icon={Target} color="text-pink-400" />
+        <MetricCard label="任务" value={`${data.goalSummary?.pendingTasks ?? 0}`} icon={Zap} color="text-yellow-400" />
+        <MetricCard label="模式" value={`${data.feedbackReport?.totalPatterns ?? 0}`} icon={GitBranch} color="text-purple-400" />
+        <MetricCard label="异常" value={`${(data.costReport?.anomalies ?? []).length}`} icon={AlertTriangle} color="text-red-400" />
+        <MetricCard label="已禁用" value={`${((data.scorerReport?.disabled?.tools ?? []).length + (data.scorerReport?.disabled?.agents ?? []).length)}`} icon={XCircle} color="text-red-300" />
       </div>
 
       {/* Health Bar */}
       <div className="bg-dark-800 rounded-xl p-4 border border-gray-800/50">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-xs text-gray-400 uppercase tracking-wider">System Intelligence Index</span>
+          <span className="text-xs text-gray-400 uppercase tracking-wider">系统智能指数</span>
           <span className={`text-lg font-bold font-mono ${scoreColor}`}>{score}/100</span>
         </div>
         <div className="w-full h-3 bg-dark-900 rounded-full overflow-hidden">
@@ -164,36 +164,36 @@ function SubsystemCard({ name, icon, active, detail }: { name: string; icon: str
 // ─── Overview Tab ───
 function OverviewTab({ data }: { data: IntelligenceData }) {
   const subsystems = [
-    { name: 'Scorer', icon: '\u{1F3AF}', active: (data.scorerReport?.totalToolCalls ?? 0) > 0 || Object.keys(data.scorerReport?.toolStats || {}).length > 0, detail: `${data.scorerReport?.totalToolCalls ?? 0} calls` },
-    { name: 'Memory', icon: '\u{1F9E0}', active: !!data.memoryStatus, detail: `${Object.keys(data.memoryStatus || {}).length} layers` },
-    { name: 'Governance', icon: '\u{1F6E1}\uFE0F', active: !!(data.governanceBudget?.dailyBudgetUsd), detail: data.governanceBudget?.criticalOps ?? 'Ready' },
-    { name: 'Cost Intel', icon: '\u{1F4B0}', active: (data.costReport?.totalRecords ?? 0) > 0, detail: `${data.costReport?.totalRecords ?? 0} records` },
-    { name: 'Model Router', icon: '\u{1F500}', active: !!data.modelRankings, detail: `${Object.keys(data.modelRankings || {}).length} models` },
-    { name: 'Observability', icon: '\u{1F4CA}', active: !!data.health, detail: 'Dashboard ready' },
-    { name: 'Goals', icon: '\u{1F3AF}', active: (data.goalSummary?.activeGoals ?? 0) > 0, detail: `${data.goalSummary?.kpisMet ?? 0}/${data.goalSummary?.kpisTotal ?? 0} KPIs` },
-    { name: 'Safety', icon: '\u{1F6A8}', active: !!data.safetyStats, detail: `${data.safetyStats?.totalSimulations ?? 0} sims` },
-    { name: 'Feedback', icon: '\u{1F504}', active: (data.feedbackReport?.totalPatterns ?? 0) > 0, detail: `${data.feedbackReport?.promotedCount ?? 0} promoted` },
+    { name: '评分器', icon: '\u{1F3AF}', active: (data.scorerReport?.totalToolCalls ?? 0) > 0 || Object.keys(data.scorerReport?.toolStats || {}).length > 0, detail: `${data.scorerReport?.totalToolCalls ?? 0} 次调用` },
+    { name: '记忆', icon: '\u{1F9E0}', active: !!data.memoryStatus, detail: `${Object.keys(data.memoryStatus || {}).length} 层` },
+    { name: '治理', icon: '\u{1F6E1}\uFE0F', active: !!(data.governanceBudget?.dailyBudgetUsd), detail: data.governanceBudget?.criticalOps ?? '就绪' },
+    { name: '成本情报', icon: '\u{1F4B0}', active: (data.costReport?.totalRecords ?? 0) > 0, detail: `${data.costReport?.totalRecords ?? 0} 条记录` },
+    { name: '模型路由', icon: '\u{1F500}', active: !!data.modelRankings, detail: `${Object.keys(data.modelRankings || {}).length} 个模型` },
+    { name: '可观测', icon: '\u{1F4CA}', active: !!data.health, detail: '仪表盘已就绪' },
+    { name: '目标', icon: '\u{1F3AF}', active: (data.goalSummary?.activeGoals ?? 0) > 0, detail: `${data.goalSummary?.kpisMet ?? 0}/${data.goalSummary?.kpisTotal ?? 0} KPI` },
+    { name: '安全', icon: '\u{1F6A8}', active: !!data.safetyStats, detail: `${data.safetyStats?.totalSimulations ?? 0} 次模拟` },
+    { name: '反馈', icon: '\u{1F504}', active: (data.feedbackReport?.totalPatterns ?? 0) > 0, detail: `${data.feedbackReport?.promotedCount ?? 0} 已晋升` },
   ];
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       <div className="bg-dark-800 rounded-xl p-5 border border-gray-800/50">
-        <h3 className="text-sm font-semibold text-gray-300 mb-4">9 Intelligence Subsystems</h3>
+        <h3 className="text-sm font-semibold text-gray-300 mb-4">9 个智能子系统</h3>
         <div className="grid grid-cols-3 gap-2">
           {subsystems.map(s => <SubsystemCard key={s.name} {...s} />)}
         </div>
       </div>
       <div className="bg-dark-800 rounded-xl p-5 border border-gray-800/50">
-        <h3 className="text-sm font-semibold text-gray-300 mb-4">Cost Suggestions</h3>
+        <h3 className="text-sm font-semibold text-gray-300 mb-4">成本建议</h3>
         <div className="space-y-2 max-h-72 overflow-y-auto">
           {(data.costReport?.suggestions ?? []).length === 0
-            ? <p className="text-xs text-gray-600">No suggestions yet</p>
+            ? <p className="text-xs text-gray-600">暂无建议</p>
             : data.costReport!.suggestions.map((s, i) => (
               <div key={i} className="p-3 bg-dark-900 rounded-lg border border-gray-800/30 text-xs">
                 <div className="font-medium text-gray-300">{s.workflowType}</div>
                 <div className="text-gray-500 mt-1">{s.suggestion}</div>
                 <div className={`mt-1 font-mono ${s.potentialSaving > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                  {s.potentialSaving > 0 ? 'Save' : 'Cost'}: ${Math.abs(s.potentialSaving).toFixed(4)}
+                  {s.potentialSaving > 0 ? '节省' : '成本'}: $${Math.abs(s.potentialSaving).toFixed(4)}
                 </div>
               </div>
             ))}
@@ -211,11 +211,11 @@ function AgentsTab({ data }: { data: IntelligenceData }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       <div className="bg-dark-800 rounded-xl p-5 border border-gray-800/50">
-        <h3 className="text-sm font-semibold text-gray-300 mb-4">Agent Performance</h3>
-        {agents.length === 0 ? <p className="text-xs text-gray-600">No agent data yet</p> : (
+        <h3 className="text-sm font-semibold text-gray-300 mb-4">智能体表现</h3>
+        {agents.length === 0 ? <p className="text-xs text-gray-600">暂无智能体数据</p> : (
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
-              <thead><tr className="text-gray-500 border-b border-gray-800/50"><th className="pb-2 text-left">Agent</th><th className="pb-2">Calls</th><th className="pb-2">Success</th><th className="pb-2">Latency</th><th className="pb-2">Trend</th></tr></thead>
+              <thead><tr className="text-gray-500 border-b border-gray-800/50"><th className="pb-2 text-left">智能体</th><th className="pb-2">调用数</th><th className="pb-2">成功率</th><th className="pb-2">延迟</th><th className="pb-2">趋势</th></tr></thead>
               <tbody>{agents.map(([id, s]) => (
                 <tr key={id} className="border-b border-gray-800/30 hover:bg-dark-700/30">
                   <td className="py-2 font-mono text-[11px]">{id}</td>
@@ -230,11 +230,11 @@ function AgentsTab({ data }: { data: IntelligenceData }) {
         )}
       </div>
       <div className="bg-dark-800 rounded-xl p-5 border border-gray-800/50">
-        <h3 className="text-sm font-semibold text-gray-300 mb-4">Tool Performance</h3>
-        {tools.length === 0 ? <p className="text-xs text-gray-600">No tool data yet</p> : (
+        <h3 className="text-sm font-semibold text-gray-300 mb-4">工具表现</h3>
+        {tools.length === 0 ? <p className="text-xs text-gray-600">暂无工具数据</p> : (
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
-              <thead><tr className="text-gray-500 border-b border-gray-800/50"><th className="pb-2 text-left">Tool</th><th className="pb-2">Calls</th><th className="pb-2">Success</th><th className="pb-2">Latency</th><th className="pb-2">Trend</th></tr></thead>
+              <thead><tr className="text-gray-500 border-b border-gray-800/50"><th className="pb-2 text-left">工具</th><th className="pb-2">调用数</th><th className="pb-2">成功率</th><th className="pb-2">延迟</th><th className="pb-2">趋势</th></tr></thead>
               <tbody>{tools.map(([id, s]) => (
                 <tr key={id} className="border-b border-gray-800/30 hover:bg-dark-700/30">
                   <td className="py-2 font-mono text-[11px]">{id}</td>
@@ -259,11 +259,11 @@ function CostsTab({ data }: { data: IntelligenceData }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       <div className="bg-dark-800 rounded-xl p-5 border border-gray-800/50">
-        <h3 className="text-sm font-semibold text-gray-300 mb-4">Cost per Workflow</h3>
-        {(cost?.costPerWorkflow ?? []).length === 0 ? <p className="text-xs text-gray-600">No cost data yet</p> : (
+        <h3 className="text-sm font-semibold text-gray-300 mb-4">工作流成本</h3>
+        {(cost?.costPerWorkflow ?? []).length === 0 ? <p className="text-xs text-gray-600">暂无成本数据</p> : (
           <div className="overflow-x-auto max-h-72 overflow-y-auto">
             <table className="w-full text-xs">
-              <thead><tr className="text-gray-500 border-b border-gray-800/50"><th className="pb-2 text-left">Workflow</th><th className="pb-2">Total</th><th className="pb-2">Avg</th><th className="pb-2">Count</th></tr></thead>
+              <thead><tr className="text-gray-500 border-b border-gray-800/50"><th className="pb-2 text-left">工作流</th><th className="pb-2">总计</th><th className="pb-2">均值</th><th className="pb-2">次数</th></tr></thead>
               <tbody>{cost!.costPerWorkflow.slice(0, 20).map((w, i) => (
                 <tr key={i} className="border-b border-gray-800/30">
                   <td className="py-1.5 font-mono text-[10px]">{w.workflowType}</td>
@@ -277,28 +277,28 @@ function CostsTab({ data }: { data: IntelligenceData }) {
         )}
       </div>
       <div className="bg-dark-800 rounded-xl p-5 border border-gray-800/50">
-        <h3 className="text-sm font-semibold text-gray-300 mb-4">Token Forecast</h3>
+        <h3 className="text-sm font-semibold text-gray-300 mb-4">Token 预测</h3>
         <div className="grid grid-cols-2 gap-3">
           <div className="bg-dark-900 rounded-lg p-3 border border-gray-800/30">
             <div className="text-lg font-bold font-mono text-cyan-400">{formatNum(fc?.dailyAvgTokens ?? 0)}</div>
-            <div className="text-[10px] text-gray-500 uppercase">Daily Avg Tokens</div>
+            <div className="text-[10px] text-gray-500 uppercase">日均 Token</div>
           </div>
           <div className="bg-dark-900 rounded-lg p-3 border border-gray-800/30">
             <div className="text-lg font-bold font-mono text-green-400">${(fc?.dailyAvgCost ?? 0).toFixed(4)}</div>
-            <div className="text-[10px] text-gray-500 uppercase">Daily Avg Cost</div>
+            <div className="text-[10px] text-gray-500 uppercase">日均成本</div>
           </div>
           <div className="bg-dark-900 rounded-lg p-3 border border-gray-800/30">
             <div className="text-lg font-bold font-mono text-yellow-400">${(fc?.projectedMonthlyCost ?? 0).toFixed(2)}</div>
-            <div className="text-[10px] text-gray-500 uppercase">Monthly Projection</div>
+            <div className="text-[10px] text-gray-500 uppercase">月度预测</div>
           </div>
           <div className="bg-dark-900 rounded-lg p-3 border border-gray-800/30">
-            <div className={`text-lg font-bold font-mono ${fc?.budgetRunoutDate ? 'text-red-400' : 'text-green-400'}`}>{fc?.budgetRunoutDate ?? 'OK'}</div>
-            <div className="text-[10px] text-gray-500 uppercase">Budget Status</div>
+            <div className={`text-lg font-bold font-mono ${fc?.budgetRunoutDate ? 'text-red-400' : 'text-green-400'}`}>{fc?.budgetRunoutDate ?? '正常'}</div>
+            <div className="text-[10px] text-gray-500 uppercase">预算状态</div>
           </div>
         </div>
         {(cost?.anomalies ?? []).length > 0 && (
           <>
-            <h4 className="text-xs text-gray-400 mt-4 mb-2">Anomalies</h4>
+            <h4 className="text-xs text-gray-400 mt-4 mb-2">异常</h4>
             <div className="space-y-1.5 max-h-40 overflow-y-auto">
               {cost!.anomalies.map((a, i) => (
                 <div key={i} className="p-2 bg-dark-900 rounded-lg border border-gray-800/30 text-[11px]">
@@ -322,19 +322,19 @@ function SafetyTab({ data }: { data: IntelligenceData }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       <div className="bg-dark-800 rounded-xl p-5 border border-gray-800/50">
-        <h3 className="text-sm font-semibold text-gray-300 mb-4">Safety Simulator</h3>
+        <h3 className="text-sm font-semibold text-gray-300 mb-4">安全模拟器</h3>
         <div className="grid grid-cols-2 gap-3">
-          <StatBox label="Simulations" value={safety?.totalSimulations ?? 0} color="text-indigo-400" />
-          <StatBox label="Blocked" value={safety?.blocked ?? 0} color="text-red-400" />
-          <StatBox label="High Risk OK" value={safety?.highRiskApproved ?? 0} color="text-yellow-400" />
-          <StatBox label="Snapshots" value={safety?.snapshotsTaken ?? 0} color="text-green-400" />
+          <StatBox label="模拟次数" value={safety?.totalSimulations ?? 0} color="text-indigo-400" />
+          <StatBox label="已拦截" value={safety?.blocked ?? 0} color="text-red-400" />
+          <StatBox label="高风险放行" value={safety?.highRiskApproved ?? 0} color="text-yellow-400" />
+          <StatBox label="快照" value={safety?.snapshotsTaken ?? 0} color="text-green-400" />
         </div>
       </div>
       <div className="bg-dark-800 rounded-xl p-5 border border-gray-800/50">
-        <h3 className="text-sm font-semibold text-gray-300 mb-4">Governance Budget</h3>
+        <h3 className="text-sm font-semibold text-gray-300 mb-4">治理预算</h3>
         <div className="mb-4">
           <div className="flex justify-between text-xs mb-1.5">
-            <span className="text-gray-400">Daily Budget</span>
+            <span className="text-gray-400">每日预算</span>
             <span className="font-mono text-green-400">${(gov?.spentToday ?? 0).toFixed(2)} / ${(gov?.dailyBudgetUsd ?? 10).toFixed(2)}</span>
           </div>
           <div className="w-full h-2.5 bg-dark-900 rounded-full overflow-hidden">
@@ -342,9 +342,9 @@ function SafetyTab({ data }: { data: IntelligenceData }) {
           </div>
         </div>
         <div className="grid grid-cols-3 gap-2">
-          <StatBox label="Critical Ops" value={gov?.criticalOps ?? '0/5'} color="text-gray-300" small />
-          <StatBox label="High Risk/Hr" value={gov?.highRiskHourly ?? '0/20'} color="text-gray-300" small />
-          <StatBox label="Remaining" value={`$${(gov?.remainingToday ?? 0).toFixed(2)}`} color="text-green-400" small />
+          <StatBox label="关键操作" value={gov?.criticalOps ?? '0/5'} color="text-gray-300" small />
+          <StatBox label="高风险/小时" value={gov?.highRiskHourly ?? '0/20'} color="text-gray-300" small />
+          <StatBox label="剩余" value={`$${(gov?.remainingToday ?? 0).toFixed(2)}`} color="text-green-400" small />
         </div>
       </div>
     </div>
@@ -357,9 +357,9 @@ function MemoryTab({ data }: { data: IntelligenceData }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       <div className="bg-dark-800 rounded-xl p-5 border border-gray-800/50">
-        <h3 className="text-sm font-semibold text-gray-300 mb-4">Memory Hierarchy</h3>
+        <h3 className="text-sm font-semibold text-gray-300 mb-4">记忆层级</h3>
         {Object.keys(data.memoryStatus || {}).length === 0
-          ? <p className="text-xs text-gray-600">No memory data yet</p>
+          ? <p className="text-xs text-gray-600">暂无记忆数据</p>
           : <div className="space-y-2">{Object.entries(data.memoryStatus || {}).map(([k, v]) => (
             <div key={k} className="p-3 bg-dark-900 rounded-lg border border-gray-800/30">
               <div className="text-xs font-semibold text-gray-300 capitalize">{k.replace(/_/g, ' ')}</div>
@@ -368,14 +368,14 @@ function MemoryTab({ data }: { data: IntelligenceData }) {
           ))}</div>}
       </div>
       <div className="bg-dark-800 rounded-xl p-5 border border-gray-800/50">
-        <h3 className="text-sm font-semibold text-gray-300 mb-4">Feedback Patterns</h3>
-        {patterns.length === 0 ? <p className="text-xs text-gray-600">No patterns yet</p> : (
+        <h3 className="text-sm font-semibold text-gray-300 mb-4">反馈模式</h3>
+        {patterns.length === 0 ? <p className="text-xs text-gray-600">暂无模式</p> : (
           <div className="space-y-1.5 max-h-72 overflow-y-auto">
             {patterns.map((p, i) => (
               <div key={i} className="flex items-center justify-between p-2.5 bg-dark-900 rounded-lg border border-gray-800/30">
                 <span className="text-xs text-gray-300 truncate flex-1">{p.description}</span>
                 <span className={`ml-2 px-2 py-0.5 rounded text-[9px] font-bold ${p.promoted ? 'bg-green-900/50 text-green-400' : 'bg-gray-800 text-gray-400'}`}>
-                  {p.promoted ? 'Promoted' : `${p.occurrences}x`}
+                  {p.promoted ? '已晋升' : `${p.occurrences}次`}
                 </span>
               </div>
             ))}
@@ -393,20 +393,20 @@ function GoalsTab({ data }: { data: IntelligenceData }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       <div className="bg-dark-800 rounded-xl p-5 border border-gray-800/50">
-        <h3 className="text-sm font-semibold text-gray-300 mb-4">Strategic Goals</h3>
+        <h3 className="text-sm font-semibold text-gray-300 mb-4">战略目标</h3>
         <div className="grid grid-cols-2 gap-3 mb-4">
-          <StatBox label="Active" value={goals?.activeGoals ?? 0} color="text-indigo-400" />
-          <StatBox label="Completed" value={goals?.completedGoals ?? 0} color="text-green-400" />
-          <StatBox label="Progress" value={`${(goals?.avgProgress ?? 0).toFixed(0)}%`} color="text-yellow-400" />
-          <StatBox label="KPIs Met" value={`${goals?.kpisMet ?? 0}/${goals?.kpisTotal ?? 0}`} color="text-cyan-400" />
+          <StatBox label="进行中" value={goals?.activeGoals ?? 0} color="text-indigo-400" />
+          <StatBox label="已完成" value={goals?.completedGoals ?? 0} color="text-green-400" />
+          <StatBox label="进度" value={`${(goals?.avgProgress ?? 0).toFixed(0)}%`} color="text-yellow-400" />
+          <StatBox label="达成 KPI" value={`${goals?.kpisMet ?? 0}/${goals?.kpisTotal ?? 0}`} color="text-cyan-400" />
         </div>
         <div className="w-full h-2.5 bg-dark-900 rounded-full overflow-hidden">
           <div className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-green-500 transition-all" style={{ width: `${goals?.avgProgress ?? 0}%` }} />
         </div>
       </div>
       <div className="bg-dark-800 rounded-xl p-5 border border-gray-800/50">
-        <h3 className="text-sm font-semibold text-gray-300 mb-4">Self-Initiated Tasks</h3>
-        {tasks.length === 0 ? <p className="text-xs text-gray-600">No pending tasks</p> : (
+        <h3 className="text-sm font-semibold text-gray-300 mb-4">自主任务</h3>
+        {tasks.length === 0 ? <p className="text-xs text-gray-600">暂无待处理任务</p> : (
           <div className="space-y-1.5 max-h-72 overflow-y-auto">
             {tasks.map((t, i) => (
               <div key={i} className="p-3 bg-dark-900 rounded-lg border border-gray-800/30">

@@ -11,7 +11,7 @@ interface FacebookAccount {
   name: string;
   userId?: string;
   cookieCount: number;
-  cookieFormat: string;
+  cookieFormat:string;
   status: 'untested' | 'active' | 'failed' | 'blocked' | 'checkpoint';
   profileName?: string;
   lastVerified?: string;
@@ -68,7 +68,7 @@ const AGENT_STATE_COLORS: Record<string, string> = {
 };
 
 const ACTION_LABELS: Record<string, string> = {
-  post: 'Posts', comment: 'Comments', friend_request: 'Friend Requests',
+  post: 'Posts', comment: '评论', friend_request: 'Friend Requests',
   group_join: 'Group Joins', message: 'Messages',
 };
 
@@ -79,7 +79,7 @@ export default function FacebookTab() {
 
   // Add account dialog
   const [showAdd, setShowAdd] = useState(false);
-  const [addName, setAddName] = useState('');
+  const [add名称, setAdd名称] = useState('');
   const [addCookies, setAddCookies] = useState('');
   const [addSaving, setAddSaving] = useState(false);
   const [preview, setPreview] = useState<ParsePreview | null>(null);
@@ -100,9 +100,9 @@ export default function FacebookTab() {
   const [stoppingAgent, setStoppingAgent] = useState<string | null>(null);
 
   // Agent config form
-  const [cfgActions, setCfgActions] = useState<string[]>(['post', 'comment']);
-  const [cfgLanguage, setCfgLanguage] = useState('Hebrew');
-  const [cfgTone, setCfgTone] = useState('friendly and engaging');
+  const [cfg动作, setCfg动作] = useState<string[]>(['post', 'comment']);
+  const [cfg语言, setCfg语言] = useState('Hebrew');
+  const [cfg语气, setCfg语气] = useState('friendly and engaging');
   const [cfgTestMode, setCfgTestMode] = useState(false);
   const [cfgTopics, setCfgTopics] = useState('');
   const [cfgPromoLink, setCfgPromoLink] = useState('');
@@ -152,13 +152,13 @@ export default function FacebookTab() {
   };
 
   const handleAddAccount = async () => {
-    if (!addName.trim() || !addCookies.trim()) return;
+    if (!add名称.trim() || !addCookies.trim()) return;
     setAddSaving(true);
     setError(null);
     try {
-      await api.facebookAddAccount(addName.trim(), addCookies.trim());
+      await api.facebookAddAccount(add名称.trim(), addCookies.trim());
       setShowAdd(false);
-      setAddName('');
+      setAdd名称('');
       setAddCookies('');
       setPreview(null);
       fetchAccounts();
@@ -214,10 +214,10 @@ export default function FacebookTab() {
     setError(null);
     try {
       const config: any = {
-        actions: cfgActions,
+        actions: cfg动作,
         content: {
-          tone: cfgTone,
-          language: cfgLanguage,
+          tone: cfg语气,
+          language: cfg语言,
           topics: cfgTopics.split(',').map(t => t.trim()).filter(Boolean),
           promoLink: cfgPromoLink || undefined,
           promoFrequency: cfgPromoLink ? 0.2 : 0,
@@ -320,8 +320,8 @@ export default function FacebookTab() {
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800/50">
         <div>
-          <h2 className="text-lg font-bold text-white">Facebook Accounts</h2>
-          <p className="text-xs text-gray-500">Manage accounts and run autonomous AI agents</p>
+          <h2 className="text-lg font-bold text-white">Facebook 账号</h2>
+          <p className="text-xs text-gray-500">管理账号并运行自治 AI 智能体</p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => { fetchAccounts(); fetchAgentStatuses(); }} className="p-2 text-gray-400 hover:text-white transition-colors">
@@ -332,7 +332,7 @@ export default function FacebookTab() {
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors"
           >
             <Plus className="w-4 h-4" />
-            Add Account
+            添加账号
           </button>
         </div>
       </div>
@@ -378,7 +378,7 @@ export default function FacebookTab() {
                 <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
               </svg>
             </div>
-            <h3 className="text-lg font-semibold text-gray-400 mb-2">No Facebook Accounts</h3>
+            <h3 className="text-lg font-semibold text-gray-400 mb-2">暂无 Facebook 账号</h3>
             <p className="text-sm text-gray-600 mb-6 max-w-md mx-auto">
               Add a Facebook account by pasting cookies from Cookie Editor, BUY format, or plain cookie string.
             </p>
@@ -396,7 +396,7 @@ export default function FacebookTab() {
               const status = STATUS_CONFIG[account.status] || STATUS_CONFIG.untested;
               const StatusIcon = status.icon;
               const agentStatus = agentStatuses[account.id];
-              const isAgentRunning = agentStatus && (agentStatus.state === 'running' || agentStatus.state === 'paused');
+              const isAgent运行ning = agentStatus && (agentStatus.state === 'running' || agentStatus.state === 'paused');
 
               return (
                 <div key={account.id} className="bg-dark-800/50 border border-gray-700/50 rounded-lg">
@@ -416,11 +416,11 @@ export default function FacebookTab() {
                               <StatusIcon className={`w-3 h-3 ${status.color}`} />
                               <span className={status.color}>{status.label}</span>
                             </span>
-                            {isAgentRunning && (
+                            {isAgent运行ning && (
                               <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium border bg-purple-500/10 border-purple-500/30`}>
                                 <Bot className="w-3 h-3 text-purple-400" />
                                 <span className={AGENT_STATE_COLORS[agentStatus.state]}>
-                                  Agent {agentStatus.state === 'paused' ? 'Paused' : 'Running'}
+                                  Agent {agentStatus.state === 'paused' ? 'Paused' : '运行ning'}
                                 </span>
                               </span>
                             )}
@@ -443,12 +443,12 @@ export default function FacebookTab() {
 
                       <div className="flex items-center gap-2">
                         {/* Agent controls */}
-                        {!isAgentRunning ? (
+                        {!isAgent运行ning ? (
                           <button
-                            onClick={() => { setShowAgentConfig(account.id); setCfgActions(['post', 'comment']); setCfgTestMode(false); }}
+                            onClick={() => { setShowAgentConfig(account.id); setCfg动作(['post', 'comment']); setCfgTestMode(false); }}
                             disabled={account.status === 'failed' || account.status === 'blocked'}
                             className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white text-xs rounded-md transition-colors disabled:opacity-50"
-                            title="Start AI Agent"
+                            title="启动 AI 智能体"
                           >
                             <Bot className="w-3.5 h-3.5" />
                             Agent
@@ -514,7 +514,7 @@ export default function FacebookTab() {
                   </div>
 
                   {/* Agent stats row (when agent is running) */}
-                  {isAgentRunning && agentStatus && (
+                  {isAgent运行ning && agentStatus && (
                     <div className="px-4 pb-3 border-t border-gray-800/30">
                       <div className="flex items-center gap-4 pt-2 text-[11px]">
                         <span className="text-gray-500">
@@ -522,10 +522,10 @@ export default function FacebookTab() {
                           {agentStatus.stats.totalActions} actions
                         </span>
                         {agentStatus.stats.posts > 0 && <span className="text-gray-500">Posts: {agentStatus.stats.posts}</span>}
-                        {agentStatus.stats.comments > 0 && <span className="text-gray-500">Comments: {agentStatus.stats.comments}</span>}
+                        {agentStatus.stats.comments > 0 && <span className="text-gray-500">评论: {agentStatus.stats.comments}</span>}
                         {agentStatus.stats.friendRequests > 0 && <span className="text-gray-500">Friends: {agentStatus.stats.friendRequests}</span>}
                         {agentStatus.stats.messages > 0 && <span className="text-gray-500">Messages: {agentStatus.stats.messages}</span>}
-                        {agentStatus.stats.errors > 0 && <span className="text-red-400">Errors: {agentStatus.stats.errors}</span>}
+                        {agentStatus.stats.errors > 0 && <span className="text-red-400">错误: {agentStatus.stats.errors}</span>}
                         {agentStatus.currentAction && (
                           <span className="text-purple-400 animate-pulse">
                             Now: {agentStatus.currentAction}
@@ -546,9 +546,9 @@ export default function FacebookTab() {
                       {/* Config summary bar */}
                       {agentStatus?.config && (
                         <div className="px-4 py-2 bg-purple-900/10 border-b border-gray-800/20 flex flex-wrap items-center gap-3 text-[11px]">
-                          <span className="text-gray-500 font-medium">Config:</span>
+                          <span className="text-gray-500 font-medium">配置：</span>
                           <span className="text-purple-300">
-                            Actions: {(agentStatus.config as any).actions?.join(', ') || 'N/A'}
+                            动作: {(agentStatus.config as any).actions?.join(', ') || 'N/A'}
                           </span>
                           {(agentStatus.config as any).groups?.length > 0 && (
                             <span className="flex items-center gap-1 text-blue-300">
@@ -574,7 +574,7 @@ export default function FacebookTab() {
                         <div className="flex items-center justify-between px-4 py-2 border-b border-gray-800/20">
                           <div className="flex items-center gap-2">
                             <Radio className="w-3.5 h-3.5 text-red-400 animate-pulse" />
-                            <span className="text-xs font-semibold text-gray-400">Live Agent Logs</span>
+                            <span className="text-xs font-semibold text-gray-400">实时智能体日志</span>
                             <span className="text-[10px] text-gray-600">
                               ({agentLogs[account.id]?.length || 0} entries, auto-refresh 5s)
                             </span>
@@ -613,7 +613,7 @@ export default function FacebookTab() {
                           }}
                         >
                           {!agentLogs[account.id] || agentLogs[account.id].length === 0 ? (
-                            <p className="text-[11px] text-gray-600 py-4 text-center">Waiting for agent activity...</p>
+                            <p className="text-[11px] text-gray-600 py-4 text-center">等待智能体活动中...</p>
                           ) : (
                             <div className="space-y-0.5">
                               {agentLogs[account.id].map((log, i) => (
@@ -659,24 +659,24 @@ export default function FacebookTab() {
           <div className="bg-dark-900 border border-gray-700/50 rounded-xl shadow-2xl p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center gap-2 mb-1">
               <Bot className="w-5 h-5 text-purple-400" />
-              <h3 className="text-lg font-bold text-white">Start AI Agent</h3>
+              <h3 className="text-lg font-bold text-white">启动 AI 智能体</h3>
             </div>
             <p className="text-xs text-gray-500 mb-4">
               Configure the autonomous agent for {accounts.find(a => a.id === showAgentConfig)?.name}
             </p>
 
-            {/* Actions */}
+            {/* 动作 */}
             <div className="mb-4">
-              <label className="block text-sm text-gray-400 mb-2">Enabled Actions</label>
+              <label className="block text-sm text-gray-400 mb-2">启用动作</label>
               <div className="flex flex-wrap gap-2">
                 {(['post', 'comment', 'friend_request', 'group_join', 'message'] as const).map(action => (
                   <button
                     key={action}
-                    onClick={() => setCfgActions(prev =>
+                    onClick={() => setCfg动作(prev =>
                       prev.includes(action) ? prev.filter(a => a !== action) : [...prev, action]
                     )}
                     className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${
-                      cfgActions.includes(action)
+                      cfg动作.includes(action)
                         ? 'bg-purple-500/20 border-purple-500/50 text-purple-300'
                         : 'bg-dark-800 border-gray-700/50 text-gray-500 hover:text-gray-300'
                     }`}
@@ -687,39 +687,39 @@ export default function FacebookTab() {
               </div>
             </div>
 
-            {/* Language + Tone */}
+            {/* 语言 + 语气 */}
             <div className="grid grid-cols-2 gap-3 mb-4">
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Language</label>
+                <label className="block text-sm text-gray-400 mb-1">语言</label>
                 <select
-                  value={cfgLanguage}
-                  onChange={e => setCfgLanguage(e.target.value)}
+                  value={cfg语言}
+                  onChange={e => setCfg语言(e.target.value)}
                   className="w-full bg-dark-800 border border-gray-700/50 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500/50"
                 >
-                  <option value="Hebrew">Hebrew</option>
-                  <option value="English">English</option>
-                  <option value="Arabic">Arabic</option>
-                  <option value="Russian">Russian</option>
+                  <option value="Hebrew">希伯来语</option>
+                  <option value="English">英语</option>
+                  <option value="Arabic">阿拉伯语</option>
+                  <option value="Russian">俄语</option>
                 </select>
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Tone</label>
+                <label className="block text-sm text-gray-400 mb-1">语气</label>
                 <select
-                  value={cfgTone}
-                  onChange={e => setCfgTone(e.target.value)}
+                  value={cfg语气}
+                  onChange={e => setCfg语气(e.target.value)}
                   className="w-full bg-dark-800 border border-gray-700/50 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500/50"
                 >
-                  <option value="friendly and engaging">Friendly</option>
-                  <option value="professional and informative">Professional</option>
-                  <option value="casual and humorous">Casual</option>
-                  <option value="enthusiastic and motivational">Enthusiastic</option>
+                  <option value="friendly and engaging">友好</option>
+                  <option value="professional and informative">专业</option>
+                  <option value="casual and humorous">轻松</option>
+                  <option value="enthusiastic and motivational">热情</option>
                 </select>
               </div>
             </div>
 
             {/* Topics */}
             <div className="mb-4">
-              <label className="block text-sm text-gray-400 mb-1">Topics (comma-separated)</label>
+              <label className="block text-sm text-gray-400 mb-1">主题（逗号分隔）</label>
               <input
                 type="text"
                 value={cfgTopics}
@@ -731,7 +731,7 @@ export default function FacebookTab() {
 
             {/* Promo link */}
             <div className="mb-4">
-              <label className="block text-sm text-gray-400 mb-1">Promotional Link (optional)</label>
+              <label className="block text-sm text-gray-400 mb-1">推广链接（可选）</label>
               <input
                 type="text"
                 value={cfgPromoLink}
@@ -739,12 +739,12 @@ export default function FacebookTab() {
                 placeholder="https://your-site.com"
                 className="w-full bg-dark-800 border border-gray-700/50 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-purple-500/50"
               />
-              <p className="text-[10px] text-gray-600 mt-1">Will be included in ~20% of posts when set</p>
+              <p className="text-[10px] text-gray-600 mt-1">设置后约 20% 的帖子会包含此链接</p>
             </div>
 
             {/* Groups — used for posting, commenting, and joining */}
             <div className="mb-4">
-              <label className="block text-sm text-gray-400 mb-1">Target Groups (one per line — slug or full URL)</label>
+              <label className="block text-sm text-gray-400 mb-1">目标群组（每行一个 slug 或完整 URL）</label>
               <textarea
                 value={cfgGroups}
                 onChange={e => setCfgGroups(e.target.value)}
@@ -752,7 +752,7 @@ export default function FacebookTab() {
                 rows={3}
                 className="w-full bg-dark-800 border border-gray-700/50 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-purple-500/50 resize-none font-mono"
               />
-              <p className="text-[10px] text-gray-600 mt-1">Used for posts, comments, and group joins. Enter group slugs or full URLs.</p>
+              <p className="text-[10px] text-gray-600 mt-1">用于发帖、评论和加群。请输入群组 slug 或完整 URL。</p>
             </div>
 
             {/* Test mode toggle */}
@@ -765,12 +765,12 @@ export default function FacebookTab() {
                 className="w-4 h-4 rounded border-gray-600 bg-dark-700 text-purple-500 focus:ring-purple-500"
               />
               <div>
-                <label htmlFor="testMode" className="text-sm text-white cursor-pointer">Test Mode</label>
-                <p className="text-[10px] text-gray-500">Log actions without executing them (dry run)</p>
+                <label htmlFor="testMode" className="text-sm text-white cursor-pointer">测试模式</label>
+                <p className="text-[10px] text-gray-500">只记录动作不执行（演练模式）</p>
               </div>
             </div>
 
-            {/* Actions */}
+            {/* 动作 */}
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setShowAgentConfig(null)}
@@ -780,13 +780,13 @@ export default function FacebookTab() {
               </button>
               <button
                 onClick={() => handleStartAgent(showAgentConfig)}
-                disabled={startingAgent !== null || cfgActions.length === 0}
+                disabled={startingAgent !== null || cfg动作.length === 0}
                 className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
               >
                 {startingAgent ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" />Starting...</>
+                  <><Loader2 className="w-4 h-4 animate-spin" />启动中...</>
                 ) : (
-                  <><Play className="w-4 h-4" />Start Agent</>
+                  <><Play className="w-4 h-4" />启动智能体</>
                 )}
               </button>
             </div>
@@ -794,22 +794,22 @@ export default function FacebookTab() {
         </div>
       )}
 
-      {/* Add Account Dialog */}
+      {/* 添加账号 Dialog */}
       {showAdd && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-dark-900 border border-gray-700/50 rounded-xl shadow-2xl p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-bold text-white mb-1">Add Facebook Account</h3>
+            <h3 className="text-lg font-bold text-white mb-1">添加 Facebook 账号</h3>
             <p className="text-xs text-gray-500 mb-4">
               Paste cookies from Cookie Editor (JSON), BUY format (pipe-separated), or plain cookie string.
             </p>
 
             {/* Account name */}
             <div className="mb-4">
-              <label className="block text-sm text-gray-400 mb-1.5">Account Name</label>
+              <label className="block text-sm text-gray-400 mb-1.5">账号名称</label>
               <input
                 type="text"
-                value={addName}
-                onChange={e => setAddName(e.target.value)}
+                value={add名称}
+                onChange={e => setAdd名称(e.target.value)}
                 placeholder="e.g. My Business Account"
                 className="w-full bg-dark-800 border border-gray-700/50 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50"
                 autoFocus
@@ -819,7 +819,7 @@ export default function FacebookTab() {
             {/* Cookies input */}
             <div className="mb-4">
               <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-sm text-gray-400">Cookies</label>
+                <label className="block text-sm text-gray-400">Cookie</label>
                 <button
                   onClick={() => setShowCookies(!showCookies)}
                   className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-gray-300"
@@ -871,10 +871,10 @@ export default function FacebookTab() {
                       </span>
                     </div>
                     <div className="text-[11px] text-gray-400 space-y-0.5">
-                      <p>Format: <span className="text-white">{preview.format.toUpperCase()}</span></p>
-                      <p>Cookies found: <span className="text-white">{preview.cookieCount}</span></p>
-                      {preview.userId && <p>User ID: <span className="text-white">{preview.userId}</span></p>}
-                      <p className="text-gray-500 truncate">Names: {preview.cookieNames.join(', ')}</p>
+                      <p>格式：<span className="text-white">{preview.format.toUpperCase()}</span></p>
+                      <p>发现 Cookies：<span className="text-white">{preview.cookieCount}</span></p>
+                      {preview.userId && <p>用户 ID：<span className="text-white">{preview.userId}</span></p>}
+                      <p className="text-gray-500 truncate">名称s: {preview.cookieNames.join(', ')}</p>
                     </div>
                     {preview.missing.length > 0 && (
                       <p className="text-[11px] text-red-400">Missing: {preview.missing.join(', ')}</p>
@@ -889,32 +889,32 @@ export default function FacebookTab() {
 
             {/* Format help */}
             <div className="mb-4 p-3 bg-dark-800 rounded-lg border border-gray-700/30">
-              <p className="text-[11px] font-semibold text-gray-400 mb-1.5">Supported Formats</p>
+              <p className="text-[11px] font-semibold text-gray-400 mb-1.5">支持格式</p>
               <div className="space-y-1 text-[10px] text-gray-500">
-                <p><span className="text-blue-400 font-medium">JSON</span> — Export from Cookie Editor browser extension</p>
-                <p><span className="text-blue-400 font-medium">BUY</span> — Pipe-separated: UID|PASS|2FA|EMAIL|...|COOKIES|TOKEN</p>
-                <p><span className="text-blue-400 font-medium">Plain</span> — Cookie string: c_user=123; xs=abc; datr=xyz</p>
+                <p><span className="text-blue-400 font-medium">JSON</span> — 从 Cookie Editor 浏览器扩展导出</p>
+                <p><span className="text-blue-400 font-medium">BUY</span> — 管道分隔：UID|PASS|2FA|EMAIL|...|COOKIES|TOKEN</p>
+                <p><span className="text-blue-400 font-medium">Plain</span> — Cookie 字符串： c_user=123; xs=abc; datr=xyz</p>
               </div>
-              <p className="text-[10px] text-gray-600 mt-1.5">Required: <span className="text-white">c_user</span> + <span className="text-white">xs</span>. Recommended: <span className="text-gray-400">datr</span>, <span className="text-gray-400">fr</span></p>
+              <p className="text-[10px] text-gray-600 mt-1.5">必填：<span className="text-white">c_user</span> + <span className="text-white">xs</span>。建议：<span className="text-gray-400">datr</span>, <span className="text-gray-400">fr</span></p>
             </div>
 
-            {/* Actions */}
+            {/* 动作 */}
             <div className="flex justify-end gap-3">
               <button
-                onClick={() => { setShowAdd(false); setAddName(''); setAddCookies(''); setPreview(null); }}
+                onClick={() => { setShowAdd(false); setAdd名称(''); setAddCookies(''); setPreview(null); }}
                 className="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleAddAccount}
-                disabled={addSaving || !addName.trim() || !addCookies.trim()}
+                disabled={addSaving || !add名称.trim() || !addCookies.trim()}
                 className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
               >
                 {addSaving ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" />Saving...</>
+                  <><Loader2 className="w-4 h-4 animate-spin" />保存中...</>
                 ) : (
-                  <><Plus className="w-4 h-4" />Add Account</>
+                  <><Plus className="w-4 h-4" />添加账号</>
                 )}
               </button>
             </div>

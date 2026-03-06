@@ -27,6 +27,14 @@ export default function OpenClaw() {
   const [loading, setLoading] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [connected, setConnected] = useState<boolean | null>(null);
+  const [connectError, setConnectError] = useState('');
+  const [context, setContext] = useState<{
+    userId: string;
+    role: 'admin' | 'user';
+    scope: { sessionKey: string; agentId: string };
+    permissions: { canUseRaw: boolean; canViewAllSessions: boolean };
+    limits: { chatPerMinute: number; agentPerMinute: number };
+  } | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -43,10 +51,23 @@ export default function OpenClaw() {
 
   const checkStatus = async () => {
     try {
-      const res = await api.openclawStatus();
+      const [res, ctx] = await Promise.all([
+        api.openclawStatus(),
+        api.openclawContext(),
+      ]);
       setConnected(res.connected);
+      setContext(ctx);
+      const reason =
+        typeof res.error === 'string' && res.error.trim()
+          ? res.error.trim()
+          : typeof res.data === 'string' && res.data.trim()
+            ? res.data.trim()
+            : '';
+      setConnectError(res.connected ? '' : reason);
     } catch {
       setConnected(false);
+      setContext(null);
+      setConnectError('状态检查失败，请确认后端服务已启动');
     }
   };
 
@@ -75,7 +96,7 @@ export default function OpenClaw() {
       const res = await api.openclawChat(text);
       addMessage('assistant', res.message);
     } catch (err: any) {
-      addMessage('system', `Error: ${err.message}`);
+      addMessage('system', `错误：${err.message}`);
     }
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
     setLoading(false);
@@ -84,7 +105,7 @@ export default function OpenClaw() {
   const clearChat = () => setMessages([]);
 
   const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+    return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
   };
 
   return (
@@ -97,15 +118,20 @@ export default function OpenClaw() {
           </div>
           <div>
             <h1 className="text-lg font-bold text-white">OpenClaw</h1>
-            <p className="text-[10px] text-gray-500">Direct communication</p>
+            <p className="text-[10px] text-gray-500">直连模式</p>
+            {context && (
+              <p className="text-[10px] text-gray-500 mt-0.5">
+                用户: {context.userId} · 作用域: {context.scope.sessionKey}
+              </p>
+            )}
           </div>
           {connected === true ? (
             <span className="flex items-center gap-1 text-xs text-green-400 ml-2">
-              <Wifi className="w-3 h-3" /> Connected
+              <Wifi className="w-3 h-3" /> 已连接
             </span>
           ) : connected === false ? (
             <span className="flex items-center gap-1 text-xs text-red-400 ml-2">
-              <WifiOff className="w-3 h-3" /> Disconnected
+              <WifiOff className="w-3 h-3" /> 未连接
             </span>
           ) : null}
         </div>
@@ -114,7 +140,7 @@ export default function OpenClaw() {
           <button
             onClick={checkStatus}
             className="p-2 text-gray-400 hover:text-orange-400 hover:bg-dark-800 rounded-lg transition-colors"
-            title="Check status"
+            title="检查状态"
           >
             <RefreshCw className="w-4 h-4" />
           </button>
@@ -122,7 +148,7 @@ export default function OpenClaw() {
             onClick={clearChat}
             disabled={messages.length === 0}
             className="p-2 text-gray-400 hover:text-red-400 hover:bg-dark-800 rounded-lg transition-colors disabled:opacity-30"
-            title="Clear chat"
+            title="清空会话"
           >
             <Trash2 className="w-4 h-4" />
           </button>
@@ -133,7 +159,17 @@ export default function OpenClaw() {
       {connected === false && (
         <div className="flex items-center gap-2 px-4 py-2 bg-red-500/10 border-b border-red-500/20 text-red-400 text-sm">
           <AlertCircle className="w-4 h-4 shrink-0" />
-          <span>OpenClaw is not reachable. Check SSH connection and OPENCLAW_GATEWAY_TOKEN.</span>
+          <span>
+            {connectError
+              ? `OpenClaw 未连接：${connectError}`
+              : 'OpenClaw 未连接，请检查 SSH 连接和 OPENCLAW_GATEWAY_TOKEN 配置。'}
+            </span>
+        </div>
+      )}
+      {context && (
+        <div className="px-4 py-2 border-b border-gray-800 bg-dark-900/70 text-[11px] text-gray-400">
+          当前隔离会话: <span className="text-gray-200">{context.scope.sessionKey}</span> · Agent: <span className="text-gray-200">{context.scope.agentId}</span> ·
+          {context.role === 'admin' ? ' 管理员（可用 raw）' : ' 普通用户（raw 已禁用）'}
         </div>
       )}
 
@@ -144,9 +180,9 @@ export default function OpenClaw() {
             <div className="w-20 h-20 mb-6 rounded-2xl bg-dark-800 border border-gray-800 flex items-center justify-center">
               <Terminal className="w-10 h-10 text-orange-400 opacity-60" />
             </div>
-            <p className="text-2xl font-bold text-gray-400 mb-2">OpenClaw Direct</p>
-            <p className="text-sm text-gray-600 mb-1">Send messages directly to OpenClaw</p>
-            <p className="text-xs text-gray-700">Separate from the main agent chat</p>
+            <p className="text-2xl font-bold text-gray-400 mb-2">OpenClaw 直连模式</p>
+            <p className="text-sm text-gray-600 mb-1">直接向 OpenClaw 发送消息</p>
+            <p className="text-xs text-gray-700">与主聊天助手会话独立</p>
           </div>
         )}
 
@@ -196,9 +232,9 @@ export default function OpenClaw() {
                 <div className="flex items-center gap-2">
                   <Loader2 className="w-4 h-4 text-orange-400 animate-spin" />
                   <span className="text-xs text-gray-400">
-                    {elapsed < 5 ? 'Connecting to OpenClaw...'
-                      : elapsed < 15 ? 'OpenClaw is thinking...'
-                      : `OpenClaw is processing... (${elapsed}s)`}
+                    {elapsed < 5 ? '正在连接 OpenClaw...'
+                      : elapsed < 15 ? 'OpenClaw 正在思考...'
+                      : `OpenClaw 正在处理...（${elapsed}秒）`}
                   </span>
                 </div>
               </div>
@@ -227,7 +263,7 @@ export default function OpenClaw() {
                 send();
               }
             }}
-            placeholder="Send a message to OpenClaw..."
+            placeholder="向 OpenClaw 发送消息..."
             rows={1}
             className="flex-1 px-4 py-3 rounded-xl bg-dark-800 border border-gray-700 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-orange-500 transition-colors resize-none overflow-y-auto"
             style={{ maxHeight: '160px' }}
@@ -236,13 +272,13 @@ export default function OpenClaw() {
             onClick={send}
             disabled={!input.trim() || loading}
             className="p-3 rounded-xl bg-orange-600 text-white hover:bg-orange-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
-            title="Send"
+            title="发送"
           >
             {loading ? <Square className="w-5 h-5" /> : <Send className="w-5 h-5" />}
           </button>
         </div>
         <p className="text-center text-[11px] text-gray-600 mt-2">
-          Direct to OpenClaw · Enter to send · Shift+Enter for new line
+          直连 OpenClaw · 回车发送 · Shift+回车换行
         </p>
       </div>
     </div>

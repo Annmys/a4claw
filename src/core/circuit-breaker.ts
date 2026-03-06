@@ -80,7 +80,12 @@ export class CircuitBreaker {
       const result = await fn();
       this.onSuccess();
       return result;
-    } catch (error) {
+    } catch (error: any) {
+      // Some errors are deterministic caller/input issues (e.g. 4xx bad request)
+      // and should not trip the circuit for all subsequent requests.
+      if (error?.ignoreForCircuitBreaker) {
+        throw error;
+      }
       this.onFailure();
       throw error;
     }

@@ -1,33 +1,47 @@
 import { NavLink } from 'react-router-dom';
 import {
   MessageSquare, ListTodo, Server, Bot, Clock, Settings,
-  LayoutDashboard, Sparkles, DollarSign, ScrollText, Timer, LineChart, Database, Brain, Network, Terminal, Zap, Monitor, Phone
+  LayoutDashboard, Sparkles, DollarSign, ScrollText, Timer, LineChart, Database, Brain, Network, Terminal, Zap, Monitor, Phone, Users
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { useAuthStore } from '../../stores/auth';
+import { decodeJwtRole } from '../../utils/auth-role';
 
-const links = [
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/', icon: MessageSquare, label: 'Chat' },
-  { to: '/openclaw', icon: Terminal, label: 'OpenClaw' },
-  { to: '/tasks', icon: ListTodo, label: 'Tasks' },
-  { to: '/skills', icon: Sparkles, label: 'Skills' },
-  { to: '/browser', icon: Monitor, label: 'Browser' },
-  { to: '/voice-agent', icon: Phone, label: 'Voice Agent' },
-  { to: '/terminal', icon: Terminal, label: 'SSH Terminal' },
-  { to: '/servers', icon: Server, label: 'Servers' },
-  { to: '/agents', icon: Bot, label: 'Agents' },
-  { to: '/cron', icon: Timer, label: 'Cron Jobs' },
-  { to: '/trading', icon: LineChart, label: 'Trading' },
-  { to: '/knowledge', icon: Database, label: 'Knowledge' },
-  { to: '/intelligence', icon: Brain, label: 'Intelligence' },
-  { to: '/evolution', icon: Zap, label: 'Evolution' },
-  { to: '/graph', icon: Network, label: 'System Graph' },
-  { to: '/costs', icon: DollarSign, label: 'Costs' },
-  { to: '/logs', icon: ScrollText, label: 'Logs' },
-  { to: '/history', icon: Clock, label: 'History' },
-  { to: '/settings', icon: Settings, label: 'Settings' },
+interface NavItem {
+  to: string;
+  icon: LucideIcon;
+  label: string;
+  adminOnly?: boolean;
+}
+
+const links: NavItem[] = [
+  { to: '/dashboard', icon: LayoutDashboard, label: '仪表盘' },
+  { to: '/', icon: MessageSquare, label: '聊天' },
+  { to: '/openclaw', icon: Terminal, label: 'OpenClaw', adminOnly: true },
+  { to: '/tasks', icon: ListTodo, label: '任务' },
+  { to: '/skills', icon: Sparkles, label: '技能' },
+  { to: '/browser', icon: Monitor, label: '浏览器', adminOnly: true },
+  { to: '/voice-agent', icon: Phone, label: '语音助手', adminOnly: true },
+  { to: '/terminal', icon: Terminal, label: 'SSH 终端', adminOnly: true },
+  { to: '/servers', icon: Server, label: '服务器' },
+  { to: '/agents', icon: Bot, label: '智能体' },
+  { to: '/cron', icon: Timer, label: '定时任务' },
+  { to: '/trading', icon: LineChart, label: '交易', adminOnly: true },
+  { to: '/knowledge', icon: Database, label: '知识库' },
+  { to: '/intelligence', icon: Brain, label: '智能中心' },
+  { to: '/evolution', icon: Zap, label: '进化' },
+  { to: '/graph', icon: Network, label: '系统图谱' },
+  { to: '/costs', icon: DollarSign, label: '成本', adminOnly: true },
+  { to: '/logs', icon: ScrollText, label: '日志' },
+  { to: '/history', icon: Clock, label: '历史记录' },
+  { to: '/users', icon: Users, label: '用户管理', adminOnly: true },
+  { to: '/settings', icon: Settings, label: '设置' },
 ];
 
 export default function Sidebar() {
+  const token = useAuthStore((s) => s.token);
+  const role = decodeJwtRole(token);
+
   return (
     <aside className="w-64 bg-dark-900 border-r border-gray-800/50 flex flex-col">
       {/* Logo */}
@@ -37,7 +51,7 @@ export default function Sidebar() {
             <span className="text-xl leading-none select-none" role="img" aria-label="logo">🐙</span>
           </div>
           <div>
-            <h2 className="text-base font-bold tracking-tight bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">ClawdAgent</h2>
+            <h2 className="text-base font-bold tracking-tight bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">a4claw</h2>
             <p className="text-[10px] text-gray-500 font-medium tracking-wider uppercase">v6.0 Pro</p>
           </div>
         </div>
@@ -45,7 +59,9 @@ export default function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
-        {links.map(link => (
+        {links
+          .filter((link) => !link.adminOnly || role === 'admin')
+          .map(link => (
           <NavLink
             key={link.to}
             to={link.to}
@@ -61,14 +77,14 @@ export default function Sidebar() {
             <link.icon className="w-[18px] h-[18px] transition-transform duration-200 group-hover:scale-110" />
             <span className="text-[13px] font-medium">{link.label}</span>
           </NavLink>
-        ))}
+          ))}
       </nav>
 
       {/* Status footer */}
       <div className="p-4 border-t border-gray-800/50">
         <div className="flex items-center gap-2.5">
           <div className="w-2 h-2 bg-green-400 rounded-full pulse-dot" />
-          <span className="text-[11px] text-gray-500 font-medium">System Online</span>
+          <span className="text-[11px] text-gray-500 font-medium">系统在线</span>
         </div>
       </div>
     </aside>

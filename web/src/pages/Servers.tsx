@@ -6,7 +6,7 @@ import {
   Clock, ChevronUp, Tag, User, Globe
 } from 'lucide-react';
 
-interface ServerEntry {
+interface Server入场 {
   id: string;
   name: string;
   host: string;
@@ -27,7 +27,7 @@ interface ExecResult {
   exitCode: number;
 }
 
-interface SystemStatus {
+interface System状态 {
   status: string;
   uptime: number;
   memory: number;
@@ -44,8 +44,8 @@ interface AddServerForm {
 const EMPTY_FORM: AddServerForm = { name: '', host: '', user: 'root', sshKeyPath: '~/.ssh/id_rsa', tags: '' };
 
 export default function Servers() {
-  const [servers, setServers] = useState<ServerEntry[]>([]);
-  const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
+  const [servers, setServers] = useState<Server入场[]>([]);
+  const [systemStatus, setSystem状态] = useState<System状态 | null>(null);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [addForm, setAddForm] = useState<AddServerForm>({ ...EMPTY_FORM });
@@ -57,7 +57,7 @@ export default function Servers() {
   const [healthLoading, setHealthLoading] = useState<Record<string, boolean>>({});
   const [cmdInput, setCmdInput] = useState<Record<string, string>>({});
   const [cmdResults, setCmdResults] = useState<Record<string, ExecResult | null>>({});
-  const [cmdRunning, setCmdRunning] = useState<Record<string, boolean>>({});
+  const [cmd运行ning, setCmd运行ning] = useState<Record<string, boolean>>({});
   const [removeConfirm, setRemoveConfirm] = useState<string | null>(null);
 
   const healthIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -70,7 +70,7 @@ export default function Servers() {
         api.status().catch(() => null),
       ]);
       setServers(serverList ?? []);
-      setSystemStatus(status);
+      setSystem状态(status);
     } catch {
       // ignore
     }
@@ -125,8 +125,8 @@ export default function Servers() {
     setAdding(false);
   };
 
-  // Remove server
-  const handleRemove = async (id: string) => {
+  // 删除 server
+  const handle删除 = async (id: string) => {
     try {
       await api.removeServer(id);
       setRemoveConfirm(null);
@@ -153,24 +153,24 @@ export default function Servers() {
   const execCommand = async (id: string) => {
     const cmd = cmdInput[id]?.trim();
     if (!cmd) return;
-    setCmdRunning(prev => ({ ...prev, [id]: true }));
+    setCmd运行ning(prev => ({ ...prev, [id]: true }));
     setCmdResults(prev => ({ ...prev, [id]: null }));
     try {
       const result = await api.execOnServer(id, cmd);
       setCmdResults(prev => ({ ...prev, [id]: result }));
     } catch (err: any) {
-      setCmdResults(prev => ({ ...prev, [id]: { output: err.message || 'Execution failed', exitCode: -1 } }));
+      setCmdResults(prev => ({ ...prev, [id]: { output: err.message || '执行失败', exitCode: -1 } }));
     }
-    setCmdRunning(prev => ({ ...prev, [id]: false }));
+    setCmd运行ning(prev => ({ ...prev, [id]: false }));
   };
 
   const formatUptime = (seconds: number) => {
     const d = Math.floor(seconds / 86400);
     const h = Math.floor((seconds % 86400) / 3600);
     const m = Math.floor((seconds % 3600) / 60);
-    if (d > 0) return `${d}d ${h}h ${m}m`;
-    if (h > 0) return `${h}h ${m}m`;
-    return `${m}m ${Math.floor(seconds % 60)}s`;
+    if (d > 0) return `${d}天 ${h}小时 ${m}分`;
+    if (h > 0) return `${h}小时 ${m}分`;
+    return `${m}分 ${Math.floor(seconds % 60)}秒`;
   };
 
   const getStatusIndicator = (status?: string) => {
@@ -187,7 +187,7 @@ export default function Servers() {
       case 'unreachable':
         return { dot: 'bg-red-500', text: 'text-red-400', label: status };
       default:
-        return { dot: 'bg-gray-500', text: 'text-gray-400', label: status || 'Unknown' };
+        return { dot: 'bg-gray-500', text: 'text-gray-400', label: status || '未知' };
     }
   };
 
@@ -219,7 +219,7 @@ export default function Servers() {
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <Server className="w-7 h-7 text-primary-500" />
-            <h1 className="text-2xl font-bold">Servers</h1>
+            <h1 className="text-2xl font-bold">服务器</h1>
             <span className="text-sm text-gray-400">({servers.length})</span>
           </div>
           <button
@@ -227,56 +227,56 @@ export default function Servers() {
             className="flex items-center gap-2 px-4 py-2 bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors font-medium"
           >
             {showAddForm ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-            {showAddForm ? 'Cancel' : 'Add Server'}
+            {showAddForm ? '取消' : '添加服务器'}
           </button>
         </div>
 
-        {/* System Status Bar */}
+        {/* System 状态 Bar */}
         {systemStatus && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <div className="bg-dark-800 rounded-lg p-4 border border-gray-800">
               <div className="flex items-center gap-2 mb-1">
                 <Clock className="w-4 h-4 text-blue-400" />
-                <p className="text-sm text-gray-400">System Uptime</p>
+                <p className="text-sm text-gray-400">系统运行时长</p>
               </div>
               <p className="text-xl font-bold text-blue-400">{formatUptime(systemStatus.uptime)}</p>
             </div>
             <div className="bg-dark-800 rounded-lg p-4 border border-gray-800">
               <div className="flex items-center gap-2 mb-1">
                 <Cpu className="w-4 h-4 text-purple-400" />
-                <p className="text-sm text-gray-400">Memory Usage</p>
+                <p className="text-sm text-gray-400">内存使用率</p>
               </div>
               <p className="text-xl font-bold text-purple-400">{(systemStatus.memory / 1024 / 1024).toFixed(0)} MB</p>
             </div>
             <div className="bg-dark-800 rounded-lg p-4 border border-gray-800">
               <div className="flex items-center gap-2 mb-1">
                 <Activity className="w-4 h-4 text-green-400" />
-                <p className="text-sm text-gray-400">Status</p>
+                <p className="text-sm text-gray-400">状态</p>
               </div>
-              <p className="text-xl font-bold text-green-400">Online</p>
+              <p className="text-xl font-bold text-green-400">在线</p>
             </div>
           </div>
         )}
 
-        {/* Add Server Form */}
+        {/* 添加服务器 Form */}
         {showAddForm && (
           <div className="mb-6 p-5 bg-dark-800 rounded-lg border border-primary-600/50">
             <h3 className="font-semibold mb-4 flex items-center gap-2">
               <Plus className="w-4 h-4 text-primary-400" />
-              Add New Server
+              添加新服务器
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Name</label>
+                <label className="block text-sm text-gray-400 mb-1">名称</label>
                 <input
                   value={addForm.name}
                   onChange={e => setAddForm({ ...addForm, name: e.target.value })}
-                  placeholder="Production Web Server"
+                  placeholder="生产 Web 服务器"
                   className="w-full p-2.5 rounded bg-dark-900 border border-gray-700 text-white text-sm focus:border-primary-500 focus:outline-none"
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Host</label>
+                <label className="block text-sm text-gray-400 mb-1">主机</label>
                 <input
                   value={addForm.host}
                   onChange={e => setAddForm({ ...addForm, host: e.target.value })}
@@ -285,7 +285,7 @@ export default function Servers() {
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">User</label>
+                <label className="block text-sm text-gray-400 mb-1">用户</label>
                 <input
                   value={addForm.user}
                   onChange={e => setAddForm({ ...addForm, user: e.target.value })}
@@ -294,7 +294,7 @@ export default function Servers() {
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">SSH Key Path</label>
+                <label className="block text-sm text-gray-400 mb-1">SSH 密钥路径</label>
                 <input
                   value={addForm.sshKeyPath}
                   onChange={e => setAddForm({ ...addForm, sshKeyPath: e.target.value })}
@@ -303,7 +303,7 @@ export default function Servers() {
                 />
               </div>
               <div className="md:col-span-2">
-                <label className="block text-sm text-gray-400 mb-1">Tags (comma separated)</label>
+                <label className="block text-sm text-gray-400 mb-1">标签（逗号分隔）</label>
                 <input
                   value={addForm.tags}
                   onChange={e => setAddForm({ ...addForm, tags: e.target.value })}
@@ -319,13 +319,13 @@ export default function Servers() {
                 className="flex items-center gap-2 px-4 py-2 bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 font-medium"
               >
                 {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                Add Server
+                添加服务器
               </button>
               <button
                 onClick={() => setShowAddForm(false)}
                 className="px-4 py-2 bg-dark-900 rounded-lg hover:bg-dark-800 transition-colors text-gray-400"
               >
-                Cancel
+                取消
               </button>
             </div>
           </div>
@@ -335,14 +335,14 @@ export default function Servers() {
         {servers.length === 0 ? (
           <div className="text-center py-16">
             <Server className="w-16 h-16 mx-auto mb-4 text-gray-700" />
-            <h2 className="text-xl font-semibold text-gray-400 mb-2">No servers configured</h2>
-            <p className="text-gray-500 mb-6">Add your first server to start managing it remotely via SSH.</p>
+            <h2 className="text-xl font-semibold text-gray-400 mb-2">尚未配置服务器</h2>
+            <p className="text-gray-500 mb-6">添加第一台服务器以开始通过 SSH 远程管理。</p>
             <button
               onClick={() => setShowAddForm(true)}
               className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors font-medium"
             >
               <Plus className="w-4 h-4" />
-              Add Your First Server
+              添加第一台服务器
             </button>
           </div>
         ) : (
@@ -353,7 +353,7 @@ export default function Servers() {
               const health = healthMap[srv.id];
               const isHealthLoading = healthLoading[srv.id];
               const cmdResult = cmdResults[srv.id];
-              const isRunning = cmdRunning[srv.id];
+              const is运行ning = cmd运行ning[srv.id];
 
               const cpuPct = parsePercent(health?.cpu);
               const memPct = parsePercent(health?.memory);
@@ -454,12 +454,12 @@ export default function Servers() {
                             ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
                             : <RefreshCw className="w-3.5 h-3.5" />
                           }
-                          Health Check
+                          健康检查
                         </button>
                         <button
                           onClick={() => {
                             if (removeConfirm === srv.id) {
-                              handleRemove(srv.id);
+                              handle删除(srv.id);
                             } else {
                               setRemoveConfirm(srv.id);
                               setTimeout(() => setRemoveConfirm(prev => prev === srv.id ? null : prev), 4000);
@@ -472,8 +472,8 @@ export default function Servers() {
                           }`}
                         >
                           {removeConfirm === srv.id
-                            ? <><AlertTriangle className="w-3.5 h-3.5" /> Confirm Remove</>
-                            : <><Trash2 className="w-3.5 h-3.5" /> Remove</>
+                            ? <><AlertTriangle className="w-3.5 h-3.5" /> 确认删除</>
+                            : <><Trash2 className="w-3.5 h-3.5" /> 删除</>
                           }
                         </button>
 
@@ -498,14 +498,14 @@ export default function Servers() {
                         <div className="p-4 border-b border-gray-800/50">
                           <h4 className="text-sm font-medium text-gray-300 mb-3 flex items-center gap-2">
                             <Activity className="w-4 h-4 text-green-400" />
-                            Health Status
+                            健康状态
                           </h4>
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                            {/* Uptime */}
+                            {/* 运行时长 */}
                             <div className="bg-dark-800 rounded-lg p-3 border border-gray-800">
                               <div className="flex items-center gap-1.5 mb-1">
                                 <Clock className="w-3.5 h-3.5 text-blue-400" />
-                                <span className="text-xs text-gray-500">Uptime</span>
+                                <span className="text-xs text-gray-500">运行时长</span>
                               </div>
                               <p className="text-sm font-semibold text-blue-400">
                                 {typeof health.uptime === 'number' ? formatUptime(health.uptime) : health.uptime ?? '--'}
@@ -533,11 +533,11 @@ export default function Servers() {
                               )}
                             </div>
 
-                            {/* Memory */}
+                            {/* 内存 */}
                             <div className="bg-dark-800 rounded-lg p-3 border border-gray-800">
                               <div className="flex items-center gap-1.5 mb-1">
                                 <Activity className="w-3.5 h-3.5 text-cyan-400" />
-                                <span className="text-xs text-gray-500">Memory</span>
+                                <span className="text-xs text-gray-500">内存</span>
                               </div>
                               {memPct != null ? (
                                 <>
@@ -554,11 +554,11 @@ export default function Servers() {
                               )}
                             </div>
 
-                            {/* Disk */}
+                            {/* 磁盘 */}
                             <div className="bg-dark-800 rounded-lg p-3 border border-gray-800">
                               <div className="flex items-center gap-1.5 mb-1">
                                 <HardDrive className="w-3.5 h-3.5 text-orange-400" />
-                                <span className="text-xs text-gray-500">Disk</span>
+                                <span className="text-xs text-gray-500">磁盘</span>
                               </div>
                               {diskPct != null ? (
                                 <>
@@ -578,30 +578,30 @@ export default function Servers() {
                         </div>
                       )}
 
-                      {/* Execute Command */}
+                      {/* 执行命令 */}
                       <div className="p-4">
                         <h4 className="text-sm font-medium text-gray-300 mb-3 flex items-center gap-2">
                           <Terminal className="w-4 h-4 text-yellow-400" />
-                          Execute Command
+                          执行命令
                         </h4>
                         <div className="flex gap-2">
                           <input
                             value={cmdInput[srv.id] ?? ''}
                             onChange={e => setCmdInput(prev => ({ ...prev, [srv.id]: e.target.value }))}
-                            onKeyDown={e => { if (e.key === 'Enter' && !isRunning) execCommand(srv.id); }}
+                            onKeyDown={e => { if (e.key === 'Enter' && !is运行ning) execCommand(srv.id); }}
                             placeholder="ls -la /var/log"
                             className="flex-1 p-2.5 rounded bg-dark-800 border border-gray-700 text-white text-sm font-mono focus:border-primary-500 focus:outline-none"
                           />
                           <button
                             onClick={() => execCommand(srv.id)}
-                            disabled={isRunning || !cmdInput[srv.id]?.trim()}
+                            disabled={is运行ning || !cmdInput[srv.id]?.trim()}
                             className="flex items-center gap-1.5 px-4 py-2 bg-primary-600 rounded hover:bg-primary-700 transition-colors disabled:opacity-50 font-medium text-sm"
                           >
-                            {isRunning
+                            {is运行ning
                               ? <Loader2 className="w-4 h-4 animate-spin" />
                               : <Terminal className="w-4 h-4" />
                             }
-                            Run
+                            运行
                           </button>
                         </div>
 
@@ -609,14 +609,14 @@ export default function Servers() {
                         {cmdResult && (
                           <div className="mt-3">
                             <div className="flex items-center justify-between mb-1">
-                              <span className="text-xs text-gray-500">Output</span>
+                              <span className="text-xs text-gray-500">输出</span>
                               <span className={`text-xs font-mono ${cmdResult.exitCode === 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                exit: {cmdResult.exitCode}
+                                退出码: {cmdResult.exitCode}
                               </span>
                             </div>
                             <div className="bg-dark-950 rounded border border-gray-800 p-3 max-h-64 overflow-y-auto">
                               <pre className="text-xs font-mono text-gray-300 whitespace-pre-wrap break-all">
-                                {cmdResult.output || '(no output)'}
+                                {cmdResult.output || '（无输出）'}
                               </pre>
                             </div>
                           </div>

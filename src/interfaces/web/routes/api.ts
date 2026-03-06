@@ -51,6 +51,7 @@ export function setupApiRoutes(engine: Engine): Router {
 
     let attachments: Array<{ type: string; url: string }> | undefined;
     let enrichedText = text;
+    let renamedFilePath: string | undefined;
 
     try {
       if (file) {
@@ -91,25 +92,39 @@ export function setupApiRoutes(engine: Engine): Router {
         } else {
           // Document file — ingest into RAG and reference in message
           const ragEngine = engine.getRAGEngine();
+          const { renameSync } = await import('fs');
+          const newPath = `${file.path}.${ext}`;
+          renameSync(file.path, newPath);
+          renamedFilePath = newPath;
+
           if (ragEngine) {
-            const { renameSync } = await import('fs');
-            const newPath = `${file.path}.${ext}`;
-            renameSync(file.path, newPath);
             const result = await ragEngine.ingestDocument(newPath, user.userId);
             try { unlinkSync(newPath); } catch {}
+            renamedFilePath = undefined;
+            const previewBlock = result.preview
+              ? `\n\n--- Document preview ---\n${result.preview}`
+              : '';
             enrichedText = text
-              ? `${text}\n\n[Document uploaded: ${file.originalname} — ${result.chunks} chunks ingested into knowledge base]`
-              : `[Document uploaded: ${file.originalname} — ${result.chunks} chunks ingested into knowledge base. Please summarize or answer questions about this document.]`;
+              ? `${text}\n\n[Document uploaded: ${file.originalname} — ${result.chunks} chunks ingested into knowledge base]${previewBlock}\n\nUse the uploaded document content when answering.`
+              : `[Document uploaded: ${file.originalname} — ${result.chunks} chunks ingested into knowledge base. Please summarize or answer questions about this document.]${previewBlock}`;
             // Mark as handled so we don't try to delete again
             (file as any)._handled = true;
           } else {
-            enrichedText = text || `[File uploaded: ${file.originalname} — RAG not available]`;
+            const { extractText } = await import('../../../actions/rag/extractor.js');
+            const docText = await extractText(newPath);
+            try { unlinkSync(newPath); } catch {}
+            renamedFilePath = undefined;
+            const preview = docText.replace(/\s+/g, ' ').trim().slice(0, 1200);
+            enrichedText = text
+              ? `${text}\n\n[File uploaded: ${file.originalname} — RAG not available]\n\n--- Document preview ---\n${preview}\n\nUse the uploaded document content when answering.`
+              : `[File uploaded: ${file.originalname} — RAG not available]\n\n--- Document preview ---\n${preview}\n\nPlease summarize or answer questions about this document.`;
+            (file as any)._handled = true;
           }
         }
 
         // Clean up temp file (skip if already handled by RAG ingest path)
         if (!(file as any)._handled) {
-          try { unlinkSync(file.path); } catch {}
+          try { unlinkSync(renamedFilePath ?? file.path); } catch {}
         }
       }
 
@@ -134,6 +149,7 @@ export function setupApiRoutes(engine: Engine): Router {
       res.json({
         message: response.text,
         thinking: response.thinking,
+        artifacts: response.artifacts,
         agent: response.agentUsed,
         provider: response.provider,
         model: response.modelUsed,
@@ -143,7 +159,7 @@ export function setupApiRoutes(engine: Engine): Router {
     } catch (error: any) {
       logger.error('Chat API error', { error: error.message });
       // Clean up file on error
-      if (file) try { unlinkSync(file.path); } catch {}
+      if (file) try { unlinkSync(renamedFilePath ?? file.path); } catch {}
       res.status(500).json({ error: 'Failed to process message', details: error.message });
     }
   });

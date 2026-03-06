@@ -3,8 +3,9 @@ import { findOrCreateUser } from '../../../memory/repositories/users.js';
 import {
   getUserConversations,
   getOrCreateConversation,
-  updateConversationTitle,
-  softDeleteConversation,
+  getConversationByIdForUser,
+  updateConversationTitleForUser,
+  softDeleteConversationForUser,
 } from '../../../memory/repositories/conversations.js';
 import { getRecentMessages } from '../../../memory/repositories/messages.js';
 import logger from '../../../utils/logger.js';
@@ -41,7 +42,14 @@ export function setupHistoryRoutes(): Router {
   // GET /api/history/:id — get single conversation with messages
   router.get('/:id', async (req: Request, res: Response) => {
     try {
+      const user = (req as any).user;
       const id = req.params.id as string;
+      const dbUserId = await resolveDbUserId(user.userId);
+      const conv = await getConversationByIdForUser(id, dbUserId);
+      if (!conv) {
+        res.status(404).json({ error: 'Conversation not found' });
+        return;
+      }
       const msgs = await getRecentMessages(id, 100);
       res.json({
         id,
@@ -50,6 +58,7 @@ export function setupHistoryRoutes(): Router {
           role: m.role,
           content: m.content,
           agent: m.agentId,
+          artifacts: Array.isArray((m.metadata as any)?.artifacts) ? (m.metadata as any).artifacts : undefined,
           createdAt: m.createdAt,
         })),
       });
@@ -62,12 +71,19 @@ export function setupHistoryRoutes(): Router {
   // PUT /api/history/:id — update conversation title
   router.put('/:id', async (req: Request, res: Response) => {
     try {
+      const user = (req as any).user;
       const { title } = req.body;
       if (!title || typeof title !== 'string') {
         res.status(400).json({ error: 'Title required' });
         return;
       }
-      await updateConversationTitle(req.params.id as string, title.slice(0, 200));
+      const dbUserId = await resolveDbUserId(user.userId);
+      const conv = await getConversationByIdForUser(req.params.id as string, dbUserId);
+      if (!conv) {
+        res.status(404).json({ error: 'Conversation not found' });
+        return;
+      }
+      await updateConversationTitleForUser(req.params.id as string, dbUserId, title.slice(0, 200));
       res.json({ ok: true });
     } catch (err: any) {
       logger.error('Failed to update conversation', { error: err.message });
@@ -78,7 +94,14 @@ export function setupHistoryRoutes(): Router {
   // DELETE /api/history/:id — soft-delete conversation
   router.delete('/:id', async (req: Request, res: Response) => {
     try {
-      await softDeleteConversation(req.params.id as string);
+      const user = (req as any).user;
+      const dbUserId = await resolveDbUserId(user.userId);
+      const conv = await getConversationByIdForUser(req.params.id as string, dbUserId);
+      if (!conv) {
+        res.status(404).json({ error: 'Conversation not found' });
+        return;
+      }
+      await softDeleteConversationForUser(req.params.id as string, dbUserId);
       res.json({ ok: true });
     } catch (err: any) {
       logger.error('Failed to delete conversation', { error: err.message });
@@ -97,11 +120,12 @@ export function setupHistoryRoutes(): Router {
       }
       const dbUserId = await resolveDbUserId(user.userId);
       const conv = await getOrCreateConversation(dbUserId, 'web', conversationId);
-      if (title) await updateConversationTitle(conv.id, title.slice(0, 200));
+      if (title) await updateConversationTitleForUser(conv.id, dbUserId, title.slice(0, 200));
       res.json({ id: conv.id, ok: true });
     } catch (err: any) {
       logger.error('Failed to create conversation', { error: err.message });
-      res.status(500).json({ error: `Failed to create: ${err.message}` });
+      const isAccessDenied = /access denied/i.test(err.message);
+      res.status(isAccessDenied ? 403 : 500).json({ error: `Failed to create: ${err.message}` });
     }
   });
 

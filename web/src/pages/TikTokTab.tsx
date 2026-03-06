@@ -13,7 +13,7 @@ interface TikTokAccount {
   handle?: string;
   userId?: string;
   cookieCount: number;
-  cookieFormat: string;
+  cookieFormat:string;
   status: 'untested' | 'active' | 'failed' | 'suspended' | 'locked';
   profileName?: string;
   lastVerified?: string;
@@ -90,8 +90,8 @@ export default function TikTokTab() {
   const [showLogs, setShowLogs] = useState(false);
   const [autoScroll, setAutoScroll] = useState(true);
   // Agent config form
-  const [configActions, setConfigActions] = useState<string[]>(['like', 'comment', 'follow', 'save']);
-  const [configTone, setConfigTone] = useState('AI and tech enthusiast. Authentic, curious, and friendly. Speaks like a real TikTok user who genuinely loves AI tools. Short, punchy comments that add value. Never robotic or generic.');
+  const [config动作, setConfig动作] = useState<string[]>(['like', 'comment', 'follow', 'save']);
+  const [config语气, setConfig语气] = useState('AI and tech enthusiast. Authentic, curious, and friendly. Speaks like a real TikTok user who genuinely loves AI tools. Short, punchy comments that add value. Never robotic or generic.');
   const [configLang, setConfigLang] = useState('English');
   const [configTopics, setConfigTopics] = useState('AI agents, AI automation, ChatGPT, Claude, AI tools, tech, no-code, productivity');
   const [configHashtags, setConfigHashtags] = useState('#AI, #AIagents, #automation, #ChatGPT, #Tech');
@@ -204,9 +204,9 @@ export default function TikTokTab() {
         body: JSON.stringify({
           accountId,
           config: {
-            actions: configActions,
+            actions: config动作,
             content: {
-              tone: configTone,
+              tone: config语气,
               language: configLang,
               topics: configTopics.split(',').map(s => s.trim()).filter(Boolean),
               hashtags: configHashtags.split(',').map(s => s.trim()).filter(Boolean),
@@ -217,7 +217,7 @@ export default function TikTokTab() {
               minDelaySeconds: 180,
               maxActionsPerHour: 5,
               pauseOnErrorCount: 2,
-              pauseDurationMinutes: 120,
+              pause时长Minutes: 120,
             },
             testMode: configTestMode,
           },
@@ -259,12 +259,12 @@ export default function TikTokTab() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-            <span className="text-2xl">🎵</span> TikTok Agent
+            <span className="text-2xl">🎵</span> TikTok 智能体
           </h1>
-          <p className="text-zinc-400 text-sm mt-1">Autonomous engagement — like, comment, follow, save</p>
+          <p className="text-zinc-400 text-sm mt-1">自治互动 —— 点赞、评论、关注、收藏</p>
         </div>
         <button onClick={() => setShowAdd(true)} className="flex items-center gap-2 px-4 py-2 bg-pink-600 hover:bg-pink-700 rounded-lg text-sm font-medium transition-colors">
-          <Plus className="w-4 h-4" /> Add Account
+          <Plus className="w-4 h-4" /> 添加账号
         </button>
       </div>
 
@@ -275,13 +275,13 @@ export default function TikTokTab() {
         </div>
       )}
 
-      {/* Agent Status Bar */}
+      {/* Agent 状态 Bar */}
       {agentStatus && (
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-3">
               <Bot className="w-5 h-5 text-pink-400" />
-              <span className="font-medium text-white">TikTok Agent</span>
+              <span className="font-medium text-white">TikTok 智能体</span>
               <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                 agentStatus.state === 'running' ? 'bg-green-500/20 text-green-400' :
                 agentStatus.state === 'paused' ? 'bg-yellow-500/20 text-yellow-400' :
@@ -299,7 +299,7 @@ export default function TikTokTab() {
               {agentStatus.state === 'paused' && (
                 <button onClick={resumeAgent} className="p-1.5 rounded hover:bg-zinc-800 text-green-400" title="Resume"><Play className="w-4 h-4" /></button>
               )}
-              <button onClick={stopAgent} disabled={agentLoading} className="p-1.5 rounded hover:bg-zinc-800 text-red-400" title="Stop">
+              <button onClick={stopAgent} disabled={agentLoading} className="p-1.5 rounded hover:bg-zinc-800 text-red-400" title="停止">
                 {agentLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Square className="w-4 h-4" />}
               </button>
               <button onClick={() => setShowLogs(!showLogs)} className="p-1.5 rounded hover:bg-zinc-800 text-zinc-400" title="Toggle logs">
@@ -312,27 +312,27 @@ export default function TikTokTab() {
           <div className="grid grid-cols-6 gap-3 text-center">
             <div className="bg-zinc-800/50 rounded-lg p-2">
               <div className="text-lg font-bold text-pink-400">{agentStatus.stats.likes}</div>
-              <div className="text-xs text-zinc-500">Likes</div>
+              <div className="text-xs text-zinc-500">点赞</div>
             </div>
             <div className="bg-zinc-800/50 rounded-lg p-2">
               <div className="text-lg font-bold text-blue-400">{agentStatus.stats.comments}</div>
-              <div className="text-xs text-zinc-500">Comments</div>
+              <div className="text-xs text-zinc-500">评论</div>
             </div>
             <div className="bg-zinc-800/50 rounded-lg p-2">
               <div className="text-lg font-bold text-sky-400">{agentStatus.stats.follows}</div>
-              <div className="text-xs text-zinc-500">Follows</div>
+              <div className="text-xs text-zinc-500">关注</div>
             </div>
             <div className="bg-zinc-800/50 rounded-lg p-2">
               <div className="text-lg font-bold text-amber-400">{agentStatus.stats.saves}</div>
-              <div className="text-xs text-zinc-500">Saves</div>
+              <div className="text-xs text-zinc-500">收藏</div>
             </div>
             <div className="bg-zinc-800/50 rounded-lg p-2">
               <div className="text-lg font-bold text-white">{agentStatus.stats.totalActions}</div>
-              <div className="text-xs text-zinc-500">Total</div>
+              <div className="text-xs text-zinc-500">总计</div>
             </div>
             <div className="bg-zinc-800/50 rounded-lg p-2">
               <div className="text-lg font-bold text-red-400">{agentStatus.stats.errors}</div>
-              <div className="text-xs text-zinc-500">Errors</div>
+              <div className="text-xs text-zinc-500">错误</div>
             </div>
           </div>
 
@@ -340,7 +340,7 @@ export default function TikTokTab() {
             <div className="mt-2 text-xs text-red-400 bg-red-500/5 rounded p-2 truncate">{agentStatus.lastError}</div>
           )}
 
-          {/* Live Logs Panel */}
+          {/* 实时日志 Panel */}
           {showLogs && (
             <div className="mt-3 border border-zinc-700 rounded-lg overflow-hidden">
               {/* Config summary bar */}
@@ -353,7 +353,7 @@ export default function TikTokTab() {
               )}
               <div className="flex items-center justify-between px-3 py-1.5 bg-zinc-800/50 border-b border-zinc-700">
                 <span className="text-xs text-zinc-400 flex items-center gap-1">
-                  <Radio className="w-3 h-3 text-green-400 animate-pulse" /> Live Logs ({agentLogs.length})
+                  <Radio className="w-3 h-3 text-green-400 animate-pulse" /> 实时日志 ({agentLogs.length})
                 </span>
                 <button onClick={() => setAutoScroll(!autoScroll)} className={`text-xs px-2 py-0.5 rounded ${autoScroll ? 'bg-green-500/20 text-green-400' : 'bg-zinc-700 text-zinc-400'}`}>
                   Auto-scroll {autoScroll ? 'ON' : 'OFF'}
@@ -361,7 +361,7 @@ export default function TikTokTab() {
               </div>
               <div ref={logsPanelRef} className="max-h-64 overflow-y-auto bg-zinc-950 font-mono text-xs">
                 {agentLogs.length === 0 ? (
-                  <div className="p-4 text-center text-zinc-500">Waiting for agent actions...</div>
+                  <div className="p-4 text-center text-zinc-500">等待智能体动作...</div>
                 ) : agentLogs.map((log, i) => (
                   <div key={i} className={`px-3 py-1 border-b border-zinc-800/50 flex items-start gap-2 ${log.status === 'error' ? 'bg-red-500/5' : ''}`}>
                     <span className="text-zinc-600 shrink-0">{new Date(log.timestamp).toLocaleTimeString()}</span>
@@ -387,10 +387,10 @@ export default function TikTokTab() {
       {accounts.length === 0 && !showAdd ? (
         <div className="text-center py-12">
           <div className="text-4xl mb-4">🎵</div>
-          <h3 className="text-lg font-medium text-white mb-2">No TikTok accounts yet</h3>
-          <p className="text-zinc-400 text-sm mb-4">Add your TikTok cookies to start the autonomous agent</p>
+          <h3 className="text-lg font-medium text-white mb-2">暂无 TikTok 账号</h3>
+          <p className="text-zinc-400 text-sm mb-4">添加 TikTok Cookies 以启动自治智能体</p>
           <button onClick={() => setShowAdd(true)} className="px-4 py-2 bg-pink-600 hover:bg-pink-700 rounded-lg text-sm font-medium transition-colors">
-            <Plus className="w-4 h-4 inline mr-1" /> Add Account
+            <Plus className="w-4 h-4 inline mr-1" /> 添加账号
           </button>
         </div>
       ) : (
@@ -398,7 +398,7 @@ export default function TikTokTab() {
           {accounts.map(account => {
             const statusCfg = STATUS_CONFIG[account.status] || STATUS_CONFIG.untested;
             const StatusIcon = statusCfg.icon;
-            const isRunning = agentStatus?.accountId === account.id && agentStatus.state !== 'stopped';
+            const is运行ning = agentStatus?.accountId === account.id && agentStatus.state !== 'stopped';
 
             return (
               <div key={account.id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
@@ -411,7 +411,7 @@ export default function TikTokTab() {
                       <div className="font-medium text-white flex items-center gap-2">
                         {account.name}
                         {account.handle && <span className="text-zinc-400 text-sm">@{account.handle}</span>}
-                        {isRunning && <span className="text-xs bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-full">Agent running</span>}
+                        {is运行ning && <span className="text-xs bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-full">智能体运行中</span>}
                       </div>
                       <div className="text-xs text-zinc-500 mt-0.5">
                         {account.cookieCount} cookies ({account.cookieFormat}) | {statusCfg.label}
@@ -426,11 +426,11 @@ export default function TikTokTab() {
                       className="p-1.5 rounded hover:bg-zinc-800 text-zinc-400 hover:text-white" title="Verify login">
                       {verifyingId === account.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
                     </button>
-                    {!isRunning && account.status === 'active' && (
+                    {!is运行ning && account.status === 'active' && (
                       <button onClick={() => startAgent(account.id)} disabled={agentLoading}
                         className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 rounded-lg text-xs font-medium transition-colors">
                         {agentLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
-                        Start Agent
+                        启动智能体
                       </button>
                     )}
                     <button onClick={() => deleteAccount(account.id)} className="p-1.5 rounded hover:bg-zinc-800 text-zinc-400 hover:text-red-400" title="Delete">
@@ -447,17 +447,17 @@ export default function TikTokTab() {
       {/* Agent Config (shown when no agent is running) */}
       {!agentStatus && accounts.some(a => a.status === 'active') && (
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-          <h3 className="text-sm font-medium text-white mb-3 flex items-center gap-2"><Zap className="w-4 h-4 text-pink-400" /> Agent Configuration</h3>
+          <h3 className="text-sm font-medium text-white mb-3 flex items-center gap-2"><Zap className="w-4 h-4 text-pink-400" /> 智能体配置</h3>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs text-zinc-400 mb-1">Actions</label>
+              <label className="block text-xs text-zinc-400 mb-1">动作</label>
               <div className="flex flex-wrap gap-2">
                 {['like', 'comment', 'follow', 'save'].map(action => (
                   <button key={action} onClick={() => {
-                    setConfigActions(prev => prev.includes(action) ? prev.filter(a => a !== action) : [...prev, action]);
+                    setConfig动作(prev => prev.includes(action) ? prev.filter(a => a !== action) : [...prev, action]);
                   }} className={`px-2.5 py-1 rounded text-xs font-medium transition-colors flex items-center gap-1 ${
-                    configActions.includes(action) ? 'bg-pink-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:text-white'
+                    config动作.includes(action) ? 'bg-pink-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:text-white'
                   }`}>
                     {action === 'like' && <Heart className="w-3 h-3" />}
                     {action === 'comment' && <MessageCircle className="w-3 h-3" />}
@@ -470,31 +470,31 @@ export default function TikTokTab() {
             </div>
 
             <div>
-              <label className="block text-xs text-zinc-400 mb-1">Language</label>
+              <label className="block text-xs text-zinc-400 mb-1">语言</label>
               <input value={configLang} onChange={e => setConfigLang(e.target.value)}
                 className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm text-white" />
             </div>
 
             <div className="col-span-2">
-              <label className="block text-xs text-zinc-400 mb-1">Tone / Persona</label>
-              <textarea value={configTone} onChange={e => setConfigTone(e.target.value)} rows={2}
+              <label className="block text-xs text-zinc-400 mb-1">语气 / 人设</label>
+              <textarea value={config语气} onChange={e => setConfig语气(e.target.value)} rows={2}
                 className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm text-white" />
             </div>
 
             <div>
-              <label className="block text-xs text-zinc-400 mb-1">Topics (comma-separated)</label>
+              <label className="block text-xs text-zinc-400 mb-1">主题（逗号分隔）</label>
               <input value={configTopics} onChange={e => setConfigTopics(e.target.value)}
                 className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm text-white" />
             </div>
 
             <div>
-              <label className="block text-xs text-zinc-400 mb-1">Hashtags (comma-separated)</label>
+              <label className="block text-xs text-zinc-400 mb-1">话题标签（逗号分隔）</label>
               <input value={configHashtags} onChange={e => setConfigHashtags(e.target.value)}
                 className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm text-white" />
             </div>
 
             <div>
-              <label className="block text-xs text-zinc-400 mb-1">Target Accounts (comma-separated, optional)</label>
+              <label className="block text-xs text-zinc-400 mb-1">目标账号（逗号分隔，可选）</label>
               <input value={configTargets} onChange={e => setConfigTargets(e.target.value)} placeholder="@OpenAI, @AnthropicAI, ..."
                 className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm text-white placeholder-zinc-600" />
             </div>
@@ -503,25 +503,25 @@ export default function TikTokTab() {
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={configTestMode} onChange={e => setConfigTestMode(e.target.checked)}
                   className="rounded bg-zinc-800 border-zinc-600" />
-                <span className="text-sm text-zinc-400">Test Mode (log only, no real actions)</span>
+                <span className="text-sm text-zinc-400">测试模式（仅记录，不执行真实动作）</span>
               </label>
             </div>
           </div>
         </div>
       )}
 
-      {/* Add Account Modal */}
+      {/* 添加账号 Modal */}
       {showAdd && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 w-full max-w-lg mx-4">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-medium text-white">Add TikTok Account</h3>
+              <h3 className="text-lg font-medium text-white">添加 TikTok 账号</h3>
               <button onClick={() => { setShowAdd(false); setPreview(null); }} className="text-zinc-400 hover:text-white"><X className="w-5 h-5" /></button>
             </div>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm text-zinc-400 mb-1">Account Name</label>
+                <label className="block text-sm text-zinc-400 mb-1">账号名称</label>
                 <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="My TikTok"
                   className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600" />
               </div>
@@ -538,7 +538,7 @@ export default function TikTokTab() {
                   placeholder='Paste cookies from Cookie Editor extension (JSON) or as "name=value; name2=value2"'
                   rows={4} style={showCookies ? {} : { WebkitTextSecurity: 'disc' } as React.CSSProperties}
                   className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 font-mono" />
-                <p className="text-xs text-zinc-500 mt-1">Required: <code className="text-pink-400">sessionid</code>. Recommended: tt_webid, msToken</p>
+                <p className="text-xs text-zinc-500 mt-1">必填：<code className="text-pink-400">sessionid</code>。建议：tt_webid, msToken</p>
               </div>
 
               {newCookies.trim() && (
@@ -563,11 +563,11 @@ export default function TikTokTab() {
               )}
 
               <div className="flex justify-end gap-2 pt-2">
-                <button onClick={() => { setShowAdd(false); setPreview(null); }} className="px-4 py-2 text-sm text-zinc-400 hover:text-white">Cancel</button>
+                <button onClick={() => { setShowAdd(false); setPreview(null); }} className="px-4 py-2 text-sm text-zinc-400 hover:text-white">取消</button>
                 <button onClick={addAccount} disabled={addLoading || !newName.trim() || !newCookies.trim()}
                   className="px-4 py-2 bg-pink-600 hover:bg-pink-700 disabled:opacity-50 rounded-lg text-sm font-medium transition-colors">
                   {addLoading ? <Loader2 className="w-4 h-4 animate-spin inline mr-1" /> : <Plus className="w-4 h-4 inline mr-1" />}
-                  Add Account
+                  添加账号
                 </button>
               </div>
             </div>

@@ -115,7 +115,7 @@ export default function Knowledge() {
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
           <Database className="w-7 h-7 text-primary-500" />
-          <h1 className="text-2xl font-bold">Knowledge Base</h1>
+          <h1 className="text-2xl font-bold">知识库</h1>
         </div>
 
         {/* Stats Cards */}
@@ -123,14 +123,14 @@ export default function Knowledge() {
           <div className="p-5 bg-dark-800 rounded-lg border border-gray-800">
             <div className="flex items-center gap-2 mb-2">
               <FileText className="w-4 h-4 text-cyan-400" />
-              <span className="text-sm text-gray-400">Documents</span>
+              <span className="text-sm text-gray-400">文档</span>
             </div>
             <p className="text-3xl font-bold text-cyan-400">{stats?.documents ?? 0}</p>
           </div>
           <div className="p-5 bg-dark-800 rounded-lg border border-gray-800">
             <div className="flex items-center gap-2 mb-2">
               <Brain className="w-4 h-4 text-purple-400" />
-              <span className="text-sm text-gray-400">Knowledge Chunks</span>
+              <span className="text-sm text-gray-400">知识分片</span>
             </div>
             <p className="text-3xl font-bold text-purple-400">{stats?.chunks ?? 0}</p>
           </div>
@@ -138,13 +138,13 @@ export default function Knowledge() {
 
         {/* Upload Section */}
         <div className="mb-8">
-          <h2 className="text-lg font-semibold mb-4">Ingest Knowledge</h2>
+          <h2 className="text-lg font-semibold mb-4">导入知识</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* File Upload */}
             <div className="p-4 bg-dark-800 rounded-lg border border-gray-800">
               <div className="flex items-center gap-2 mb-3">
                 <Upload className="w-4 h-4 text-green-400" />
-                <span className="text-sm font-medium">Upload File</span>
+                <span className="text-sm font-medium">上传文件</span>
               </div>
               <input
                 ref={fileInputRef}
@@ -176,7 +176,7 @@ export default function Knowledge() {
             <div className="p-4 bg-dark-800 rounded-lg border border-gray-800">
               <div className="flex items-center gap-2 mb-3">
                 <Globe className="w-4 h-4 text-blue-400" />
-                <span className="text-sm font-medium">Ingest URL</span>
+                <span className="text-sm font-medium">导入网址</span>
               </div>
               <div className="flex gap-2">
                 <input
@@ -200,7 +200,7 @@ export default function Knowledge() {
 
         {/* Query Section */}
         <div className="mb-8">
-          <h2 className="text-lg font-semibold mb-4">Query Knowledge</h2>
+          <h2 className="text-lg font-semibold mb-4">知识问答</h2>
           <div className="p-4 bg-dark-800 rounded-lg border border-gray-800">
             <div className="flex gap-2 mb-3">
               <input
@@ -232,8 +232,8 @@ export default function Knowledge() {
           {documents.length === 0 ? (
             <div className="text-center text-gray-500 py-12">
               <Database className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p>No documents ingested yet</p>
-              <p className="text-sm mt-1">Upload files or ingest URLs to build your knowledge base</p>
+              <p>尚未导入文档</p>
+              <p className="text-sm mt-1">上传文件或导入网址来构建你的知识库</p>
             </div>
           ) : (
             <div className="bg-dark-800 rounded-lg border border-gray-800 divide-y divide-gray-800">
@@ -250,7 +250,7 @@ export default function Knowledge() {
                   <button
                     onClick={() => handleDelete(doc)}
                     className="p-1.5 text-gray-500 hover:text-red-400 hover:bg-dark-700 rounded-lg transition-colors shrink-0"
-                    title="Delete document"
+                    title="删除文档"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>

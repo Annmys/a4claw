@@ -8,7 +8,7 @@ import { User, Lock, LogIn, UserPlus, Loader2, Eye, EyeOff } from 'lucide-react'
 // Constants
 // ---------------------------------------------------------------------------
 
-const REMEMBER_KEY = 'clawdagent_remember_user';
+const REMEMBER_KEY = 'a4claw_remember_user';
 
 // ---------------------------------------------------------------------------
 // Main component
@@ -44,7 +44,7 @@ export default function Login() {
     const passwordVal = (form.querySelector('#login-password') as HTMLInputElement)?.value || password;
 
     if (!usernameVal || !passwordVal) {
-      setError('Please enter both username and password.');
+      setError('请输入用户名和密码。');
       return;
     }
 
@@ -66,7 +66,7 @@ export default function Login() {
       setToken(token);
       navigate('/');
     } catch (err: any) {
-      setError(err.message || 'Authentication failed. Please try again.');
+      setError(err.message || '认证失败，请重试。');
     } finally {
       setLoading(false);
     }
@@ -80,18 +80,18 @@ export default function Login() {
         <div className="text-center mb-8">
           <div className="w-20 h-20 bg-gradient-to-br from-primary-600 to-primary-700 rounded-2xl
                           flex items-center justify-center mx-auto mb-5 shadow-lg shadow-primary-600/20">
-            <span className="text-4xl" role="img" aria-label="ClawdAgent logo">
+            <span className="text-4xl" role="img" aria-label="a4claw logo">
               🐙
             </span>
           </div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">ClawdAgent</h1>
-          <p className="text-gray-500 mt-2 text-sm">v6.0 — Autonomous AI Agent</p>
+          <h1 className="text-3xl font-bold text-white tracking-tight">a4claw</h1>
+          <p className="text-gray-500 mt-2 text-sm">v6.0 — 自主 AI 智能体</p>
         </div>
 
         {/* ---- Card ------------------------------------------------------ */}
         <div className="bg-dark-800 p-8 rounded-2xl border border-gray-800 shadow-xl shadow-black/20">
           <h2 className="text-lg font-semibold mb-6 text-white">
-            {isRegister ? 'Create Account' : 'Welcome Back'}
+            {isRegister ? '创建账号' : '欢迎回来'}
           </h2>
 
           <form onSubmit={handleSubmit} className="space-y-5">
@@ -99,7 +99,7 @@ export default function Login() {
             {/* Username */}
             <div>
               <label htmlFor="login-username" className="text-sm text-gray-400 mb-1.5 block font-medium">
-                Username
+                用户名
               </label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
@@ -107,7 +107,7 @@ export default function Login() {
                   id="login-username"
                   type="text"
                   autoComplete="username"
-                  placeholder="Enter username"
+                  placeholder="请输入用户名"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 rounded-lg bg-dark-900 border border-gray-700
@@ -121,7 +121,7 @@ export default function Login() {
             {/* Password */}
             <div>
               <label htmlFor="login-password" className="text-sm text-gray-400 mb-1.5 block font-medium">
-                Password
+                密码
               </label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
@@ -129,7 +129,7 @@ export default function Login() {
                   id="login-password"
                   type={showPassword ? 'text' : 'password'}
                   autoComplete={isRegister ? 'new-password' : 'current-password'}
-                  placeholder="Enter password"
+                  placeholder="请输入密码"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full pl-10 pr-11 py-3 rounded-lg bg-dark-900 border border-gray-700
@@ -143,7 +143,7 @@ export default function Login() {
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500
                              hover:text-gray-300 transition-colors focus:outline-none"
                   tabIndex={-1}
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-label={showPassword ? '隐藏密码' : '显示密码'}
                 >
                   {showPassword
                     ? <EyeOff className="w-4 h-4" />
@@ -162,7 +162,7 @@ export default function Login() {
                 className="w-4 h-4 rounded border-gray-600 bg-dark-900 accent-primary-600
                            focus:ring-primary-500"
               />
-              <span className="text-sm text-gray-400">Remember me</span>
+              <span className="text-sm text-gray-400">记住我</span>
             </label>
 
             {/* Error */}
@@ -184,7 +184,7 @@ export default function Login() {
               {loading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  {isRegister ? 'Creating account...' : 'Signing in...'}
+                  {isRegister ? '正在创建账号...' : '正在登录...'}
                 </>
               ) : (
                 <>
@@ -192,7 +192,7 @@ export default function Login() {
                     ? <UserPlus className="w-4 h-4" />
                     : <LogIn className="w-4 h-4" />
                   }
-                  {isRegister ? 'Create Account' : 'Sign In'}
+                  {isRegister ? '创建账号' : '登录'}
                 </>
               )}
             </button>
@@ -207,8 +207,8 @@ export default function Login() {
               }}
             >
               {isRegister
-                ? 'Already have an account? Sign in'
-                : "Don't have an account? Create one"
+                ? '已有账号？去登录'
+                : '还没有账号？创建一个'
               }
             </p>
           </form>
@@ -216,7 +216,7 @@ export default function Login() {
 
         {/* ---- Footer ---------------------------------------------------- */}
         <p className="text-center text-gray-600 text-xs mt-6">
-          Powered by Claude
+          由 Claude 驱动
         </p>
       </div>
     </div>

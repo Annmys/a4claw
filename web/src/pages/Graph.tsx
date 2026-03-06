@@ -41,11 +41,11 @@ const GROUP_COLORS: Record<string, string> = {
 
 const GROUP_LABELS: Record<string, string> = {
   core: 'Engine',
-  agent: 'Agents',
+  agent: '智能体',
   tool: 'Tools',
-  intelligence: 'Intelligence',
-  skill: 'Skills',
-  evolution: 'Evolution',
+  intelligence: '智能中心',
+  skill: '技能',
+  evolution: '进化',
   provider: 'Providers',
   model: 'Models',
   browser: 'Browser',
@@ -566,7 +566,7 @@ export default function Graph() {
       <div className="flex items-center justify-between px-6 py-3 border-b border-gray-800/50 bg-dark-900/80">
         <div className="flex items-center gap-3">
           <Network className="w-6 h-6 text-primary-500" />
-          <h1 className="text-xl font-bold">System Graph</h1>
+          <h1 className="text-xl font-bold">系统图谱</h1>
           <span className="text-xs text-gray-500 bg-dark-800 px-2 py-0.5 rounded-full">
             {filteredData.nodes.length} nodes / {filteredData.links.length} links
           </span>
@@ -592,14 +592,14 @@ export default function Graph() {
           <button
             onClick={handleUnlockAll}
             className="px-2.5 py-1.5 rounded-lg bg-dark-800 hover:bg-dark-700 text-gray-400 text-[11px] transition-colors"
-            title="Unlock all pinned nodes"
+            title="解锁所有固定节点"
           >
             Unlock All
           </button>
           <button
             onClick={handleCenter}
             className="p-1.5 rounded-lg bg-dark-800 hover:bg-dark-700 text-gray-400 transition-colors"
-            title="Fit to view"
+            title="适配视图"
           >
             <Maximize2 className="w-4 h-4" />
           </button>
@@ -708,7 +708,7 @@ export default function Graph() {
 
         {/* Legend */}
         <div className="absolute top-3 right-3 p-3 bg-dark-900/90 backdrop-blur-xl border border-gray-800/50 rounded-xl">
-          <p className="text-[9px] uppercase tracking-widest text-gray-600 mb-2 font-bold">Legend</p>
+          <p className="text-[9px] uppercase tracking-widest text-gray-600 mb-2 font-bold">图例</p>
           {Object.entries(GROUP_LABELS).map(([key, label]) => (
             <div key={key} className="flex items-center gap-2 py-0.5">
               <div className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: GROUP_COLORS[key], boxShadow: `0 0 4px ${GROUP_COLORS[key]}40` }} />
@@ -716,9 +716,9 @@ export default function Graph() {
             </div>
           ))}
           <div className="mt-2 pt-2 border-t border-gray-800/50 text-[10px] text-gray-600 space-y-0.5">
-            <div>Click = select</div>
-            <div>Dbl-click = details</div>
-            <div>Drag = pin node</div>
+            <div>单击 = 选择</div>
+            <div>双击 = 详情</div>
+            <div>拖拽 = 固定节点</div>
           </div>
         </div>
       </div>

@@ -13,6 +13,7 @@ import Costs from './pages/Costs';
 import Logs from './pages/Logs';
 import History from './pages/History';
 import Settings from './pages/Settings';
+import Users from './pages/Users';
 import Trading from './pages/Trading';
 import Knowledge from './pages/Knowledge';
 import Intelligence from './pages/Intelligence';
@@ -24,7 +25,11 @@ import VoiceAgent from './pages/VoiceAgent';
 import TerminalPage from './pages/Terminal';
 import ToastContainer, { pushToast } from './components/shared/ToastContainer';
 import { useAuthStore } from './stores/auth';
+import { useChatStore } from './stores/chat';
 import { useNotificationsStore } from './stores/notifications';
+import { api } from './api/client';
+import { applyLanguage, persistLanguageChoice, readLanguageChoice, type UILanguage } from './utils/ui-language';
+import { decodeJwtRole } from './utils/auth-role';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const token = useAuthStore((s) => s.token);
@@ -56,6 +61,14 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
 
   return token ? <>{children}</> : <Navigate to="/login" />;
+}
+
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const token = useAuthStore((s) => s.token);
+  if (!token) return <Navigate to="/login" replace />;
+  const role = decodeJwtRole(token);
+  if (role !== 'admin') return <Navigate to="/" replace />;
+  return <>{children}</>;
 }
 
 /** Global WebSocket listener for real-time notifications */
@@ -91,6 +104,30 @@ function NotificationWSListener() {
 }
 
 export default function App() {
+  const token = useAuthStore((s) => s.token);
+  const hydrateChatForCurrentUser = useChatStore((s) => s.hydrateForCurrentUser);
+
+  useEffect(() => {
+    hydrateChatForCurrentUser();
+  }, [token, hydrateChatForCurrentUser]);
+
+  useEffect(() => {
+    if (!token) {
+      applyLanguage(readLanguageChoice());
+      return;
+    }
+
+    api.getSettings()
+      .then((settings: any) => {
+        const lang = (settings?.language ?? readLanguageChoice()) as UILanguage;
+        persistLanguageChoice(lang);
+        applyLanguage(lang);
+      })
+      .catch(() => {
+        applyLanguage(readLanguageChoice());
+      });
+  }, [token]);
+
   return (
     <BrowserRouter>
       <NotificationWSListener />
@@ -99,24 +136,25 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
           <Route index element={<Chat />} />
-          <Route path="openclaw" element={<OpenClaw />} />
+          <Route path="openclaw" element={<AdminRoute><OpenClaw /></AdminRoute>} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="tasks" element={<Tasks />} />
           <Route path="skills" element={<Skills />} />
-          <Route path="browser" element={<BrowserView />} />
-          <Route path="voice-agent" element={<VoiceAgent />} />
-          <Route path="terminal" element={<TerminalPage />} />
+          <Route path="browser" element={<AdminRoute><BrowserView /></AdminRoute>} />
+          <Route path="voice-agent" element={<AdminRoute><VoiceAgent /></AdminRoute>} />
+          <Route path="terminal" element={<AdminRoute><TerminalPage /></AdminRoute>} />
           <Route path="servers" element={<Servers />} />
           <Route path="agents" element={<Agents />} />
           <Route path="cron" element={<Cron />} />
-          <Route path="trading" element={<Trading />} />
+          <Route path="trading" element={<AdminRoute><Trading /></AdminRoute>} />
           <Route path="knowledge" element={<Knowledge />} />
           <Route path="intelligence" element={<Intelligence />} />
           <Route path="evolution" element={<Evolution />} />
           <Route path="graph" element={<Graph />} />
-          <Route path="costs" element={<Costs />} />
+          <Route path="costs" element={<AdminRoute><Costs /></AdminRoute>} />
           <Route path="logs" element={<Logs />} />
           <Route path="history" element={<History />} />
+          <Route path="users" element={<AdminRoute><Users /></AdminRoute>} />
           <Route path="settings" element={<Settings />} />
         </Route>
       </Routes>

@@ -46,7 +46,7 @@ export default function Cron() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this cron task?')) return;
+    if (!confirm('确认删除该定时任务吗？')) return;
     try {
       await api.deleteCronTask(id);
       await loadTasks();
@@ -65,11 +65,11 @@ export default function Cron() {
   };
 
   const cronExamples = [
-    { label: 'Every 5 minutes', value: '*/5 * * * *' },
-    { label: 'Every hour', value: '0 * * * *' },
-    { label: 'Every morning 8:00', value: '0 8 * * *' },
-    { label: 'Every day 22:00', value: '0 22 * * *' },
-    { label: 'Every Monday 9:00', value: '0 9 * * 1' },
+    { label: '每 5 分钟', value: '*/5 * * * *' },
+    { label: '每小时', value: '0 * * * *' },
+    { label: '每天早上 8:00', value: '0 8 * * *' },
+    { label: '每天 22:00', value: '0 22 * * *' },
+    { label: '每周一 9:00', value: '0 9 * * 1' },
   ];
 
   if (loading) {
@@ -86,7 +86,7 @@ export default function Cron() {
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <Timer className="w-7 h-7 text-primary-500" />
-            <h1 className="text-2xl font-bold">Cron Jobs</h1>
+            <h1 className="text-2xl font-bold">定时任务</h1>
             <span className="text-sm text-gray-400">({tasks.length})</span>
           </div>
           <button
@@ -94,7 +94,7 @@ export default function Cron() {
             className="flex items-center gap-2 px-4 py-2 bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors font-medium"
           >
             <Plus className="w-4 h-4" />
-            New Job
+            新建任务
           </button>
         </div>
 
@@ -102,27 +102,27 @@ export default function Cron() {
         {showCreate && (
           <div className="mb-6 p-5 bg-dark-800 rounded-lg border border-primary-600/50">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold">Create Cron Job</h3>
+              <h3 className="font-semibold">创建定时任务</h3>
               <button onClick={() => setShowCreate(false)} className="text-gray-400 hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
             <div className="space-y-3">
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Description</label>
+                <label className="block text-sm text-gray-400 mb-1">描述</label>
                 <input
                   value={newTask.description}
                   onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
-                  placeholder="Send morning briefing"
+                  placeholder="发送早报"
                   className="w-full p-2.5 rounded bg-dark-900 border border-gray-700 text-white text-sm"
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Schedule (cron expression or natural language)</label>
+                <label className="block text-sm text-gray-400 mb-1">执行计划（cron 表达式或自然语言）</label>
                 <input
                   value={newTask.expression}
                   onChange={(e) => setNewTask({ ...newTask, expression: e.target.value })}
-                  placeholder="0 8 * * * or 'every morning'"
+                  placeholder="0 8 * * * 或 每天早晨"
                   className="w-full p-2.5 rounded bg-dark-900 border border-gray-700 text-white text-sm font-mono"
                 />
                 <div className="flex gap-2 mt-2 flex-wrap">
@@ -138,16 +138,16 @@ export default function Cron() {
                 </div>
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Action</label>
+                <label className="block text-sm text-gray-400 mb-1">动作</label>
                 <select
                   value={newTask.action}
                   onChange={(e) => setNewTask({ ...newTask, action: e.target.value })}
                   className="w-full p-2.5 rounded bg-dark-900 border border-gray-700 text-white text-sm"
                 >
-                  <option value="send_message">Send Message</option>
-                  <option value="news_summary">News Summary</option>
-                  <option value="health_check">Server Health Check</option>
-                  <option value="backup">Backup</option>
+                  <option value="send_message">发送消息</option>
+                  <option value="news_summary">新闻摘要</option>
+                  <option value="health_check">服务器健康检查</option>
+                  <option value="backup">备份</option>
                 </select>
               </div>
               <div className="flex gap-2 pt-2">
@@ -157,10 +157,10 @@ export default function Cron() {
                   className="flex items-center gap-2 px-4 py-2 bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 font-medium"
                 >
                   {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                  Create
+                  创建
                 </button>
                 <button onClick={() => setShowCreate(false)} className="px-4 py-2 bg-dark-900 rounded-lg hover:bg-dark-800 transition-colors text-gray-400">
-                  Cancel
+                  取消
                 </button>
               </div>
             </div>
@@ -177,20 +177,20 @@ export default function Cron() {
                     <Play className="w-4 h-4 text-cyan-400" />
                     <h3 className="font-medium">{task.description || task.action}</h3>
                     <span className={`text-xs px-2 py-0.5 rounded-full ${task.enabled !== false ? 'bg-green-500/20 text-green-400' : 'bg-gray-700 text-gray-400'}`}>
-                      {task.enabled !== false ? 'Active' : 'Paused'}
+                      {task.enabled !== false ? '启用中' : '已暂停'}
                     </span>
                   </div>
                   <div className="flex items-center gap-4 text-sm text-gray-400">
                     <span className="font-mono">{task.expression}</span>
-                    <span>Action: {task.action}</span>
-                    {task.lastRun && <span>Last: {new Date(task.lastRun).toLocaleString()}</span>}
+                    <span>动作：{task.action}</span>
+                    {task.lastRun && <span>上次运行：{new Date(task.lastRun).toLocaleString()}</span>}
                   </div>
                 </div>
                 <div className="flex gap-1 ml-4">
                   <button
                     onClick={() => handleToggle(task.id)}
                     className="p-2 text-gray-400 hover:text-white hover:bg-dark-900 rounded transition-colors"
-                    title={task.enabled !== false ? 'Pause' : 'Resume'}
+                    title={task.enabled !== false ? '暂停' : '恢复'}
                   >
                     {task.enabled !== false ? <ToggleRight className="w-5 h-5 text-green-400" /> : <ToggleLeft className="w-5 h-5" />}
                   </button>
@@ -208,8 +208,8 @@ export default function Cron() {
           {tasks.length === 0 && (
             <div className="text-center text-gray-500 py-12">
               <Timer className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p>No cron jobs yet</p>
-              <p className="text-sm mt-1">Create scheduled tasks to automate your workflow</p>
+              <p>暂无定时任务</p>
+              <p className="text-sm mt-1">创建定时任务以自动化你的工作流程</p>
             </div>
           )}
         </div>

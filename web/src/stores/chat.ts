@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { api } from '../api/client';
+import type { ChatArtifact } from '../api/client';
 
 export interface ProgressEntry {
   type: string;
@@ -13,6 +14,7 @@ export interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  artifacts?: ChatArtifact[];
   thinking?: string;
   agent?: string;
   provider?: string;
@@ -44,6 +46,7 @@ interface ChatState {
   activeConversationId: string | null;
   loadingConversationId: string | null;
   synced: boolean;
+  storageKey: string;
 
   // Derived
   isLoading: boolean;
@@ -60,13 +63,33 @@ interface ChatState {
   setConversationLoading: (conversationId: string | null) => void;
   isConversationLoading: (conversationId: string) => boolean;
   clear: () => void;
+  hydrateForCurrentUser: () => void;
   syncWithServer: () => Promise<void>;
   loadConversationFromServer: (id: string) => Promise<void>;
 }
 
-const STORAGE_KEY = 'clawdagent-conversations';
+const STORAGE_KEY_PREFIX = 'a4claw-conversations';
 
-function saveToStorage(conversations: Conversation[]) {
+function decodeJwtUserId(token: string | null): string | null {
+  if (!token) return null;
+  const parts = token.split('.');
+  if (parts.length < 2) return null;
+  try {
+    const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = payload.padEnd(Math.ceil(payload.length / 4) * 4, '=');
+    const parsed = JSON.parse(atob(padded)) as { userId?: string };
+    return typeof parsed.userId === 'string' && parsed.userId ? parsed.userId : null;
+  } catch {
+    return null;
+  }
+}
+
+function getCurrentStorageKey(): string {
+  const userId = decodeJwtUserId(localStorage.getItem('token')) ?? 'guest';
+  return `${STORAGE_KEY_PREFIX}:${userId}`;
+}
+
+function saveToStorage(storageKey: string, conversations: Conversation[]) {
   try {
     const data: SerializedConversation[] = conversations.map(c => ({
       ...c,
@@ -74,13 +97,13 @@ function saveToStorage(conversations: Conversation[]) {
       createdAt: c.createdAt.toISOString(),
       updatedAt: c.updatedAt.toISOString(),
     }));
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    localStorage.setItem(storageKey, JSON.stringify(data));
   } catch { /* storage full or unavailable */ }
 }
 
-function loadFromStorage(): Conversation[] {
+function loadFromStorage(storageKey: string): Conversation[] {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storageKey);
     if (!raw) return [];
     const data: SerializedConversation[] = JSON.parse(raw);
     return data.map(c => ({
@@ -126,7 +149,8 @@ function addMessageToConversation(
   });
 }
 
-const initialConversations = loadFromStorage();
+const initialStorageKey = getCurrentStorageKey();
+const initialConversations = loadFromStorage(initialStorageKey);
 const initialActive = initialConversations.length > 0 ? initialConversations[0].id : null;
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -134,6 +158,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   activeConversationId: initialActive,
   loadingConversationId: null,
   synced: false,
+  storageKey: initialStorageKey,
   isLoading: false,
 
   getMessages: () => {
@@ -146,7 +171,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const conv = createConversation();
     set(state => {
       const updated = [conv, ...state.conversations];
-      saveToStorage(updated);
+      saveToStorage(state.storageKey, updated);
       return { conversations: updated, activeConversationId: conv.id };
     });
     // Sync to server in background (fire-and-forget)
@@ -164,7 +189,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   deleteConversation: (id) => {
     set(state => {
       const updated = state.conversations.filter(c => c.id !== id);
-      saveToStorage(updated);
+      saveToStorage(state.storageKey, updated);
       const newActive = state.activeConversationId === id
         ? (updated[0]?.id ?? null)
         : state.activeConversationId;
@@ -179,7 +204,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const updated = state.conversations.map(c =>
         c.id === id ? { ...c, title } : c
       );
-      saveToStorage(updated);
+      saveToStorage(state.storageKey, updated);
       return { conversations: updated };
     });
     // Sync rename to server
@@ -200,7 +225,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
 
     const updated = addMessageToConversation(conversations, activeConversationId, msg);
-    saveToStorage(updated);
+    saveToStorage(state.storageKey, updated);
 
     // If first user message, sync the auto-generated title to server
     const conv = updated.find(c => c.id === activeConversationId);
@@ -214,7 +239,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   // Add message to a SPECIFIC conversation (even if not active)
   addMessageTo: (conversationId, msg) => set(state => {
     const updated = addMessageToConversation(state.conversations, conversationId, msg);
-    saveToStorage(updated);
+    saveToStorage(state.storageKey, updated);
     return { conversations: updated };
   }),
 
@@ -240,9 +265,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
         ? { ...c, messages: [], title: 'New Chat', updatedAt: new Date() }
         : c
     );
-    saveToStorage(updated);
+    saveToStorage(state.storageKey, updated);
     return { conversations: updated };
   }),
+
+  hydrateForCurrentUser: () => {
+    const storageKey = getCurrentStorageKey();
+    const conversations = loadFromStorage(storageKey);
+    const activeConversationId = conversations[0]?.id ?? null;
+    set({
+      storageKey,
+      conversations,
+      activeConversationId,
+      loadingConversationId: null,
+      synced: false,
+      isLoading: false,
+    });
+  },
 
   // Sync conversations from server — merges with localStorage
   syncWithServer: async () => {
@@ -276,7 +315,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           // Sort all by updatedAt desc
           const merged = [...state.conversations, ...newFromServer]
             .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
-          saveToStorage(merged);
+          saveToStorage(state.storageKey, merged);
           return { conversations: merged, synced: true };
         });
       } else {
@@ -311,6 +350,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         role: m.role as 'user' | 'assistant',
         content: m.content,
         agent: m.agent,
+        artifacts: m.artifacts,
         timestamp: new Date(m.createdAt),
       }));
 
@@ -318,7 +358,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         const updated = state.conversations.map(c =>
           c.id === id ? { ...c, messages } : c
         );
-        saveToStorage(updated);
+        saveToStorage(state.storageKey, updated);
         return { conversations: updated };
       });
     } catch {

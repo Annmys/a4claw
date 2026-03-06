@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useChatStore } from '../stores/chat';
 import { api } from '../api/client';
+import type { ChatArtifact } from '../api/client';
 import { WsClient } from '../api/websocket';
 import {
   Send, Search, Trash2, Bot, User, Loader2, Square,
@@ -14,9 +15,9 @@ import hljs from 'highlight.js/lib/common';
 import 'highlight.js/styles/github-dark.css';
 
 const RESPONSE_MODES = [
-  { id: 'auto' as const, label: 'אוטומטי', labelEn: 'Auto', icon: Cpu, color: 'text-blue-400', desc: 'המערכת מחליטה' },
-  { id: 'quick' as const, label: 'מהיר', labelEn: 'Fast', icon: Zap, color: 'text-yellow-400', desc: 'תגובה מהירה' },
-  { id: 'deep' as const, label: 'מעמיק', labelEn: 'Deep', icon: Brain, color: 'text-purple-400', desc: 'ניתוח מלא' },
+  { id: 'auto' as const, label: 'אוטומטי', labelEn: '自动', icon: Cpu, color: 'text-blue-400', desc: 'המערכת מחליטה' },
+  { id: 'quick' as const, label: 'מהיר', labelEn: '快速', icon: Zap, color: 'text-yellow-400', desc: 'תגובה מהירה' },
+  { id: 'deep' as const, label: 'מעמיק', labelEn: '深度', icon: Brain, color: 'text-purple-400', desc: 'ניתוח מלא' },
 ];
 
 /** Render message content — detects inline images and browser session markers */
@@ -51,7 +52,7 @@ function renderMessageContent(content: string) {
       className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 bg-teal-600/20 hover:bg-teal-600/30 text-teal-400 text-xs font-medium rounded-lg border border-teal-500/30 transition-colors"
     >
       <Monitor className="w-3.5 h-3.5" />
-      Watch in Browser View
+      在浏览器视图中查看
     </a>
   ) : null;
 
@@ -72,7 +73,7 @@ function renderMessageContent(content: string) {
           <img
             key={i}
             src={part.value}
-            alt="QR Code"
+            alt="二维码"
             className="my-2 rounded-lg border border-gray-700 max-w-[280px]"
           />
         ) : (
@@ -115,12 +116,12 @@ function CodeBlock({ code, lang }: { code: string; lang?: string }) {
   return (
     <div className="relative group/code my-2">
       <div className="flex items-center justify-between px-3 py-1.5 bg-[#1a1b26] border border-gray-800 rounded-t-lg">
-        <span className="text-[10px] text-gray-500 font-mono">{lang || 'code'}</span>
+        <span className="text-[10px] text-gray-500 font-mono">{lang || '代码'}</span>
         <button
           onClick={handleCopy}
           className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] text-gray-400 hover:text-white hover:bg-gray-700/50 transition-colors"
         >
-          {copied ? <><Check className="w-3 h-3" /> Copied</> : <><Copy className="w-3 h-3" /> Copy</>}
+          {copied ? <><Check className="w-3 h-3" /> 已复制</> : <><Copy className="w-3 h-3" /> 复制</>}
         </button>
       </div>
       <pre className="bg-[#0d1117] border border-t-0 border-gray-800 rounded-b-lg px-3 py-2 overflow-x-auto text-xs font-mono leading-relaxed">
@@ -303,21 +304,21 @@ export default function Chat() {
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [progressLog, setProgressLog] = useState<Array<{ type: string; message: string; agent?: string; tool?: string; time: number }>>([]);
-  const [isRtl, setIsRtl] = useState(() => localStorage.getItem('clawdagent-rtl') === 'true');
-  const [isStyled, setIsStyled] = useState(() => localStorage.getItem('clawdagent-styled') !== 'false');
+  const [isRtl, setIsRtl] = useState(() => localStorage.getItem('a4claw-rtl') === 'true');
+  const [isStyled, setIsStyled] = useState(() => localStorage.getItem('a4claw-styled') !== 'false');
   const [chatTheme, setChatTheme] = useState<'default' | 'glass'>(() =>
-    (localStorage.getItem('clawdagent-theme') as 'default' | 'glass') || 'default'
+    (localStorage.getItem('a4claw-theme') as 'default' | 'glass') || 'default'
   );
   const [responseMode, setResponseMode] = useState<'auto' | 'quick' | 'deep'>(() =>
-    (localStorage.getItem('clawdagent-response-mode') as 'auto' | 'quick' | 'deep') || 'auto'
+    (localStorage.getItem('a4claw-response-mode') as 'auto' | 'quick' | 'deep') || 'auto'
   );
   const [showModeMenu, setShowModeMenu] = useState(false);
   const [selectedModel, setSelectedModel] = useState<string>(() =>
-    localStorage.getItem('clawdagent-selected-model') || 'auto'
+    localStorage.getItem('a4claw-selected-model') || 'auto'
   );
   const [showModelMenu, setShowModelMenu] = useState(false);
   const [modelList, setModelList] = useState<Array<{ id: string; name: string; provider: string; tier: string; supportsHebrew?: boolean; supportsVision?: boolean }>>([
-    { id: 'auto', name: 'Auto', provider: 'auto', tier: 'auto' },
+    { id: 'auto', name: '自动', provider: 'auto', tier: 'auto' },
   ]);
   const [streamingText, setStreamingText] = useState('');
   const [showWhatsAppQR, setShowWhatsAppQR] = useState(false);
@@ -376,7 +377,7 @@ export default function Chat() {
       if (connected) setWsError(null);
     });
 
-    ws.on('message', (data: { text: string; thinking?: string; agent?: string; tokens?: { input: number; output: number; total: number }; provider?: string; model?: string; elapsed?: number; conversationId?: string }) => {
+    ws.on('message', (data: { text: string; thinking?: string; artifacts?: ChatArtifact[]; agent?: string; tokens?: { input: number; output: number; total: number }; provider?: string; model?: string; elapsed?: number; conversationId?: string }) => {
       // Use conversationId from response (for recovered messages) or from pending ref
       const targetConv = data.conversationId || pendingConvRef.current;
       pendingConvRef.current = null;
@@ -392,6 +393,7 @@ export default function Chat() {
           role: 'assistant',
           content: data.text,
           thinking: data.thinking,
+          artifacts: data.artifacts,
           agent: data.agent,
           provider: data.provider,
           model: data.model,
@@ -544,7 +546,7 @@ export default function Chat() {
     if (file) {
       try {
         const res = await api.chatWithFile(text, file, convId, responseMode === 'auto' ? undefined : responseMode, selectedModel === 'auto' ? undefined : selectedModel);
-        addMessageTo(convId, { role: 'assistant', content: res.message, thinking: res.thinking, agent: res.agent, provider: res.provider, model: res.model, tokens: res.tokens ? { ...res.tokens, total: res.tokens.input + res.tokens.output } : undefined, elapsed: res.elapsed });
+        addMessageTo(convId, { role: 'assistant', content: res.message, thinking: res.thinking, artifacts: res.artifacts, agent: res.agent, provider: res.provider, model: res.model, tokens: res.tokens ? { ...res.tokens, total: res.tokens.input + res.tokens.output } : undefined, elapsed: res.elapsed });
       } catch (err: any) {
         addMessageTo(convId, { role: 'assistant', content: `Error: ${err.message}` });
       }
@@ -566,7 +568,7 @@ export default function Chat() {
     // REST API fallback
     try {
       const res = await api.chat(text, convId, responseMode === 'auto' ? undefined : responseMode, selectedModel === 'auto' ? undefined : selectedModel);
-      addMessageTo(convId, { role: 'assistant', content: res.message, thinking: res.thinking, agent: res.agent, provider: res.provider, model: res.model, tokens: res.tokens ? { ...res.tokens, total: res.tokens.input + res.tokens.output } : undefined, elapsed: res.elapsed });
+      addMessageTo(convId, { role: 'assistant', content: res.message, thinking: res.thinking, artifacts: res.artifacts, agent: res.agent, provider: res.provider, model: res.model, tokens: res.tokens ? { ...res.tokens, total: res.tokens.input + res.tokens.output } : undefined, elapsed: res.elapsed });
     } catch (err: any) {
       addMessageTo(convId, { role: 'assistant', content: `Error: ${err.message}` });
     }
@@ -599,15 +601,15 @@ export default function Chat() {
 
   // ── Toggle RTL / Styled / Theme ─────────────────────────────────
   const toggleRtl = useCallback(() => {
-    setIsRtl(v => { const n = !v; localStorage.setItem('clawdagent-rtl', String(n)); return n; });
+    setIsRtl(v => { const n = !v; localStorage.setItem('a4claw-rtl', String(n)); return n; });
   }, []);
 
   const toggleStyled = useCallback(() => {
-    setIsStyled(v => { const n = !v; localStorage.setItem('clawdagent-styled', String(n)); return n; });
+    setIsStyled(v => { const n = !v; localStorage.setItem('a4claw-styled', String(n)); return n; });
   }, []);
 
   const toggleTheme = useCallback(() => {
-    setChatTheme(v => { const n = v === 'default' ? 'glass' : 'default'; localStorage.setItem('clawdagent-theme', n); return n; });
+    setChatTheme(v => { const n = v === 'default' ? 'glass' : 'default'; localStorage.setItem('a4claw-theme', n); return n; });
   }, []);
 
   // ── Export conversation ────────────────────────────────────────
@@ -626,10 +628,10 @@ export default function Chat() {
       mime = 'application/json';
       ext = 'json';
     } else {
-      const lines = [`# ${title}\n`, `_Exported ${new Date().toLocaleString()}_\n`];
+      const lines = [`# ${title}\n`, `_导出时间 ${new Date().toLocaleString()}_\n`];
       for (const m of messages) {
         lines.push(`---\n`);
-        lines.push(`**${m.role === 'user' ? 'User' : (m.agent || 'Assistant')}** _(${new Date(m.timestamp).toLocaleTimeString()})_\n`);
+        lines.push(`**${m.role === 'user' ? '用户' : (m.agent || '助手')}** _(${new Date(m.timestamp).toLocaleTimeString()})_\n`);
         lines.push(m.content + '\n');
       }
       content = lines.join('\n');
@@ -688,10 +690,37 @@ export default function Chat() {
     const diff = now.getTime() - d.getTime();
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
     if (days === 0) return formatTime(d);
-    if (days === 1) return 'Yesterday';
+    if (days === 1) return '昨天';
     if (days < 7) return d.toLocaleDateString('en-US', { weekday: 'short' });
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
+
+  const formatSize = (size?: number) => {
+    if (!size || size < 0) return '';
+    if (size < 1024) return `${size} B`;
+    if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+    return `${(size / (1024 * 1024)).toFixed(2)} MB`;
+  };
+
+  const downloadArtifact = useCallback(async (artifact: ChatArtifact) => {
+    if (!artifact.url) return;
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(artifact.url, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = artifact.originalName || artifact.name || 'download.bin';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      alert(`下载失败: ${err.message}`);
+    }
+  }, []);
 
   return (
     <div className="flex h-full bg-dark-950">
@@ -700,19 +729,19 @@ export default function Chat() {
         <div className="w-64 shrink-0 flex flex-col border-r border-gray-800 bg-dark-900 max-md:absolute max-md:inset-y-0 max-md:left-0 max-md:z-30 max-md:shadow-2xl max-md:shadow-black/50">
           {/* Sidebar header */}
           <div className="flex items-center justify-between px-3 py-3 border-b border-gray-800">
-            <span className="text-sm font-semibold text-gray-300">Conversations</span>
+            <span className="text-sm font-semibold text-gray-300">会话列表</span>
             <div className="flex items-center gap-1">
               <button
                 onClick={handleNewChat}
                 className="p-1.5 text-gray-400 hover:text-white hover:bg-dark-800 rounded-lg transition-colors"
-                title="New chat"
+                title="新建会话"
               >
                 <Plus className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setShowConversations(false)}
                 className="p-1.5 text-gray-400 hover:text-white hover:bg-dark-800 rounded-lg transition-colors"
-                title="Hide panel"
+                title="隐藏面板"
               >
                 <PanelLeftClose className="w-4 h-4" />
               </button>
@@ -723,7 +752,7 @@ export default function Chat() {
           <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
             {conversations.length === 0 && (
               <div className="text-center py-8 text-gray-600 text-xs">
-                No conversations yet
+                暂无会话
               </div>
             )}
             {conversations.map(conv => (
@@ -764,7 +793,7 @@ export default function Chat() {
                   ) : (
                     <>
                       <p className="text-xs font-medium truncate">{conv.title}</p>
-                      <p className="text-[10px] text-gray-500">{conv.messages.length} msgs · {formatDate(conv.updatedAt)}</p>
+                      <p className="text-[10px] text-gray-500">{conv.messages.length} 条消息 · {formatDate(conv.updatedAt)}</p>
                     </>
                   )}
                 </div>
@@ -789,7 +818,7 @@ export default function Chat() {
                       }}
                       className="w-full text-left px-3 py-1.5 text-xs text-gray-300 hover:bg-dark-700 transition-colors"
                     >
-                      Rename
+                      重命名
                     </button>
                     <button
                       onClick={(e) => {
@@ -799,7 +828,7 @@ export default function Chat() {
                       }}
                       className="w-full text-left px-3 py-1.5 text-xs text-red-400 hover:bg-dark-700 transition-colors"
                     >
-                      Delete
+                      删除
                     </button>
                   </div>
                 )}
@@ -828,20 +857,20 @@ export default function Chat() {
               <button
                 onClick={() => setShowConversations(true)}
                 className="p-1.5 text-gray-400 hover:text-white hover:bg-dark-800 rounded-lg transition-colors mr-1"
-                title="Show conversations"
+                title="显示会话"
               >
                 <PanelLeft className="w-4 h-4" />
               </button>
             )}
             <MessageSquare className="w-6 h-6 text-primary-500" />
-            <h1 className="text-lg font-bold text-white">Chat</h1>
+            <h1 className="text-lg font-bold text-white">聊天</h1>
             {wsConnected ? (
               <span className="flex items-center gap-1 text-xs text-green-400">
-                <Wifi className="w-3 h-3" /> Live
+                <Wifi className="w-3 h-3" /> 实时
               </span>
             ) : (
               <span className="flex items-center gap-1 text-xs text-yellow-400">
-                <WifiOff className="w-3 h-3" /> REST
+                <WifiOff className="w-3 h-3" /> 接口
               </span>
             )}
           </div>
@@ -851,7 +880,7 @@ export default function Chat() {
             <button
               onClick={handleNewChat}
               className="p-2 text-gray-400 hover:text-white hover:bg-dark-800 rounded-lg transition-colors"
-              title="New chat"
+              title="新建会话"
             >
               <Plus className="w-4 h-4" />
             </button>
@@ -860,7 +889,7 @@ export default function Chat() {
             <button
               onClick={() => { setShowSearch(s => !s); setSearchQuery(''); }}
               className="p-2 text-gray-400 hover:text-white hover:bg-dark-800 rounded-lg transition-colors"
-              title="Search messages"
+              title="搜索消息"
             >
               <Search className="w-4 h-4" />
             </button>
@@ -870,7 +899,7 @@ export default function Chat() {
               onClick={handleClear}
               disabled={messages.length === 0}
               className="p-2 text-gray-400 hover:text-red-400 hover:bg-dark-800 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-              title="Clear chat"
+              title="清空会话"
             >
               <Trash2 className="w-4 h-4" />
             </button>
@@ -880,7 +909,7 @@ export default function Chat() {
               <button
                 disabled={messages.length === 0}
                 className="p-2 text-gray-400 hover:text-primary-400 hover:bg-dark-800 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                title="Export conversation"
+                title="导出会话"
               >
                 <Download className="w-4 h-4" />
               </button>
@@ -914,7 +943,7 @@ export default function Chat() {
                 setWhatsappLoading(false);
               }}
               className="p-2 text-gray-400 hover:text-green-400 hover:bg-dark-800 rounded-lg transition-colors"
-              title="WhatsApp QR"
+              title="WhatsApp 二维码"
             >
               <QrCode className="w-4 h-4" />
             </button>
@@ -930,7 +959,7 @@ export default function Chat() {
                   ? 'text-primary-400 bg-primary-500/15 hover:bg-primary-500/25'
                   : 'text-gray-400 hover:text-white hover:bg-dark-800'
               }`}
-              title={isRtl ? 'Switch to LTR' : 'Switch to RTL (Hebrew)'}
+              title={isRtl ? '切换为左到右' : '切换为右到左（希伯来语）'}
             >
               <Languages className="w-4 h-4" />
             </button>
@@ -943,7 +972,7 @@ export default function Chat() {
                   ? 'text-amber-400 bg-amber-500/15 hover:bg-amber-500/25'
                   : 'text-gray-400 hover:text-white hover:bg-dark-800'
               }`}
-              title={isStyled ? 'Plain text mode' : 'Styled text mode'}
+              title={isStyled ? '纯文本模式' : '样式模式'}
             >
               <Sparkles className="w-4 h-4" />
             </button>
@@ -956,7 +985,7 @@ export default function Chat() {
                   ? 'text-purple-400 bg-purple-500/15 hover:bg-purple-500/25'
                   : 'text-gray-400 hover:text-white hover:bg-dark-800'
               }`}
-              title={chatTheme === 'glass' ? 'Default theme' : 'Glass theme'}
+              title={chatTheme === 'glass' ? '默认主题' : '玻璃主题'}
             >
               <Palette className="w-4 h-4" />
             </button>
@@ -972,7 +1001,7 @@ export default function Chat() {
                 ref={searchInputRef}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search messages..."
+                placeholder="搜索消息..."
                 className="w-full pl-10 pr-8 py-2 rounded-lg bg-dark-800 border border-gray-700 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-primary-500 transition-colors"
               />
               {searchQuery && (
@@ -986,7 +1015,7 @@ export default function Chat() {
             </div>
             {searchQuery && (
               <p className="text-xs text-gray-500 mt-1">
-                {filteredMessages.length} result{filteredMessages.length !== 1 ? 's' : ''} found
+                找到 {filteredMessages.length} 条结果
               </p>
             )}
           </div>
@@ -996,7 +1025,7 @@ export default function Chat() {
         {wsError && (
           <div className="flex items-center gap-2 px-4 py-2 bg-red-500/10 border-b border-red-500/20 text-red-400 text-sm">
             <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>{wsError} -- using REST API fallback</span>
+            <span>{wsError} —— 正在使用 REST 接口兜底</span>
             <button
               onClick={() => setWsError(null)}
               className="ml-auto text-red-400 hover:text-red-300"
@@ -1014,8 +1043,8 @@ export default function Chat() {
               <div className="w-20 h-20 mb-6 rounded-2xl bg-dark-800 border border-gray-800 flex items-center justify-center">
                 <Bot className="w-10 h-10 text-primary-500 opacity-60" />
               </div>
-              <p className="text-2xl font-bold text-gray-400 mb-2">ClawdAgent</p>
-              <p className="text-sm text-gray-600">Send a message to start</p>
+              <p className="text-2xl font-bold text-gray-400 mb-2">a4claw</p>
+              <p className="text-sm text-gray-600">发送一条消息开始对话</p>
             </div>
           )}
 
@@ -1023,7 +1052,7 @@ export default function Chat() {
           {messages.length > 0 && filteredMessages.length === 0 && searchQuery && (
             <div className="flex flex-col items-center justify-center py-20 text-gray-500">
               <Search className="w-12 h-12 mb-4 opacity-30" />
-              <p className="text-sm">No messages match "{searchQuery}"</p>
+              <p className="text-sm">没有匹配“{searchQuery}”的消息</p>
             </div>
           )}
 
@@ -1072,7 +1101,7 @@ export default function Chat() {
                         {(m as any).modelDisplay && (
                           <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
                             isGlass ? 'bg-amber-400/10 text-amber-200 border border-amber-400/20' : 'bg-amber-500/15 text-amber-300'
-                          }`} title={`Model: ${(m as any).modelDisplay}`}>
+                          }`} title={`模型：${(m as any).modelDisplay}`}>
                             🤖 {(m as any).modelDisplay}
                           </span>
                         )}
@@ -1098,7 +1127,7 @@ export default function Chat() {
                           }`}
                         >
                           <Brain className="w-3.5 h-3.5" />
-                          <span>THINKING</span>
+                          <span>思考中</span>
                           {expandedThinking.has(`${m.id}_collapsed`)
                             ? <ChevronDown className="w-3 h-3" />
                             : <ChevronUp className="w-3 h-3" />
@@ -1135,7 +1164,7 @@ export default function Chat() {
                           }`}
                         >
                           <Wrench className="w-3.5 h-3.5" />
-                          <span>{m.progressLog.filter(e => e.type === 'tool').length} STEPS</span>
+                          <span>{m.progressLog.filter(e => e.type === 'tool').length} 步</span>
                           {expandedThinking.has(`${m.id}_progress_collapsed`)
                             ? <ChevronDown className="w-3 h-3" />
                             : <ChevronUp className="w-3 h-3" />
@@ -1171,6 +1200,36 @@ export default function Chat() {
                       ? renderFormattedContent(m.content)
                       : renderMessageContent(m.content)
                     }
+
+                    {/* Generated files */}
+                    {!isUser && m.artifacts && m.artifacts.length > 0 && (
+                      <div className="mt-2 space-y-1.5">
+                        {m.artifacts.map((artifact, idx) => (
+                          <div key={artifact.id || `${artifact.name}-${idx}`} className={`rounded-lg border px-2.5 py-2 ${isGlass ? 'border-gray-600/40 bg-dark-900/40' : 'border-gray-700/60 bg-dark-900/70'}`}>
+                            <div className="flex items-center gap-2">
+                              <FileIcon className="w-3.5 h-3.5 text-blue-300 shrink-0" />
+                              <div className="min-w-0 flex-1">
+                                <p className="text-xs text-gray-200 truncate">{artifact.originalName || artifact.name}</p>
+                                <p className="text-[10px] text-gray-500">{formatSize(artifact.size)}</p>
+                              </div>
+                              <button
+                                onClick={() => downloadArtifact(artifact)}
+                                className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] bg-primary-600/20 text-primary-300 hover:bg-primary-600/30"
+                                title="下载文件"
+                              >
+                                <Download className="w-3 h-3" />
+                                下载
+                              </button>
+                            </div>
+                            {artifact.path && (
+                              <p className="mt-1 text-[10px] text-gray-500 break-all">
+                                路径: {artifact.path}
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
 
                     {/* Metadata footer — cost, tokens, model, time */}
                     {!isUser && m.tokens && (
@@ -1222,14 +1281,14 @@ export default function Chat() {
                               navigator.clipboard.writeText(m.content);
                             }}
                             className="p-1 rounded text-gray-500 hover:text-white hover:bg-gray-700/50 transition-colors"
-                            title="Copy message"
+                            title="复制消息"
                           >
                             <Copy className="w-3 h-3" />
                           </button>
                           <button
                             onClick={() => handleRetry(m.id)}
                             className="p-1 rounded text-gray-500 hover:text-white hover:bg-gray-700/50 transition-colors"
-                            title="Retry"
+                            title="重试"
                           >
                             <RotateCcw className="w-3 h-3" />
                           </button>
@@ -1333,13 +1392,13 @@ export default function Chat() {
                       <div className="flex items-center gap-2">
                         <Loader2 className="w-3.5 h-3.5 text-primary-400 animate-spin shrink-0" />
                         <span className="text-xs font-medium text-gray-300">
-                          {currentAgent || (isRtl ? 'מעבד...' : 'Processing...')}
+                          {currentAgent || (isRtl ? 'מעבד...' : '处理中...')}
                         </span>
                       </div>
                       <div className="flex items-center gap-2 text-[10px] text-gray-500">
-                        {toolCount > 0 && <span>{toolCount} {isRtl ? 'צעדים' : 'steps'}</span>}
-                        {errorCount > 0 && <span className="text-red-400">{errorCount} {isRtl ? 'שגיאות' : 'errors'}</span>}
-                        {Number(elapsed) > 0 && <span>{elapsed}s</span>}
+                        {toolCount > 0 && <span>{toolCount} {isRtl ? 'צעדים' : '步骤'}</span>}
+                        {errorCount > 0 && <span className="text-red-400">{errorCount} {isRtl ? 'שגיאות' : '错误'}</span>}
+                        {Number(elapsed) > 0 && <span>{elapsed}秒</span>}
                       </div>
                     </div>
 
@@ -1347,22 +1406,22 @@ export default function Chat() {
                     {realEvents.length > 0 && (
                       <div className="flex items-center gap-1 mb-2 flex-wrap">
                         {([
-                          { key: 'router', label: 'Router', icon: <GitBranch className="w-2.5 h-2.5" />,
+                          { key: 'router', label: '路由', icon: <GitBranch className="w-2.5 h-2.5" />,
                             active: 'bg-violet-500/30 text-violet-200 border-violet-400/50',
                             hit: 'bg-violet-500/10 text-violet-400/70 border-violet-500/20' },
-                          { key: 'agent', label: 'Agent', icon: <Cpu className="w-2.5 h-2.5" />,
+                          { key: 'agent', label: '智能体', icon: <Cpu className="w-2.5 h-2.5" />,
                             active: 'bg-blue-500/30 text-blue-200 border-blue-400/50',
                             hit: 'bg-blue-500/10 text-blue-400/70 border-blue-500/20' },
-                          { key: 'engine', label: 'Engine', icon: <Cog className="w-2.5 h-2.5" />,
+                          { key: 'engine', label: '引擎', icon: <Cog className="w-2.5 h-2.5" />,
                             active: 'bg-cyan-500/30 text-cyan-200 border-cyan-400/50',
                             hit: 'bg-cyan-500/10 text-cyan-400/70 border-cyan-500/20' },
-                          { key: 'provider', label: 'LLM', icon: <Zap className="w-2.5 h-2.5" />,
+                          { key: 'provider', label: '模型', icon: <Zap className="w-2.5 h-2.5" />,
                             active: 'bg-yellow-500/30 text-yellow-200 border-yellow-400/50',
                             hit: 'bg-yellow-500/10 text-yellow-400/70 border-yellow-500/20' },
-                          { key: 'tool', label: 'Tools', icon: <Wrench className="w-2.5 h-2.5" />,
+                          { key: 'tool', label: '工具', icon: <Wrench className="w-2.5 h-2.5" />,
                             active: 'bg-green-500/30 text-green-200 border-green-400/50',
                             hit: 'bg-green-500/10 text-green-400/70 border-green-500/20' },
-                          { key: 'security', label: 'Security', icon: <Shield className="w-2.5 h-2.5" />,
+                          { key: 'security', label: '安全', icon: <Shield className="w-2.5 h-2.5" />,
                             active: 'bg-rose-500/30 text-rose-200 border-rose-400/50',
                             hit: 'bg-rose-500/10 text-rose-400/70 border-rose-500/20' },
                         ] as { key: string; label: string; icon: JSX.Element; active: string; hit: string }[]).map((stage, idx) => {
@@ -1388,7 +1447,7 @@ export default function Chat() {
                     {/* Event log — with component badges */}
                     {visible.length === 0 ? (
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-400 animate-pulse">{isRtl ? '...מתחיל לעבוד' : 'Starting...'}</span>
+                        <span className="text-xs text-gray-400 animate-pulse">{isRtl ? '...מתחיל לעבוד' : '启动中...'}</span>
                       </div>
                     ) : (
                       <div className="space-y-1.5">
@@ -1420,10 +1479,10 @@ export default function Chat() {
                             <Loader2 className="w-3 h-3 text-primary-400 animate-spin shrink-0" />
                             <span className="text-[10px] text-gray-400 animate-pulse">
                               {visible[visible.length - 1].type === 'tool'
-                                ? (isRtl ? '...מריץ כלי' : 'Running tool...')
+                                ? (isRtl ? '...מריץ כלי' : '工具执行中...')
                                 : visible[visible.length - 1].type === 'thinking'
-                                ? (isRtl ? '...חושב' : 'Thinking...')
-                                : (isRtl ? '...עובד' : 'Working...')}
+                                ? (isRtl ? '...חושב' : '思考中...')
+                                : (isRtl ? '...עובד' : '处理中...')}
                             </span>
                           </div>
                         )}
@@ -1445,7 +1504,7 @@ export default function Chat() {
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <QrCode className="w-5 h-5 text-green-400" />
-                  <h3 className="font-semibold text-white">WhatsApp QR</h3>
+                  <h3 className="font-semibold text-white">WhatsApp 二维码</h3>
                 </div>
                 <button onClick={() => setShowWhatsAppQR(false)} className="text-gray-400 hover:text-white">
                   <X className="w-5 h-5" />
@@ -1454,20 +1513,20 @@ export default function Chat() {
               {whatsappLoading ? (
                 <div className="flex flex-col items-center py-8">
                   <Loader2 className="w-8 h-8 text-green-400 animate-spin mb-3" />
-                  <p className="text-sm text-gray-400">Loading QR code...</p>
+                  <p className="text-sm text-gray-400">正在加载二维码...</p>
                 </div>
               ) : whatsappQR?.status === 'authenticated' ? (
                 <div className="text-center py-6">
                   <div className="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-3">
                     <Wifi className="w-6 h-6 text-green-400" />
                   </div>
-                  <p className="text-green-400 font-medium">WhatsApp Connected</p>
-                  <p className="text-xs text-gray-500 mt-1">Already authenticated</p>
+                  <p className="text-green-400 font-medium">WhatsApp 已连接</p>
+                  <p className="text-xs text-gray-500 mt-1">已完成认证</p>
                 </div>
               ) : whatsappQR?.qrDataUrl ? (
                 <div className="text-center">
-                  <img src={whatsappQR.qrDataUrl} alt="WhatsApp QR Code" className="mx-auto rounded-lg border border-gray-700 max-w-[250px]" />
-                  <p className="text-xs text-gray-400 mt-3">Scan with WhatsApp to connect</p>
+                  <img src={whatsappQR.qrDataUrl} alt="WhatsApp 二维码" className="mx-auto rounded-lg border border-gray-700 max-w-[250px]" />
+                  <p className="text-xs text-gray-400 mt-3">使用 WhatsApp 扫码连接</p>
                   <button
                     onClick={async () => {
                       setWhatsappLoading(true);
@@ -1479,15 +1538,15 @@ export default function Chat() {
                     }}
                     className="mt-3 px-4 py-2 bg-dark-900 border border-gray-700 rounded-lg text-xs text-gray-300 hover:bg-dark-800 transition-colors"
                   >
-                    Refresh QR
+                    刷新二维码
                   </button>
                 </div>
               ) : (
                 <div className="text-center py-6">
                   <p className="text-gray-400 text-sm">
-                    {whatsappQR?.status === 'error' ? 'Failed to load QR code' : 'No QR code available'}
+                    {whatsappQR?.status === 'error' ? '二维码加载失败' : '暂无二维码'}
                   </p>
-                  <p className="text-xs text-gray-500 mt-1">WhatsApp may not be enabled</p>
+                  <p className="text-xs text-gray-500 mt-1">可能尚未启用 WhatsApp</p>
                 </div>
               )}
             </div>
@@ -1499,8 +1558,8 @@ export default function Chat() {
           <div className="absolute inset-0 z-30 bg-primary-600/10 border-2 border-dashed border-primary-500 rounded-lg flex items-center justify-center backdrop-blur-sm">
             <div className="text-center">
               <Paperclip className="w-12 h-12 text-primary-400 mx-auto mb-3" />
-              <p className="text-lg font-semibold text-primary-300">Drop file here</p>
-              <p className="text-sm text-gray-400 mt-1">Images, PDFs, documents, code files</p>
+              <p className="text-lg font-semibold text-primary-300">将文件拖到这里</p>
+              <p className="text-sm text-gray-400 mt-1">图片、PDF、文档、代码文件</p>
             </div>
           </div>
         )}
@@ -1549,7 +1608,7 @@ export default function Chat() {
               onClick={() => fileInputRef.current?.click()}
               disabled={isLoading}
               className="p-3 rounded-xl text-gray-400 hover:text-primary-400 hover:bg-dark-800 transition-colors disabled:opacity-40 shrink-0"
-              title="Attach file (images, PDFs, documents)"
+              title="添加附件（图片、PDF、文档）"
             >
               <Paperclip className="w-5 h-5" />
             </button>
@@ -1563,7 +1622,7 @@ export default function Chat() {
                     ? (RESPONSE_MODES.find(m => m.id === responseMode)?.color ?? 'text-gray-400')
                     : 'text-gray-400'
                 }`}
-                title={`${isRtl ? 'מצב תגובה' : 'Response mode'}: ${RESPONSE_MODES.find(m => m.id === responseMode)?.label ?? 'Auto'}`}
+                title={`${isRtl ? 'מצב תגובה' : '响应模式'}: ${RESPONSE_MODES.find(m => m.id === responseMode)?.label ?? '自动'}`}
               >
                 {responseMode === 'auto' ? <Cpu className="w-5 h-5" /> :
                  responseMode === 'quick' ? <Zap className="w-5 h-5" /> :
@@ -1578,7 +1637,7 @@ export default function Chat() {
                         key={mode.id}
                         onClick={() => {
                           setResponseMode(mode.id);
-                          localStorage.setItem('clawdagent-response-mode', mode.id);
+                          localStorage.setItem('a4claw-response-mode', mode.id);
                           setShowModeMenu(false);
                         }}
                         className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-dark-700 transition-colors ${
@@ -1604,7 +1663,7 @@ export default function Chat() {
                 className={`p-3 rounded-xl hover:bg-dark-800 transition-colors shrink-0 ${
                   selectedModel !== 'auto' ? 'text-green-400' : 'text-gray-400'
                 }`}
-                title={`${isRtl ? 'מודל' : 'Model'}: ${modelList.find(m => m.id === selectedModel)?.name ?? 'Auto'}`}
+                title={`${isRtl ? 'מודל' : '模型'}: ${modelList.find(m => m.id === selectedModel)?.name ?? '自动'}`}
               >
                 <Bot className="w-5 h-5" />
               </button>
@@ -1614,12 +1673,12 @@ export default function Chat() {
                     const modelsInTier = modelList.filter(m => m.tier === tier);
                     if (modelsInTier.length === 0) return null;
                     const tierLabel: Record<string, string> = {
-                      auto: isRtl ? 'אוטומטי' : 'Automatic',
-                      free: isRtl ? 'חינמי' : 'Free',
-                      cheap: isRtl ? 'חסכוני' : 'Economy',
-                      mid: isRtl ? 'סטנדרטי' : 'Standard',
-                      premium: isRtl ? 'פרימיום' : 'Premium',
-                      ultra: isRtl ? 'אולטרה' : 'Ultra',
+                      auto: isRtl ? 'אוטומטי' : '自动',
+                      free: isRtl ? 'חינמי' : '免费',
+                      cheap: isRtl ? 'חסכוני' : '经济',
+                      mid: isRtl ? 'סטנדרטי' : '标准',
+                      premium: isRtl ? 'פרימיום' : '高级',
+                      ultra: isRtl ? 'אולטרה' : '旗舰',
                     };
                     const tierColor: Record<string, string> = {
                       auto: 'bg-blue-400', free: 'bg-gray-400', cheap: 'bg-green-400',
@@ -1635,7 +1694,7 @@ export default function Chat() {
                             key={model.id}
                             onClick={() => {
                               setSelectedModel(model.id);
-                              localStorage.setItem('clawdagent-selected-model', model.id);
+                              localStorage.setItem('a4claw-selected-model', model.id);
                               setShowModelMenu(false);
                             }}
                             className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-dark-700 transition-colors ${
@@ -1692,11 +1751,11 @@ export default function Chat() {
               placeholder={
                 loadingConversationId
                   ? (loadingConversationId === activeConversationId
-                    ? (isRtl ? '...מעבד — לחץ Stop או Escape לביטול' : 'Processing... press Stop or Escape to cancel')
-                    : (isRtl ? '...שיחה אחרת מעובדת — לחץ Stop לביטול' : 'Another conversation is processing... press Stop to cancel'))
+                    ? (isRtl ? '...מעבד — לחץ Stop או Escape לביטול' : '处理中... 按 Stop 或 Escape 取消')
+                    : (isRtl ? '...שיחה אחרת מעובדת — לחץ Stop לביטול' : '另一条会话正在处理... 按 Stop 取消'))
                   : (attachedFile
-                    ? (isRtl ? `...הודעה על ${attachedFile.name}` : `Message about ${attachedFile.name}...`)
-                    : (isRtl ? '...כתוב הודעה' : 'Type a message...'))
+                    ? (isRtl ? `...הודעה על ${attachedFile.name}` : `关于 ${attachedFile.name} 的消息...`)
+                    : (isRtl ? '...כתוב הודעה' : '输入消息...'))
               }
               disabled={false}
               rows={1}
@@ -1711,7 +1770,7 @@ export default function Chat() {
               <button
                 onClick={handleCancel}
                 className="p-3 rounded-xl bg-red-600 text-white hover:bg-red-700 transition-colors shrink-0"
-                title="Stop"
+                title="停止"
               >
                 <Square className="w-5 h-5" />
               </button>
@@ -1720,14 +1779,14 @@ export default function Chat() {
                 onClick={send}
                 disabled={!input.trim() && !attachedFile}
                 className="p-3 rounded-xl bg-primary-600 text-white hover:bg-primary-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
-                title="Send message"
+                title="发送消息"
               >
                 <Send className="w-5 h-5" />
               </button>
             )}
           </div>
           <p className="text-center text-[11px] text-gray-600 mt-2 hidden sm:block" dir="ltr">
-            Enter to send · Shift+Enter for new line · Paste/drop images & files{!wsConnected && ' · REST fallback'}
+            回车发送 · Shift+回车换行 · 粘贴/拖拽图片与文件{!wsConnected && ' · REST 接口兜底'}
           </p>
         </div>
       </div>

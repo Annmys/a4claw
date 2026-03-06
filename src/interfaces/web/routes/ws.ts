@@ -362,6 +362,7 @@ function setupMessageHandler(ws: WebSocket, engine: Engine, user: { userId: stri
         const responseData = {
           text: response.text,
           thinking: response.thinking,
+          artifacts: response.artifacts,
           agent: response.agentUsed,
           provider: response.provider,
           model: response.modelUsed,

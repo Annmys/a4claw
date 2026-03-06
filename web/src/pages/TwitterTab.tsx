@@ -12,7 +12,7 @@ interface TwitterAccount {
   handle?: string;
   userId?: string;
   cookieCount: number;
-  cookieFormat: string;
+  cookieFormat:string;
   status: 'untested' | 'active' | 'failed' | 'suspended' | 'locked';
   profileName?: string;
   lastVerified?: string;
@@ -70,8 +70,8 @@ const AGENT_STATE_COLORS: Record<string, string> = {
 };
 
 const ACTION_LABELS: Record<string, string> = {
-  tweet: 'Tweets', reply: 'Replies', like: 'Likes',
-  retweet: 'Retweets', follow: 'Follows', thread: 'Threads',
+  tweet: 'Tweets', reply: 'Replies', like: '点赞',
+  retweet: 'Retweets', follow: '关注', thread: 'Threads',
 };
 
 export default function TwitterTab() {
@@ -84,7 +84,7 @@ export default function TwitterTab() {
 
   // Add account dialog
   const [showAdd, setShowAdd] = useState(false);
-  const [addName, setAddName] = useState('');
+  const [add名称, setAdd名称] = useState('');
   const [addCookies, setAddCookies] = useState('');
   const [addSaving, setAddSaving] = useState(false);
   const [preview, setPreview] = useState<ParsePreview | null>(null);
@@ -105,9 +105,9 @@ export default function TwitterTab() {
   const [stoppingAgent, setStoppingAgent] = useState<string | null>(null);
 
   // Agent config form
-  const [cfgActions, setCfgActions] = useState<string[]>(['tweet', 'reply']);
-  const [cfgLanguage, setCfgLanguage] = useState('English');
-  const [cfgTone, setCfgTone] = useState('insightful and authentic');
+  const [cfg动作, setCfg动作] = useState<string[]>(['tweet', 'reply']);
+  const [cfg语言, setCfg语言] = useState('English');
+  const [cfg语气, setCfg语气] = useState('insightful and authentic');
   const [cfgTestMode, setCfgTestMode] = useState(false);
   const [cfgTopics, setCfgTopics] = useState('');
   const [cfgHashtags, setCfgHashtags] = useState('#AI, #Tech');
@@ -163,14 +163,14 @@ export default function TwitterTab() {
   };
 
   const handleAddAccount = async () => {
-    if (!addName.trim() || !addCookies.trim()) return;
+    if (!add名称.trim() || !addCookies.trim()) return;
     setAddSaving(true);
     setError(null);
     try {
-      const res = await fetch('/api/twitter/accounts', { method: 'POST', headers, body: JSON.stringify({ name: addName.trim(), cookies: addCookies.trim() }) });
+      const res = await fetch('/api/twitter/accounts', { method: 'POST', headers, body: JSON.stringify({ name: add名称.trim(), cookies: addCookies.trim() }) });
       if (!res.ok) { const e = await res.json().catch(() => ({ error: 'Failed' })); throw new Error(e.error ?? `HTTP ${res.status}`); }
       setShowAdd(false);
-      setAddName('');
+      setAdd名称('');
       setAddCookies('');
       setPreview(null);
       fetchAccounts();
@@ -231,10 +231,10 @@ export default function TwitterTab() {
     setError(null);
     try {
       const config: any = {
-        actions: cfgActions,
+        actions: cfg动作,
         content: {
-          tone: cfgTone,
-          language: cfgLanguage,
+          tone: cfg语气,
+          language: cfg语言,
           topics: cfgTopics.split(',').map(t => t.trim()).filter(Boolean),
           hashtags: cfgHashtags.split(',').map(h => h.trim()).filter(Boolean),
           maxLength: 280,
@@ -341,8 +341,8 @@ export default function TwitterTab() {
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800/50">
         <div>
-          <h2 className="text-lg font-bold text-white">Twitter / X Accounts</h2>
-          <p className="text-xs text-gray-500">Manage accounts and run autonomous AI agents</p>
+          <h2 className="text-lg font-bold text-white">Twitter / X 账号</h2>
+          <p className="text-xs text-gray-500">管理账号并运行自治 AI 智能体</p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => { fetchAccounts(); fetchAgentStatuses(); }} className="p-2 text-gray-400 hover:text-white transition-colors">
@@ -353,7 +353,7 @@ export default function TwitterTab() {
             className="flex items-center gap-2 px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium rounded-lg transition-colors"
           >
             <Plus className="w-4 h-4" />
-            Add Account
+            添加账号
           </button>
         </div>
       </div>
@@ -399,7 +399,7 @@ export default function TwitterTab() {
                 <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
               </svg>
             </div>
-            <h3 className="text-lg font-semibold text-gray-400 mb-2">No Twitter / X Accounts</h3>
+            <h3 className="text-lg font-semibold text-gray-400 mb-2">暂无 Twitter / X 账号</h3>
             <p className="text-sm text-gray-600 mb-6 max-w-md mx-auto">
               Add a Twitter/X account by pasting cookies from Cookie Editor or plain cookie string.
             </p>
@@ -417,7 +417,7 @@ export default function TwitterTab() {
               const status = STATUS_CONFIG[account.status] || STATUS_CONFIG.untested;
               const StatusIcon = status.icon;
               const agentStatus = agentStatuses[account.id];
-              const isAgentRunning = agentStatus && (agentStatus.state === 'running' || agentStatus.state === 'paused');
+              const isAgent运行ning = agentStatus && (agentStatus.state === 'running' || agentStatus.state === 'paused');
 
               return (
                 <div key={account.id} className="bg-dark-800/50 border border-gray-700/50 rounded-lg">
@@ -438,11 +438,11 @@ export default function TwitterTab() {
                               <StatusIcon className={`w-3 h-3 ${status.color}`} />
                               <span className={status.color}>{status.label}</span>
                             </span>
-                            {isAgentRunning && (
+                            {isAgent运行ning && (
                               <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium border bg-purple-500/10 border-purple-500/30`}>
                                 <Bot className="w-3 h-3 text-purple-400" />
                                 <span className={AGENT_STATE_COLORS[agentStatus.state]}>
-                                  Agent {agentStatus.state === 'paused' ? 'Paused' : 'Running'}
+                                  Agent {agentStatus.state === 'paused' ? 'Paused' : '运行ning'}
                                 </span>
                               </span>
                             )}
@@ -465,12 +465,12 @@ export default function TwitterTab() {
 
                       <div className="flex items-center gap-2">
                         {/* Agent controls */}
-                        {!isAgentRunning ? (
+                        {!isAgent运行ning ? (
                           <button
-                            onClick={() => { setShowAgentConfig(account.id); setCfgActions(['tweet', 'reply']); setCfgTestMode(false); }}
+                            onClick={() => { setShowAgentConfig(account.id); setCfg动作(['tweet', 'reply']); setCfgTestMode(false); }}
                             disabled={account.status === 'failed' || account.status === 'suspended'}
                             className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white text-xs rounded-md transition-colors disabled:opacity-50"
-                            title="Start AI Agent"
+                            title="启动 AI 智能体"
                           >
                             <Bot className="w-3.5 h-3.5" />
                             Agent
@@ -536,7 +536,7 @@ export default function TwitterTab() {
                   </div>
 
                   {/* Agent stats row (when agent is running) */}
-                  {isAgentRunning && agentStatus && (
+                  {isAgent运行ning && agentStatus && (
                     <div className="px-4 pb-3 border-t border-gray-800/30">
                       <div className="flex items-center gap-4 pt-2 text-[11px]">
                         <span className="text-gray-500">
@@ -545,11 +545,11 @@ export default function TwitterTab() {
                         </span>
                         {agentStatus.stats.tweets > 0 && <span className="text-gray-500">Tweets: {agentStatus.stats.tweets}</span>}
                         {agentStatus.stats.replies > 0 && <span className="text-gray-500">Replies: {agentStatus.stats.replies}</span>}
-                        {agentStatus.stats.likes > 0 && <span className="text-gray-500">Likes: {agentStatus.stats.likes}</span>}
+                        {agentStatus.stats.likes > 0 && <span className="text-gray-500">点赞: {agentStatus.stats.likes}</span>}
                         {agentStatus.stats.retweets > 0 && <span className="text-gray-500">Retweets: {agentStatus.stats.retweets}</span>}
-                        {agentStatus.stats.follows > 0 && <span className="text-gray-500">Follows: {agentStatus.stats.follows}</span>}
+                        {agentStatus.stats.follows > 0 && <span className="text-gray-500">关注: {agentStatus.stats.follows}</span>}
                         {agentStatus.stats.threads > 0 && <span className="text-gray-500">Threads: {agentStatus.stats.threads}</span>}
-                        {agentStatus.stats.errors > 0 && <span className="text-red-400">Errors: {agentStatus.stats.errors}</span>}
+                        {agentStatus.stats.errors > 0 && <span className="text-red-400">错误: {agentStatus.stats.errors}</span>}
                         {agentStatus.currentAction && (
                           <span className="text-purple-400 animate-pulse">
                             Now: {agentStatus.currentAction}
@@ -571,7 +571,7 @@ export default function TwitterTab() {
                       {agentStatus?.config && (
                         <div className="px-4 py-2 border-b border-gray-800/20 flex flex-wrap items-center gap-3 text-[11px]">
                           <span className="text-purple-300">
-                            Actions: {(agentStatus.config as any).actions?.join(', ') || 'N/A'}
+                            动作: {(agentStatus.config as any).actions?.join(', ') || 'N/A'}
                           </span>
                           {(agentStatus.config as any).content?.targetAccounts?.length > 0 && (
                             <span className="flex items-center gap-1 text-sky-300">
@@ -597,7 +597,7 @@ export default function TwitterTab() {
                         <div className="flex items-center justify-between px-4 py-2 border-b border-gray-800/20">
                           <div className="flex items-center gap-2">
                             <Radio className="w-3.5 h-3.5 text-red-400 animate-pulse" />
-                            <span className="text-xs font-semibold text-gray-400">Live Agent Logs</span>
+                            <span className="text-xs font-semibold text-gray-400">实时智能体日志</span>
                             <span className="text-[10px] text-gray-600">
                               ({agentLogs[account.id]?.length || 0} entries, auto-refresh 5s)
                             </span>
@@ -636,7 +636,7 @@ export default function TwitterTab() {
                           }}
                         >
                           {!agentLogs[account.id] || agentLogs[account.id].length === 0 ? (
-                            <p className="text-[11px] text-gray-600 py-4 text-center">Waiting for agent activity...</p>
+                            <p className="text-[11px] text-gray-600 py-4 text-center">等待智能体活动中...</p>
                           ) : (
                             <div className="space-y-0.5">
                               {agentLogs[account.id].map((log, i) => (
@@ -685,24 +685,24 @@ export default function TwitterTab() {
           <div className="bg-dark-900 border border-gray-700/50 rounded-xl shadow-2xl p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center gap-2 mb-1">
               <Bot className="w-5 h-5 text-purple-400" />
-              <h3 className="text-lg font-bold text-white">Start AI Agent</h3>
+              <h3 className="text-lg font-bold text-white">启动 AI 智能体</h3>
             </div>
             <p className="text-xs text-gray-500 mb-4">
               Configure the autonomous agent for {accounts.find(a => a.id === showAgentConfig)?.name}
             </p>
 
-            {/* Actions */}
+            {/* 动作 */}
             <div className="mb-4">
-              <label className="block text-sm text-gray-400 mb-2">Enabled Actions</label>
+              <label className="block text-sm text-gray-400 mb-2">启用动作</label>
               <div className="flex flex-wrap gap-2">
                 {(['tweet', 'reply', 'like', 'retweet', 'follow', 'thread'] as const).map(action => (
                   <button
                     key={action}
-                    onClick={() => setCfgActions(prev =>
+                    onClick={() => setCfg动作(prev =>
                       prev.includes(action) ? prev.filter(a => a !== action) : [...prev, action]
                     )}
                     className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${
-                      cfgActions.includes(action)
+                      cfg动作.includes(action)
                         ? 'bg-purple-500/20 border-purple-500/50 text-purple-300'
                         : 'bg-dark-800 border-gray-700/50 text-gray-500 hover:text-gray-300'
                     }`}
@@ -713,24 +713,24 @@ export default function TwitterTab() {
               </div>
             </div>
 
-            {/* Language + Tone */}
+            {/* 语言 + 语气 */}
             <div className="grid grid-cols-2 gap-3 mb-4">
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Language</label>
+                <label className="block text-sm text-gray-400 mb-1">语言</label>
                 <input
                   type="text"
-                  value={cfgLanguage}
-                  onChange={e => setCfgLanguage(e.target.value)}
+                  value={cfg语言}
+                  onChange={e => setCfg语言(e.target.value)}
                   placeholder="English"
                   className="w-full bg-dark-800 border border-gray-700/50 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-purple-500/50"
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Tone</label>
+                <label className="block text-sm text-gray-400 mb-1">语气</label>
                 <input
                   type="text"
-                  value={cfgTone}
-                  onChange={e => setCfgTone(e.target.value)}
+                  value={cfg语气}
+                  onChange={e => setCfg语气(e.target.value)}
                   placeholder="insightful and authentic"
                   className="w-full bg-dark-800 border border-gray-700/50 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-purple-500/50"
                 />
@@ -739,7 +739,7 @@ export default function TwitterTab() {
 
             {/* Topics */}
             <div className="mb-4">
-              <label className="block text-sm text-gray-400 mb-1">Topics (comma-separated)</label>
+              <label className="block text-sm text-gray-400 mb-1">主题（逗号分隔）</label>
               <input
                 type="text"
                 value={cfgTopics}
@@ -751,7 +751,7 @@ export default function TwitterTab() {
 
             {/* Hashtags */}
             <div className="mb-4">
-              <label className="block text-sm text-gray-400 mb-1">Hashtags (comma-separated)</label>
+              <label className="block text-sm text-gray-400 mb-1">话题标签（逗号分隔）</label>
               <input
                 type="text"
                 value={cfgHashtags}
@@ -759,12 +759,12 @@ export default function TwitterTab() {
                 placeholder="#AI, #Tech"
                 className="w-full bg-dark-800 border border-gray-700/50 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-purple-500/50"
               />
-              <p className="text-[10px] text-gray-600 mt-1">Hashtags to include in tweets when relevant</p>
+              <p className="text-[10px] text-gray-600 mt-1">在相关推文中附带的话题标签</p>
             </div>
 
             {/* Target Accounts */}
             <div className="mb-4">
-              <label className="block text-sm text-gray-400 mb-1">Target Accounts (comma-separated @handles)</label>
+              <label className="block text-sm text-gray-400 mb-1">目标账号（逗号分隔 @账号）</label>
               <input
                 type="text"
                 value={cfgTargetAccounts}
@@ -772,7 +772,7 @@ export default function TwitterTab() {
                 placeholder="@elonmusk, @OpenAI, @anthropikiAI"
                 className="w-full bg-dark-800 border border-gray-700/50 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-purple-500/50"
               />
-              <p className="text-[10px] text-gray-600 mt-1">Accounts to interact with (reply, like, retweet their content)</p>
+              <p className="text-[10px] text-gray-600 mt-1">要互动的账号（回复、点赞、转推其内容）</p>
             </div>
 
             {/* Test mode toggle */}
@@ -785,12 +785,12 @@ export default function TwitterTab() {
                 className="w-4 h-4 rounded border-gray-600 bg-dark-700 text-purple-500 focus:ring-purple-500"
               />
               <div>
-                <label htmlFor="testMode" className="text-sm text-white cursor-pointer">Test Mode</label>
-                <p className="text-[10px] text-gray-500">Log actions without executing them (dry run)</p>
+                <label htmlFor="testMode" className="text-sm text-white cursor-pointer">测试模式</label>
+                <p className="text-[10px] text-gray-500">只记录动作不执行（演练模式）</p>
               </div>
             </div>
 
-            {/* Actions */}
+            {/* 动作 */}
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setShowAgentConfig(null)}
@@ -800,13 +800,13 @@ export default function TwitterTab() {
               </button>
               <button
                 onClick={() => handleStartAgent(showAgentConfig)}
-                disabled={startingAgent !== null || cfgActions.length === 0}
+                disabled={startingAgent !== null || cfg动作.length === 0}
                 className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
               >
                 {startingAgent ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" />Starting...</>
+                  <><Loader2 className="w-4 h-4 animate-spin" />启动中...</>
                 ) : (
-                  <><Play className="w-4 h-4" />Start Agent</>
+                  <><Play className="w-4 h-4" />启动智能体</>
                 )}
               </button>
             </div>
@@ -814,22 +814,22 @@ export default function TwitterTab() {
         </div>
       )}
 
-      {/* Add Account Dialog */}
+      {/* 添加账号 Dialog */}
       {showAdd && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-dark-900 border border-gray-700/50 rounded-xl shadow-2xl p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-bold text-white mb-1">Add Twitter / X Account</h3>
+            <h3 className="text-lg font-bold text-white mb-1">添加 Twitter / X 账号</h3>
             <p className="text-xs text-gray-500 mb-4">
               Paste cookies from Cookie Editor (JSON) or plain cookie string.
             </p>
 
             {/* Account name */}
             <div className="mb-4">
-              <label className="block text-sm text-gray-400 mb-1.5">Account Name</label>
+              <label className="block text-sm text-gray-400 mb-1.5">账号名称</label>
               <input
                 type="text"
-                value={addName}
-                onChange={e => setAddName(e.target.value)}
+                value={add名称}
+                onChange={e => setAdd名称(e.target.value)}
                 placeholder="e.g. My Twitter Account"
                 className="w-full bg-dark-800 border border-gray-700/50 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-sky-500/50"
                 autoFocus
@@ -839,7 +839,7 @@ export default function TwitterTab() {
             {/* Cookies input */}
             <div className="mb-4">
               <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-sm text-gray-400">Cookies</label>
+                <label className="block text-sm text-gray-400">Cookie</label>
                 <button
                   onClick={() => setShowCookies(!showCookies)}
                   className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-gray-300"
@@ -891,10 +891,10 @@ export default function TwitterTab() {
                       </span>
                     </div>
                     <div className="text-[11px] text-gray-400 space-y-0.5">
-                      <p>Format: <span className="text-white">{preview.format.toUpperCase()}</span></p>
-                      <p>Cookies found: <span className="text-white">{preview.cookieCount}</span></p>
-                      {preview.userId && <p>User ID: <span className="text-white">{preview.userId}</span></p>}
-                      <p className="text-gray-500 truncate">Names: {preview.cookieNames.join(', ')}</p>
+                      <p>格式：<span className="text-white">{preview.format.toUpperCase()}</span></p>
+                      <p>发现 Cookies：<span className="text-white">{preview.cookieCount}</span></p>
+                      {preview.userId && <p>用户 ID：<span className="text-white">{preview.userId}</span></p>}
+                      <p className="text-gray-500 truncate">名称s: {preview.cookieNames.join(', ')}</p>
                     </div>
                     {preview.missing.length > 0 && (
                       <p className="text-[11px] text-red-400">Missing: {preview.missing.join(', ')}</p>
@@ -909,31 +909,31 @@ export default function TwitterTab() {
 
             {/* Format help */}
             <div className="mb-4 p-3 bg-dark-800 rounded-lg border border-gray-700/30">
-              <p className="text-[11px] font-semibold text-gray-400 mb-1.5">Supported Formats</p>
+              <p className="text-[11px] font-semibold text-gray-400 mb-1.5">支持格式</p>
               <div className="space-y-1 text-[10px] text-gray-500">
-                <p><span className="text-sky-400 font-medium">JSON</span> — Export from Cookie Editor browser extension</p>
-                <p><span className="text-sky-400 font-medium">Plain</span> — Cookie string: auth_token=abc; ct0=xyz; twid=u%3D123</p>
+                <p><span className="text-sky-400 font-medium">JSON</span> — 从 Cookie Editor 浏览器扩展导出</p>
+                <p><span className="text-sky-400 font-medium">Plain</span> — Cookie 字符串： auth_token=abc; ct0=xyz; twid=u%3D123</p>
               </div>
-              <p className="text-[10px] text-gray-600 mt-1.5">Required: <span className="text-white">auth_token</span> + <span className="text-white">ct0</span>. Recommended: <span className="text-gray-400">twid</span></p>
+              <p className="text-[10px] text-gray-600 mt-1.5">必填：<span className="text-white">auth_token</span> + <span className="text-white">ct0</span>。建议：<span className="text-gray-400">twid</span></p>
             </div>
 
-            {/* Actions */}
+            {/* 动作 */}
             <div className="flex justify-end gap-3">
               <button
-                onClick={() => { setShowAdd(false); setAddName(''); setAddCookies(''); setPreview(null); }}
+                onClick={() => { setShowAdd(false); setAdd名称(''); setAddCookies(''); setPreview(null); }}
                 className="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleAddAccount}
-                disabled={addSaving || !addName.trim() || !addCookies.trim()}
+                disabled={addSaving || !add名称.trim() || !addCookies.trim()}
                 className="flex items-center gap-2 px-4 py-2 bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
               >
                 {addSaving ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" />Saving...</>
+                  <><Loader2 className="w-4 h-4 animate-spin" />保存中...</>
                 ) : (
-                  <><Plus className="w-4 h-4" />Add Account</>
+                  <><Plus className="w-4 h-4" />添加账号</>
                 )}
               </button>
             </div>

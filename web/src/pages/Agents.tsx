@@ -200,7 +200,7 @@ export default function Agents() {
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
           <Bot className="w-7 h-7 text-primary-500" />
-          <h1 className="text-2xl font-bold">AI Agents</h1>
+          <h1 className="text-2xl font-bold">AI 智能体</h1>
           <span className="text-sm bg-green-600/20 text-green-400 px-3 py-0.5 rounded-full font-medium">
             {activeCount} Active
           </span>
@@ -212,10 +212,10 @@ export default function Agents() {
           <div className="flex items-center gap-4 mb-6 p-3 bg-dark-800 rounded-lg border border-gray-800 text-sm text-gray-400">
             <div className="flex items-center gap-2">
               <Zap className="w-4 h-4 text-yellow-400" />
-              <span>Routing engine online</span>
+              <span>路由引擎在线</span>
             </div>
             <span className="text-gray-700">|</span>
-            <span>Agents auto-selected per message intent</span>
+            <span>系统会根据消息意图自动选择智能体</span>
           </div>
         )}
 

@@ -35,7 +35,7 @@ const PAGE_SIZE = 20;
 // ── Platform visual config ─────────────────────────────────────────
 const platformConfig: Record<string, { icon: React.ElementType; color: string; bg: string; label: string }> = {
   telegram: { icon: Send,  color: 'text-blue-400',   bg: 'bg-blue-500/15',   label: 'Telegram' },
-  web:      { icon: Globe, color: 'text-green-400',  bg: 'bg-green-500/15',  label: 'Web' },
+  web:      { icon: Globe, color: 'text-green-400',  bg: 'bg-green-500/15',  label: '网页' },
   discord:  { icon: Hash,  color: 'text-purple-400', bg: 'bg-purple-500/15', label: 'Discord' },
 };
 
@@ -48,16 +48,16 @@ function timeAgo(dateStr: string): string {
   const now = new Date();
   const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
-  if (seconds < 60) return 'just now';
+  if (seconds < 60) return '刚刚';
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 60) return `${minutes}分钟前`;
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) return `${hours}小时前`;
   const days = Math.floor(hours / 24);
-  if (days === 1) return 'yesterday';
-  if (days < 7) return `${days}d ago`;
+  if (days === 1) return '昨天';
+  if (days < 7) return `${days}天前`;
   const weeks = Math.floor(days / 7);
-  if (weeks < 4) return `${weeks}w ago`;
+  if (weeks < 4) return `${weeks}周前`;
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
@@ -161,7 +161,7 @@ export default function History() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <Clock className="w-7 h-7 text-primary-500" />
-            <h1 className="text-2xl font-bold text-white">Conversation History</h1>
+            <h1 className="text-2xl font-bold text-white">会话历史</h1>
             {total > 0 && (
               <span className="text-sm text-gray-400">({total})</span>
             )}
@@ -171,7 +171,7 @@ export default function History() {
             onClick={refresh}
             disabled={refreshing}
             className="p-2 text-gray-400 hover:text-white hover:bg-dark-800 rounded-lg transition-colors disabled:opacity-50"
-            title="Refresh"
+            title="刷新"
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
           </button>
@@ -195,7 +195,7 @@ export default function History() {
                       : 'bg-dark-800 text-gray-400 hover:text-white hover:bg-dark-700 border border-gray-800'
                   }`}
                 >
-                  {p === 'all' ? 'All' : cfg?.label ?? p}
+                  {p === 'all' ? '全部' : cfg?.label ?? p}
                 </button>
               );
             })}
@@ -209,11 +209,11 @@ export default function History() {
         {conversations.length === 0 && (
           <div className="flex flex-col items-center justify-center py-24 text-gray-500">
             <Inbox className="w-16 h-16 mb-4 opacity-30" />
-            <p className="text-lg font-medium text-gray-400">No conversations found</p>
+            <p className="text-lg font-medium text-gray-400">未找到会话</p>
             <p className="text-sm mt-1 text-gray-600">
               {platform !== 'all'
-                ? `No conversations from ${getPlatformConfig(platform).label} yet`
-                : 'Chat history will appear here once conversations are recorded'}
+                ? `来自 ${getPlatformConfig(platform).label} 的会话暂时为空`
+                : '会话记录生成后会显示在这里'}
             </p>
           </div>
         )}
@@ -248,7 +248,7 @@ export default function History() {
                       <span className="text-xs text-gray-400 font-mono truncate">{convo.userId || convo.id?.slice(0, 8)}</span>
                     </div>
                     {/* Last message preview */}
-                    <p className="text-sm text-gray-300 truncate">{convo.title || getLastMessageText(convo.lastMessage) || 'No messages'}</p>
+                    <p className="text-sm text-gray-300 truncate">{convo.title || getLastMessageText(convo.lastMessage) || '暂无消息'}</p>
                   </div>
 
                   {/* Meta */}
@@ -277,13 +277,13 @@ export default function History() {
                       <div className="flex flex-wrap gap-4 text-xs text-gray-500 pb-2">
                         <span className="flex items-center gap-1">
                           <Clock className="w-3 h-3" />
-                          Started {getConvoTime(convo) ? new Date(getConvoTime(convo)).toLocaleString('en-US', {
+                          开始于 {getConvoTime(convo) ? new Date(getConvoTime(convo)).toLocaleString('zh-CN', {
                             month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
-                          }) : 'Unknown'}
+                          }) : '未知'}
                         </span>
                         <span className="flex items-center gap-1">
                           <MessageSquare className="w-3 h-3" />
-                          {convo.messageCount} message{convo.messageCount !== 1 ? 's' : ''}
+                          {convo.messageCount} 条消息
                         </span>
                         <span className="flex items-center gap-1 font-mono">
                           <User className="w-3 h-3" />
@@ -309,10 +309,10 @@ export default function History() {
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-2 mb-0.5">
                                     <span className={`text-xs font-medium ${isUserMsg ? 'text-primary-400' : 'text-gray-400'}`}>
-                                      {isUserMsg ? 'User' : 'Assistant'}
+                                      {isUserMsg ? '用户' : '助手'}
                                     </span>
                                     <span className="text-[10px] text-gray-600">
-                                      {new Date(msg.timestamp).toLocaleTimeString('en-US', {
+                                      {new Date(msg.timestamp).toLocaleTimeString('zh-CN', {
                                         hour: '2-digit', minute: '2-digit', hour12: false,
                                       })}
                                     </span>
@@ -325,11 +325,11 @@ export default function History() {
                         </div>
                       ) : (
                         <div className="bg-dark-800 rounded-lg border border-gray-800 p-3">
-                          <p className="text-xs text-gray-500 mb-1">Last message</p>
+                          <p className="text-xs text-gray-500 mb-1">最后一条消息</p>
                           <p className="text-sm text-gray-300">{getLastMessageText(convo.lastMessage)}</p>
                           {convo.messageCount > 1 && (
                             <p className="text-xs text-gray-600 mt-2">
-                              + {convo.messageCount - 1} earlier message{convo.messageCount - 1 !== 1 ? 's' : ''}
+                              + {convo.messageCount - 1} 条更早消息
                             </p>
                           )}
                         </div>
@@ -353,12 +353,12 @@ export default function History() {
               {loadingMore ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Loading...
+                  加载中...
                 </>
               ) : (
                 <>
                   <ChevronDown className="w-4 h-4" />
-                  Load More ({total - conversations.length} remaining)
+                  加载更多（剩余 {total - conversations.length} 条）
                 </>
               )}
             </button>
@@ -368,7 +368,7 @@ export default function History() {
         {/* ── End-of-list indicator ────────────────────────────── */}
         {!hasMore && conversations.length > 0 && (
           <div className="text-center py-6 text-xs text-gray-600">
-            All {total} conversation{total !== 1 ? 's' : ''} loaded
+            已加载全部 {total} 条会话
           </div>
         )}
       </div>

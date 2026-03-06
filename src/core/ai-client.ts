@@ -8,6 +8,7 @@ import { convertMessagesToOpenAI, STRONG_FALLBACK_CHAIN } from './model-router.j
 import { ClaudeCodeProvider } from '../providers/claude-code-provider.js';
 import { getCircuitBreaker, CircuitOpenError } from './circuit-breaker.js';
 import { trackAICall } from './metrics.js';
+import type { ChatArtifact } from './shared-artifacts.js';
 
 export interface Message {
   role: 'user' | 'assistant';
@@ -63,6 +64,7 @@ export interface AIResponse {
   stopReason: string;
   provider: string;
   modelUsed?: string;
+  artifacts?: ChatArtifact[];
   /** Citation sources when citations are enabled */
   citations?: Array<{ text: string; source: string; startIndex?: number; endIndex?: number }>;
 }
@@ -260,7 +262,7 @@ class OpenAIProvider implements ProviderClient {
   }
 
   async chat(request: AIRequest): Promise<AIResponse> {
-    const model = request.model ?? 'gpt-4o';
+    const model = (request.model ?? config.MODEL_OVERRIDE ?? config.AI_MODEL ?? 'gpt-4o').replace(/^openai\//, '');
     const messages = [
       { role: 'system' as const, content: request.systemPrompt },
       ...request.messages.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
@@ -1093,11 +1095,30 @@ export class AIClient {
             requestForProvider = { ...requestForProvider, fallbackModels: fallbacks };
           }
         }
+        if (providerName === 'openai') {
+          if (!modelStr || modelStr === 'undefined') {
+            requestForProvider = { ...sanitizedRequest, model: (config.MODEL_OVERRIDE || config.AI_MODEL || 'gpt-4o').replace(/^openai\//, '') };
+          } else if (modelStr.startsWith('openai/')) {
+            requestForProvider = { ...sanitizedRequest, model: modelStr.replace(/^openai\//, '') };
+          }
+        }
 
         try {
           const cb = getCircuitBreaker(`ai:${providerName}`, { failureThreshold: 5, cooldownMs: 30_000 });
           const callStart = Date.now();
-          const response = await cb.execute(() => provider.chat(requestForProvider));
+          const response = await cb.execute(async () => {
+            try {
+              return await provider.chat(requestForProvider);
+            } catch (err: any) {
+              // Do not open the circuit for deterministic client/request errors.
+              // Keep breaker for transient failures (429/5xx/network timeout).
+              const status = Number(err?.status);
+              if (!Number.isNaN(status) && status >= 400 && status < 500 && status !== 429) {
+                (err as any).ignoreForCircuitBreaker = true;
+              }
+              throw err;
+            }
+          });
           this.totalTokensUsed.input += response.usage.inputTokens;
           this.totalTokensUsed.output += response.usage.outputTokens;
           trackAICall(providerName, requestForProvider.model ?? 'default', Date.now() - callStart, response.usage.inputTokens, response.usage.outputTokens, true);
@@ -1174,13 +1195,19 @@ export class AIClient {
    */
   async chatWithTools(
     request: AIRequest,
-    toolExecutor: (name: string, input: Record<string, unknown>) => Promise<{ output: string; error?: string; success: boolean }>
+    toolExecutor: (name: string, input: Record<string, unknown>) => Promise<{
+      output: string;
+      error?: string;
+      success: boolean;
+      artifacts?: ChatArtifact[];
+    }>
   ): Promise<AIResponse & { toolsUsed: string[]; iterations: number }> {
     const messages: Message[] = [...request.messages];
     let lastResponse: AIResponse | null = null;
     let iterations = 0;
     const MAX_TOOL_ITERATIONS = request.maxToolIterations ?? 12;
     const toolsUsed: string[] = [];
+    const artifacts: ChatArtifact[] = [];
 
     while (iterations < MAX_TOOL_ITERATIONS) {
       // Signal stream reset before each AI call (clears partial text in frontend)
@@ -1190,7 +1217,8 @@ export class AIClient {
 
       // If no tool calls → we're done, return the text response
       if (!lastResponse.toolCalls?.length) {
-        return { ...lastResponse, toolsUsed, iterations };
+        const deduped = artifacts.filter((a, i, arr) => arr.findIndex(x => x.path === a.path) === i);
+        return { ...lastResponse, toolsUsed, iterations, artifacts: deduped };
       }
 
       // AI wants to use tools — build proper assistant content blocks
@@ -1216,6 +1244,7 @@ export class AIClient {
 
         try {
           const result = await toolExecutor(toolCall.name, toolCall.input);
+          if (result.artifacts?.length) artifacts.push(...result.artifacts);
           toolResultBlocks.push({
             type: 'tool_result',
             tool_use_id: toolCall.id,
@@ -1250,6 +1279,7 @@ export class AIClient {
       content: fallbackContent,
       toolsUsed,
       iterations,
+      artifacts: artifacts.filter((a, i, arr) => arr.findIndex(x => x.path === a.path) === i),
     };
   }
 

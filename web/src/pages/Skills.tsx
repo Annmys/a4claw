@@ -74,7 +74,7 @@ export default function Skills() {
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <Sparkles className="w-7 h-7 text-primary-500" />
-            <h1 className="text-2xl font-bold">Skills</h1>
+            <h1 className="text-2xl font-bold">技能</h1>
             <span className="text-sm text-gray-400">({skills.length})</span>
           </div>
           <button
@@ -93,14 +93,14 @@ export default function Skills() {
         {editingSkill && (
           <div className="mb-6 p-5 bg-dark-800 rounded-lg border border-primary-600/50">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold">{isNew ? 'Create Skill' : 'Edit Skill'}</h3>
+              <h3 className="font-semibold">{isNew ? '创建技能' : '编辑技能'}</h3>
               <button onClick={() => setEditingSkill(null)} className="text-gray-400 hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
             <div className="space-y-3">
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Name</label>
+                <label className="block text-sm text-gray-400 mb-1">名称</label>
                 <input
                   value={editingSkill.name ?? ''}
                   onChange={(e) => setEditingSkill({ ...editingSkill, name: e.target.value })}
@@ -109,7 +109,7 @@ export default function Skills() {
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Description</label>
+                <label className="block text-sm text-gray-400 mb-1">描述</label>
                 <input
                   value={editingSkill.description ?? ''}
                   onChange={(e) => setEditingSkill({ ...editingSkill, description: e.target.value })}
@@ -118,7 +118,7 @@ export default function Skills() {
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Trigger (regex pattern)</label>
+                <label className="block text-sm text-gray-400 mb-1">触发器（正则表达式）</label>
                 <input
                   value={editingSkill.trigger ?? ''}
                   onChange={(e) => setEditingSkill({ ...editingSkill, trigger: e.target.value })}
@@ -127,7 +127,7 @@ export default function Skills() {
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Prompt</label>
+                <label className="block text-sm text-gray-400 mb-1">提示词</label>
                 <textarea
                   value={editingSkill.prompt ?? ''}
                   onChange={(e) => setEditingSkill({ ...editingSkill, prompt: e.target.value })}
@@ -191,7 +191,7 @@ export default function Skills() {
           {skills.length === 0 && (
             <div className="text-center text-gray-500 py-12">
               <Sparkles className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p>No skills yet. Create your first skill!</p>
+              <p>还没有技能，先创建第一个吧！</p>
             </div>
           )}
         </div>

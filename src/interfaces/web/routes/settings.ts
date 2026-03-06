@@ -40,7 +40,7 @@ interface AppSettings {
     skillScanIntervalHours: number;
   };
   providerMode: 'free' | 'cheap' | 'balanced' | 'max';
-  language: 'auto' | 'he' | 'en';
+  language: 'auto' | 'he' | 'en' | 'zh';
 }
 
 function getDefaultSettings(): AppSettings {
@@ -211,7 +211,9 @@ export function setupSettingsRoutes(): Router {
     }
 
     if (updates.providerMode) current.providerMode = updates.providerMode;
-    if (updates.language) current.language = updates.language;
+    if (updates.language && ['auto', 'he', 'en', 'zh'].includes(updates.language)) {
+      current.language = updates.language;
+    }
 
     saveSettings(current);
     logger.info('Settings updated via dashboard');

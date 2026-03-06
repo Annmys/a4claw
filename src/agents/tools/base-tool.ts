@@ -4,6 +4,17 @@ export interface ToolResult {
   success: boolean;
   output: string;
   error?: string;
+  artifacts?: Array<{
+    id: string;
+    name: string;
+    originalName: string;
+    mime: string;
+    size: number;
+    path: string;
+    url: string;
+    userKey: string;
+    createdAt: string;
+  }>;
 }
 
 export abstract class BaseTool {

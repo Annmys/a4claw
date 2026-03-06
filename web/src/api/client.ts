@@ -1,5 +1,25 @@
 const BASE_URL = '/api';
 
+export interface ChatArtifact {
+  id: string;
+  name: string;
+  originalName?: string;
+  mime?: string;
+  size?: number;
+  path?: string;
+  url: string;
+  userKey?: string;
+  createdAt?: string;
+}
+
+export interface WebUser {
+  id: string;
+  username: string;
+  role: 'admin' | 'user';
+  lastLogin: string | null;
+  createdAt: string;
+}
+
 export async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = localStorage.getItem('token');
   const response = await fetch(`${BASE_URL}${path}`, {
@@ -54,8 +74,19 @@ export const api = {
   login: (username: string, password: string) => apiRequest<{ token: string }>('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
   register: (username: string, password: string) => apiRequest<{ token: string }>('/auth/register', { method: 'POST', body: JSON.stringify({ username, password }) }),
 
+  // User Management (Admin)
+  getUsers: () => apiRequest<{ users: WebUser[] }>('/users'),
+  createUser: (data: { username: string; password: string; role?: 'admin' | 'user' }) =>
+    apiRequest<{ user: WebUser }>('/users', { method: 'POST', body: JSON.stringify(data) }),
+  updateUserRole: (id: string, role: 'admin' | 'user') =>
+    apiRequest<{ success: boolean; user: WebUser }>(`/users/${id}/role`, { method: 'PUT', body: JSON.stringify({ role }) }),
+  resetUserPassword: (id: string, password: string) =>
+    apiRequest<{ success: boolean }>(`/users/${id}/password`, { method: 'PUT', body: JSON.stringify({ password }) }),
+  deleteUser: (id: string) =>
+    apiRequest<{ success: boolean }>(`/users/${id}`, { method: 'DELETE' }),
+
   // Chat
-  chat: (text: string, conversationId?: string, responseMode?: string, model?: string) => apiRequest<{ message: string; thinking?: string; agent: string; provider?: string; model?: string; tokens?: { input: number; output: number }; elapsed?: number }>('/chat', { method: 'POST', body: JSON.stringify({ text, conversationId, responseMode, model }) }),
+  chat: (text: string, conversationId?: string, responseMode?: string, model?: string) => apiRequest<{ message: string; thinking?: string; artifacts?: ChatArtifact[]; agent: string; provider?: string; model?: string; tokens?: { input: number; output: number }; elapsed?: number }>('/chat', { method: 'POST', body: JSON.stringify({ text, conversationId, responseMode, model }) }),
   chatWithFile: (text: string, file: File, conversationId?: string, responseMode?: string, model?: string) => {
     const formData = new FormData();
     formData.append('text', text);
@@ -63,7 +94,7 @@ export const api = {
     if (conversationId) formData.append('conversationId', conversationId);
     if (responseMode) formData.append('responseMode', responseMode);
     if (model) formData.append('model', model);
-    return uploadRequest<{ message: string; thinking?: string; agent: string; provider?: string; model?: string; tokens?: { input: number; output: number }; elapsed?: number }>('/chat', formData);
+    return uploadRequest<{ message: string; thinking?: string; artifacts?: ChatArtifact[]; agent: string; provider?: string; model?: string; tokens?: { input: number; output: number }; elapsed?: number }>('/chat', formData);
   },
   status: () => apiRequest<{ status: string; uptime: number; memory: number }>('/status'),
 
@@ -113,7 +144,7 @@ export const api = {
     if (params?.offset) qs.set('offset', String(params.offset));
     return apiRequest<{ conversations: Array<{ id: string; title: string | null; platform: string; messageCount: number; lastMessage: { content: string; role: string; createdAt: string } | null; createdAt: string; updatedAt: string }> }>(`/history?${qs.toString()}`);
   },
-  getConversation: (id: string) => apiRequest<{ id: string; messages: Array<{ id: string; role: string; content: string; agent?: string; createdAt: string }> }>(`/history/${id}`),
+  getConversation: (id: string) => apiRequest<{ id: string; messages: Array<{ id: string; role: string; content: string; agent?: string; artifacts?: ChatArtifact[]; createdAt: string }> }>(`/history/${id}`),
   createConversationOnServer: (conversationId: string, title?: string) => apiRequest<{ id: string; ok: boolean }>('/history', { method: 'POST', body: JSON.stringify({ conversationId, title }) }),
   renameConversationOnServer: (id: string, title: string) => apiRequest<{ ok: boolean }>(`/history/${id}`, { method: 'PUT', body: JSON.stringify({ title }) }),
   deleteConversationOnServer: (id: string) => apiRequest<{ ok: boolean }>(`/history/${id}`, { method: 'DELETE' }),
@@ -164,7 +195,14 @@ export const api = {
 
   // OpenClaw (direct chat)
   openclawChat: (text: string) => apiRequest<{ message: string; success: boolean }>('/openclaw/chat', { method: 'POST', body: JSON.stringify({ text }) }),
-  openclawStatus: () => apiRequest<{ status: string; connected: boolean; data?: any }>('/openclaw/status'),
+  openclawStatus: () => apiRequest<{ status: string; connected: boolean; data?: any; error?: string; scope?: { sessionKey: string; agentId: string } }>('/openclaw/status'),
+  openclawContext: () => apiRequest<{
+    userId: string;
+    role: 'admin' | 'user';
+    scope: { sessionKey: string; agentId: string };
+    permissions: { canUseRaw: boolean; canViewAllSessions: boolean };
+    limits: { chatPerMinute: number; agentPerMinute: number };
+  }>('/openclaw/context'),
 
   // Evolution
   evolutionStatus: () => apiRequest<any>('/evolution/status'),

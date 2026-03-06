@@ -70,7 +70,7 @@ export default function Logs() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <ScrollText className="w-7 h-7 text-primary-500" />
-            <h1 className="text-2xl font-bold">Logs</h1>
+            <h1 className="text-2xl font-bold">日志</h1>
             <span className="text-sm text-gray-400">({logs.length})</span>
           </div>
           <div className="flex items-center gap-2">
@@ -81,7 +81,7 @@ export default function Logs() {
                 onChange={(e) => setAutoRefresh(e.target.checked)}
                 className="w-4 h-4 rounded accent-primary-600"
               />
-              Auto-refresh
+              自动刷新
             </label>
             <button
               onClick={() => { setLoading(true); loadLogs(); }}
@@ -99,7 +99,7 @@ export default function Logs() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              placeholder="Search logs..."
+              placeholder="搜索日志..."
               className="w-full pl-10 p-2.5 rounded bg-dark-800 border border-gray-700 text-white text-sm"
             />
           </div>
@@ -108,11 +108,11 @@ export default function Logs() {
             onChange={(e) => setLevel(e.target.value)}
             className="p-2.5 rounded bg-dark-800 border border-gray-700 text-white text-sm min-w-[120px]"
           >
-            <option value="">All Levels</option>
-            <option value="error">Error</option>
-            <option value="warn">Warning</option>
-            <option value="info">Info</option>
-            <option value="debug">Debug</option>
+            <option value="">全部级别</option>
+            <option value="error">错误</option>
+            <option value="warn">警告</option>
+            <option value="info">信息</option>
+            <option value="debug">调试</option>
           </select>
         </div>
       </div>
@@ -135,7 +135,7 @@ export default function Logs() {
         {logs.length === 0 && (
           <div className="text-center text-gray-500 py-12">
             <ScrollText className="w-12 h-12 mx-auto mb-4 opacity-50" />
-            <p>No logs found</p>
+            <p>未找到日志</p>
           </div>
         )}
         <div ref={bottomRef} />

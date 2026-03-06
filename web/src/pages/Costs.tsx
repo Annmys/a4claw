@@ -58,7 +58,7 @@ export default function Costs() {
       <div className="p-6 max-w-4xl">
         <div className="flex items-center gap-3 mb-6">
           <DollarSign className="w-7 h-7 text-primary-500" />
-          <h1 className="text-2xl font-bold">Costs</h1>
+          <h1 className="text-2xl font-bold">成本</h1>
         </div>
 
         {/* Summary Cards */}
@@ -66,21 +66,21 @@ export default function Costs() {
           <div className="p-5 bg-dark-800 rounded-lg border border-gray-800">
             <div className="flex items-center gap-2 mb-2">
               <DollarSign className="w-4 h-4 text-yellow-400" />
-              <span className="text-sm text-gray-400">Today's Cost</span>
+              <span className="text-sm text-gray-400">今日成本</span>
             </div>
             <p className="text-3xl font-bold text-yellow-400">${totalToday.toFixed(4)}</p>
           </div>
           <div className="p-5 bg-dark-800 rounded-lg border border-gray-800">
             <div className="flex items-center gap-2 mb-2">
               <TrendingUp className="w-4 h-4 text-cyan-400" />
-              <span className="text-sm text-gray-400">API Calls Today</span>
+              <span className="text-sm text-gray-400">今日 API 调用</span>
             </div>
             <p className="text-3xl font-bold text-cyan-400">{totalCalls}</p>
           </div>
           <div className="p-5 bg-dark-800 rounded-lg border border-gray-800">
             <div className="flex items-center gap-2 mb-2">
               <BarChart3 className="w-4 h-4 text-green-400" />
-              <span className="text-sm text-gray-400">Models Used</span>
+              <span className="text-sm text-gray-400">已使用模型</span>
             </div>
             <p className="text-3xl font-bold text-green-400">{modelEntries.length}</p>
           </div>
@@ -95,25 +95,25 @@ export default function Costs() {
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
               <div className="p-4 rounded-lg border bg-dark-800 border-gray-800">
-                <p className="text-sm text-gray-400 mb-1">Today P&L</p>
+                <p className="text-sm text-gray-400 mb-1">今日盈亏</p>
                 <p className={`text-2xl font-bold ${(tradingPnl.dayPnl ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                   {(tradingPnl.dayPnl ?? 0) >= 0 ? '+' : ''}${(tradingPnl.dayPnl ?? 0).toFixed(2)}
                 </p>
               </div>
               <div className="p-4 rounded-lg border bg-dark-800 border-gray-800">
-                <p className="text-sm text-gray-400 mb-1">Realized P&L</p>
+                <p className="text-sm text-gray-400 mb-1">已实现盈亏</p>
                 <p className={`text-2xl font-bold ${(tradingPnl.totalRealizedPnl ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                   {(tradingPnl.totalRealizedPnl ?? 0) >= 0 ? '+' : ''}${(tradingPnl.totalRealizedPnl ?? 0).toFixed(2)}
                 </p>
               </div>
               <div className="p-4 rounded-lg border bg-dark-800 border-gray-800">
-                <p className="text-sm text-gray-400 mb-1">Unrealized P&L</p>
+                <p className="text-sm text-gray-400 mb-1">未实现盈亏</p>
                 <p className={`text-2xl font-bold ${(tradingPnl.totalUnrealizedPnl ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                   {(tradingPnl.totalUnrealizedPnl ?? 0) >= 0 ? '+' : ''}${(tradingPnl.totalUnrealizedPnl ?? 0).toFixed(2)}
                 </p>
               </div>
               <div className="p-4 rounded-lg border bg-dark-800 border-gray-800">
-                <p className="text-sm text-gray-400 mb-1">Win Rate</p>
+                <p className="text-sm text-gray-400 mb-1">胜率</p>
                 <p className="text-2xl font-bold text-cyan-400">
                   {tradingStats?.winRate?.toFixed(1) ?? '0.0'}%
                   <span className="text-xs text-gray-500 ml-1">({tradingStats?.totalTrades ?? 0} trades)</span>
@@ -188,7 +188,7 @@ export default function Costs() {
         {/* History */}
         {history?.days && history.days.length > 0 && (
           <div>
-            <h2 className="text-lg font-semibold mb-4">Daily History</h2>
+            <h2 className="text-lg font-semibold mb-4">每日历史</h2>
             <div className="bg-dark-800 rounded-lg border border-gray-800 divide-y divide-gray-800">
               {history.days.map((day: any) => (
                 <div key={day.date} className="flex items-center justify-between p-4">
@@ -206,8 +206,8 @@ export default function Costs() {
         {modelEntries.length === 0 && (
           <div className="text-center text-gray-500 py-12">
             <DollarSign className="w-12 h-12 mx-auto mb-4 opacity-50" />
-            <p>No costs recorded today</p>
-            <p className="text-sm mt-1">Costs will appear here as you use AI models</p>
+            <p>今天暂无成本记录</p>
+            <p className="text-sm mt-1">当你使用 AI 模型时，成本会显示在这里</p>
           </div>
         )}
       </div>

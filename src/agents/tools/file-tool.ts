@@ -2,6 +2,7 @@ import { readFile, writeFile, stat } from 'fs/promises';
 import { resolve, normalize } from 'path';
 import { BaseTool, ToolResult } from './base-tool.js';
 import { audit } from '../../security/audit-log.js';
+import { publishFileToUserShare } from '../../core/shared-artifacts.js';
 import logger from '../../utils/logger.js';
 
 /**
@@ -106,7 +107,24 @@ export class FileTool extends BaseTool {
         case 'write': {
           const content = input.content as string;
           await writeFile(check.resolved, content, 'utf-8');
-          return { success: true, output: `Written to ${check.resolved}` };
+          try {
+            const artifact = await publishFileToUserShare(check.resolved, userId);
+            return {
+              success: true,
+              output: `Written to ${check.resolved}\nShared copy: ${artifact.path}\nDownload: ${artifact.url}`,
+              artifacts: [artifact],
+            };
+          } catch (shareErr: any) {
+            logger.warn('Failed to publish file to shared output', {
+              userId,
+              path: check.resolved,
+              error: shareErr.message,
+            });
+            return {
+              success: true,
+              output: `Written to ${check.resolved}\nShared publish failed: ${shareErr.message}`,
+            };
+          }
         }
         case 'stat': {
           const info = await stat(check.resolved);

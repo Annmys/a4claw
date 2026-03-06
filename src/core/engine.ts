@@ -30,6 +30,7 @@ import logger from '../utils/logger.js';
 
 import { detectSocialEngineering } from '../security/content-guard.js';
 import { scanMessage as guardScanMessage } from '../security/message-guard.js';
+import type { ChatArtifact } from './shared-artifacts.js';
 
 // ─── Output Secret Filter ──────────────────────────────────────────
 // Prevents LLM from leaking API keys, tokens, or secrets in responses.
@@ -84,6 +85,7 @@ export interface OutgoingMessage {
   thinking?: string;
   format?: 'text' | 'markdown' | 'html';
   attachments?: Array<{ type: string; data: Buffer; name: string }>;
+  artifacts?: ChatArtifact[];
   agentUsed?: string;
   tokensUsed?: { input: number; output: number };
   provider?: string;
@@ -401,8 +403,9 @@ export class Engine {
       const claudeCodeActive = this.ai.getAvailableProviders().includes('claude-code');
       const hasOpenRouter = this.ai.getAvailableProviders().includes('openrouter');
       const hasAnthropic = this.ai.getAvailableProviders().includes('anthropic');
-      logger.info('Quick mode provider selection', { resolvedMode, claudeCodeActive, hasOpenRouter, hasAnthropic, providers: this.ai.getAvailableProviders() });
-      let selectedProvider: 'anthropic' | 'openrouter' | 'claude-code' | 'ollama' | undefined;
+      const hasOpenAI = this.ai.getAvailableProviders().includes('openai');
+      logger.info('Quick mode provider selection', { resolvedMode, claudeCodeActive, hasOpenRouter, hasAnthropic, hasOpenAI, providers: this.ai.getAvailableProviders() });
+      let selectedProvider: 'anthropic' | 'openrouter' | 'openai' | 'claude-code' | 'ollama' | undefined;
       let selectedModelId: string | undefined;
 
       // User model override from UI selector
@@ -441,6 +444,10 @@ export class Engine {
           selectedModelId = config.OPENROUTER_DEFAULT_MODEL ?? 'anthropic/claude-sonnet-4.6';
           incoming.onProgress?.({ type: 'status', message: `⚡ Fast API — ${selectedModelId}` });
         }
+      } else if (hasOpenAI) {
+        selectedProvider = 'openai';
+        selectedModelId = (config.MODEL_OVERRIDE || config.AI_MODEL || 'gpt-4o-mini').replace(/^openai\//, '');
+        incoming.onProgress?.({ type: 'status', message: `⚡ Fast API — ${selectedModelId}` });
       } else if (claudeCodeActive) {
         // Fallback to Claude Code CLI if nothing else available
         selectedProvider = 'claude-code';
@@ -1416,6 +1423,10 @@ If they want to check a running project, use "status" with projectName.`,
         }).catch(() => {});
       }
 
+      const responseArtifacts = Array.isArray((response as any).artifacts)
+        ? (response as any).artifacts as ChatArtifact[]
+        : undefined;
+
       // 9. Save messages to persistent memory (never save empty content)
       if (this.saveMessage) {
         if (incoming.text) {
@@ -1425,7 +1436,11 @@ If they want to check a running project, use "status" with projectName.`,
         }
         if (response.content) {
           await this.saveMessage(incoming.userId, incoming.platform, 'assistant', response.content, {
-            agent: agent.id, tokens: response.usage, provider: response.provider, skill: matchedSkill?.id,
+            agent: agent.id,
+            tokens: response.usage,
+            provider: response.provider,
+            skill: matchedSkill?.id,
+            artifacts: responseArtifacts,
           });
         }
       }
@@ -1514,6 +1529,7 @@ If they want to check a running project, use "status" with projectName.`,
         text: finalText,
         thinking,
         format: 'markdown',
+        artifacts: responseArtifacts,
         agentUsed: agent.id,
         tokensUsed: response.usage ? { input: response.usage.inputTokens, output: response.usage.outputTokens } : undefined,
         provider: response.provider,

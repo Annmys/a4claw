@@ -46,7 +46,7 @@ export default function BrowserView() {
   const [activeSession, setActiveSession] = useState<string | null>(null);
   const [urlInput, setUrlInput] = useState('');
   const [aiInput, setAiInput] = useState('');
-  const [aiRunning, setAiRunning] = useState(false);
+  const [ai运行ning, setAi运行ning] = useState(false);
   const [aiResult, setAiResult] = useState<string | null>(null);
   const [newSessionUrl, setNewSessionUrl] = useState('');
   const [showNewDialog, setShowNewDialog] = useState(false);
@@ -166,7 +166,7 @@ export default function BrowserView() {
 
   const runAiAction = async () => {
     if (!activeSession || !aiInput.trim()) return;
-    setAiRunning(true);
+    setAi运行ning(true);
     setAiResult(null);
     try {
       const res = await api.browserAiAction(activeSession, aiInput.trim());
@@ -176,7 +176,7 @@ export default function BrowserView() {
     } catch (err: any) {
       setAiResult(`Error: ${err.message}`);
     } finally {
-      setAiRunning(false);
+      setAi运行ning(false);
     }
   };
 
@@ -198,7 +198,7 @@ export default function BrowserView() {
           }`}
         >
           <Monitor className="w-4 h-4" />
-          Browser
+          浏览器
         </button>
         <button
           onClick={() => setActiveTab('facebook')}
@@ -264,7 +264,7 @@ export default function BrowserView() {
             <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
             <line x1="12" y1="18" x2="12.01" y2="18" />
           </svg>
-          Mobile
+          移动端
         </button>
       </div>
 
@@ -298,13 +298,13 @@ export default function BrowserView() {
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-dark-800 border border-gray-700/50">
               <Cpu className="w-3.5 h-3.5 text-gray-400" />
               <span className="text-xs text-gray-400">
-                {resources.sessions}/{resources.maxSessions} sessions
+                {resources.sessions}/{resources.maxSessions} 会话
               </span>
               <span className="text-xs text-gray-600">|</span>
               <span className="text-xs text-green-400">{resources.vncSessions} VNC</span>
               <span className="text-xs text-gray-600">|</span>
               <span className={`text-xs ${resources.ramAvailableMB < 1000 ? 'text-red-400' : 'text-gray-400'}`}>
-                {(resources.ramAvailableMB / 1024).toFixed(1)}GB free
+                {(resources.ramAvailableMB / 1024).toFixed(1)}GB 可用
               </span>
             </div>
           )}
@@ -316,7 +316,7 @@ export default function BrowserView() {
             className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
           >
             <Plus className="w-4 h-4" />
-            New Session
+            新建会话
           </button>
           <button onClick={fetchData} className="p-2 text-gray-400 hover:text-white transition-colors">
             <RefreshCw className="w-4 h-4" />
@@ -346,11 +346,11 @@ export default function BrowserView() {
         {/* Session list — left panel */}
         <div className="w-64 border-r border-gray-800/50 flex flex-col overflow-y-auto">
           <div className="p-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-            Active Sessions ({sessions.length})
+            活跃会话（{sessions.length}）
           </div>
           {sessions.length === 0 ? (
             <div className="p-4 text-center text-gray-600 text-sm">
-              No active sessions. Click "New Session" to start.
+              暂无活跃会话，点击“新建会话”开始。
             </div>
           ) : (
             sessions.map(s => (
@@ -371,21 +371,21 @@ export default function BrowserView() {
                       s.status === 'error' ? 'bg-red-400' : 'bg-gray-500'
                     }`} />
                     <span className="text-xs font-medium truncate max-w-[100px]">
-                      {s.title || 'New Tab'}
+                      {s.title || '新标签页'}
                     </span>
                   </div>
                   <div className="flex items-center gap-1">
                     <button
                       onClick={(e) => { e.stopPropagation(); toggleVnc(s.id); }}
                       className={`p-1 transition-colors ${s.vncEnabled ? 'text-green-400 hover:text-green-300' : 'text-gray-600 hover:text-gray-400'}`}
-                      title={s.vncEnabled ? 'VNC active — click to detach' : 'VNC off — click to attach'}
+                      title={s.vncEnabled ? 'VNC 已开启，点击可断开' : 'VNC 已关闭，点击可连接'}
                     >
                       {s.vncEnabled ? <Wifi className="w-3.5 h-3.5" /> : <WifiOff className="w-3.5 h-3.5" />}
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); closeSession(s.id); }}
                       className="p-1 text-gray-500 hover:text-red-400 transition-colors"
-                      title="Close session"
+                      title="关闭会话"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -398,7 +398,7 @@ export default function BrowserView() {
                     <span className="text-[9px] px-1 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20">VNC</span>
                   )}
                   {!s.vncEnabled && (
-                    <span className="text-[9px] px-1 py-0.5 rounded bg-gray-500/10 text-gray-500 border border-gray-500/20">headless</span>
+                    <span className="text-[9px] px-1 py-0.5 rounded bg-gray-500/10 text-gray-500 border border-gray-500/20">无头模式</span>
                   )}
                 </div>
               </div>
@@ -422,7 +422,7 @@ export default function BrowserView() {
                   className="flex-1 bg-dark-800 border border-gray-700/50 rounded-md px-3 py-1.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-primary-500/50"
                 />
                 <button onClick={navigate} className="px-3 py-1.5 bg-dark-800 hover:bg-dark-700 text-gray-300 text-sm rounded-md border border-gray-700/50 transition-colors">
-                  Go
+                  前往
                 </button>
                 {!activeSessionData.vncEnabled && (
                   <button
@@ -430,12 +430,12 @@ export default function BrowserView() {
                     className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600/20 hover:bg-green-600/30 text-green-400 text-sm rounded-md border border-green-500/30 transition-colors"
                   >
                     <Wifi className="w-3.5 h-3.5" />
-                    Enable VNC
+                    启用 VNC
                   </button>
                 )}
                 {vncUrl && (
                   <a href={vncUrl} target="_blank" rel="noopener noreferrer"
-                    className="p-1.5 text-gray-500 hover:text-white transition-colors" title="Open VNC in new tab">
+                    className="p-1.5 text-gray-500 hover:text-white transition-colors" title="在新标签页打开 VNC">
                     <Maximize2 className="w-4 h-4" />
                   </a>
                 )}
@@ -445,43 +445,43 @@ export default function BrowserView() {
               <div className="border-b border-gray-800/50 bg-gradient-to-r from-purple-900/20 to-dark-900/60">
                 <div className="flex items-center gap-2 px-4 pt-2.5 pb-1">
                   <Brain className="w-4 h-4 text-purple-400 flex-shrink-0" />
-                  <span className="text-xs font-bold text-purple-300">AI Command</span>
+                  <span className="text-xs font-bold text-purple-300">AI 指令</span>
                   <span className="mx-1 text-gray-700">|</span>
-                  <span className="text-[10px] text-gray-400">Write what you want the AI to do on this browser page</span>
+                  <span className="text-[10px] text-gray-400">告诉 AI 你希望它在当前浏览器页面执行什么操作</span>
                 </div>
                 <div className="flex items-center gap-2 px-4 pb-2">
                   <input
                     type="text"
                     value={aiInput}
                     onChange={e => setAiInput(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && !aiRunning && runAiAction()}
-                    placeholder="What should the AI do? e.g. 'Click the login button', 'Fill email field with test@gmail.com', 'Scroll to the bottom'..."
+                    onKeyDown={e => e.key === 'Enter' && !ai运行ning && runAiAction()}
+                    placeholder="让 AI 在当前页面做什么？例如：点击登录按钮、填写邮箱、滚动到底部..."
                     className="flex-1 bg-dark-800 border border-gray-700/50 rounded-md px-3 py-1.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-purple-500/50"
                   />
                   <button
                     onClick={runAiAction}
-                    disabled={aiRunning || !aiInput.trim()}
+                    disabled={ai运行ning || !aiInput.trim()}
                     className="flex items-center gap-1.5 px-4 py-1.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-md transition-colors"
                   >
-                    {aiRunning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Brain className="w-3.5 h-3.5" />}
-                    {aiRunning ? 'Working...' : 'Execute'}
+                    {ai运行ning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Brain className="w-3.5 h-3.5" />}
+                    {ai运行ning ? '执行中...' : '执行'}
                   </button>
                 </div>
                 <div className="flex items-center gap-1.5 px-4 pb-2.5 flex-wrap">
-                  <span className="text-[9px] text-gray-600 mr-1">Quick:</span>
+                  <span className="text-[9px] text-gray-600 mr-1">快捷：</span>
                   {[
-                    { label: 'Click login', cmd: 'Find and click the login or sign-in button' },
-                    { label: 'Fill form', cmd: 'Fill all visible form fields with appropriate test data' },
-                    { label: 'Scrape data', cmd: 'Extract the main content and data from this page' },
-                    { label: 'Get all links', cmd: 'Extract all links from this page with their text' },
-                    { label: 'Screenshot', cmd: 'Take a screenshot of the current page' },
-                    { label: 'Scroll down', cmd: 'Scroll down to see more content' },
-                    { label: 'Accept cookies', cmd: 'Find and accept the cookie consent popup' },
+                    { label: '点击登录', cmd: '找到并点击登录按钮' },
+                    { label: '填写表单', cmd: '为可见表单字段填写合适的测试数据' },
+                    { label: '提取数据', cmd: '提取当前页面的主要内容和数据' },
+                    { label: '提取链接', cmd: '提取页面中的全部链接及其文本' },
+                    { label: '截图', cmd: '对当前页面进行截图' },
+                    { label: '向下滚动', cmd: '向下滚动查看更多内容' },
+                    { label: '接受 Cookie', cmd: '找到并接受 Cookie 同意弹窗' },
                   ].map(q => (
                     <button
                       key={q.label}
                       onClick={() => { setAiInput(q.cmd); }}
-                      disabled={aiRunning}
+                      disabled={ai运行ning}
                       className="px-2 py-0.5 text-[10px] font-medium bg-dark-800 hover:bg-purple-600/20 text-gray-400 hover:text-purple-300 rounded border border-gray-700/50 hover:border-purple-500/30 transition-all disabled:opacity-50"
                     >
                       {q.label}
@@ -507,26 +507,26 @@ export default function BrowserView() {
                     ref={iframeRef}
                     src={vncUrl}
                     className="w-full h-full border-0"
-                    title="Browser VNC"
+                    title="浏览器 VNC"
                     allow="clipboard-read; clipboard-write"
                   />
                 ) : activeSessionData.vncEnabled ? (
                   <div className="flex items-center justify-center h-full text-gray-500">
                     <Loader2 className="w-6 h-6 animate-spin mr-2" />
-                    Connecting to VNC...
+                    正在连接 VNC...
                   </div>
                 ) : (
                   <div className="flex-1 flex items-center justify-center h-full">
                     <div className="text-center">
                       <WifiOff className="w-12 h-12 text-gray-700 mx-auto mb-3" />
-                      <p className="text-gray-400 mb-1">Browser running in headless mode</p>
-                      <p className="text-xs text-gray-600 mb-4">VNC is off to save resources. Enable it to see the browser live.</p>
+                      <p className="text-gray-400 mb-1">浏览器当前以无头模式运行</p>
+                      <p className="text-xs text-gray-600 mb-4">VNC 已关闭以节省资源。启用后可实时查看浏览器。</p>
                       <button
                         onClick={() => toggleVnc(activeSessionData.id)}
                         className="inline-flex items-center gap-2 px-4 py-2 bg-green-600/20 hover:bg-green-600/30 text-green-400 font-medium rounded-lg border border-green-500/30 transition-colors"
                       >
                         <Wifi className="w-4 h-4" />
-                        Enable VNC Streaming
+                        启用 VNC Streaming
                       </button>
                     </div>
                   </div>
@@ -537,10 +537,10 @@ export default function BrowserView() {
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center">
                 <Monitor className="w-16 h-16 text-gray-700 mx-auto mb-4" />
-                <h2 className="text-xl font-semibold text-gray-400 mb-2">No Browser Session Selected</h2>
+                <h2 className="text-xl font-semibold text-gray-400 mb-2">未选择浏览器会话</h2>
                 <p className="text-sm text-gray-600 mb-6 max-w-md">
-                  Launch a headed browser session to browse any website in real-time.
-                  Each session includes anti-detection stealth and AI-driven automation.
+                  启动有界面浏览器会话，可实时浏览任意网站。
+                  每个会话都包含防检测能力与 AI 自动化。
                 </p>
                 <button
                   onClick={() => setShowNewDialog(true)}
@@ -548,7 +548,7 @@ export default function BrowserView() {
                   className="inline-flex items-center gap-2 px-6 py-3 bg-primary-600 hover:bg-primary-500 disabled:opacity-50 text-white font-medium rounded-lg transition-colors"
                 >
                   <Plus className="w-5 h-5" />
-                  Launch Browser Session
+                  启动浏览器会话
                 </button>
               </div>
             </div>
@@ -561,15 +561,15 @@ export default function BrowserView() {
       {showNewDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-dark-900 border border-gray-700/50 rounded-xl shadow-2xl p-6 w-full max-w-md mx-4">
-            <h3 className="text-lg font-bold text-white mb-1">New Browser Session</h3>
+            <h3 className="text-lg font-bold text-white mb-1">新建浏览器会话</h3>
             <p className="text-xs text-gray-500 mb-4">
-              Each session uses ~250MB RAM (headless) or ~400MB (with VNC). Max {resources?.maxSessions ?? 3} sessions.
+              每个会话约占用 250MB 内存（无头）或 400MB（启用 VNC），最多 {resources?.maxSessions ?? 3} 个会话。
             </p>
 
             {resources && (
               <div className="mb-4 p-3 bg-dark-800 rounded-lg border border-gray-700/30">
                 <div className="flex justify-between text-xs mb-1.5">
-                  <span className="text-gray-400">RAM Available</span>
+                  <span className="text-gray-400">可用内存</span>
                   <span className={resources.ramAvailableMB < 1000 ? 'text-red-400' : 'text-green-400'}>
                     {(resources.ramAvailableMB / 1024).toFixed(1)}GB / {(resources.ramTotalMB / 1024).toFixed(1)}GB
                   </span>
@@ -587,7 +587,7 @@ export default function BrowserView() {
             )}
 
             <div className="mb-4">
-              <label className="block text-sm text-gray-400 mb-1.5">Start URL (optional)</label>
+              <label className="block text-sm text-gray-400 mb-1.5">起始网址（可选）</label>
               <input
                 type="text"
                 value={newSessionUrl}
@@ -604,7 +604,7 @@ export default function BrowserView() {
                 onClick={() => { setShowNewDialog(false); setNewSessionUrl(''); }}
                 className="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors"
               >
-                Cancel
+                取消
               </button>
               <button
                 onClick={createSession}
@@ -612,9 +612,9 @@ export default function BrowserView() {
                 className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-500 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
               >
                 {creating ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" />Starting...</>
+                  <><Loader2 className="w-4 h-4 animate-spin" />启动中...</>
                 ) : (
-                  <><ExternalLink className="w-4 h-4" />Launch</>
+                  <><ExternalLink className="w-4 h-4" />启动</>
                 )}
               </button>
             </div>

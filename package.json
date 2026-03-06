@@ -1,5 +1,5 @@
 {
-  "name": "clawdagent",
+  "name": "a4claw",
   "version": "6.3.0",
   "description": "Autonomous AI agent system — 18 agents, 29 tools, 90 skills. Visual browser (VNC), autonomous Facebook agent, scheduled publishing, self-evolving.",
   "type": "module",

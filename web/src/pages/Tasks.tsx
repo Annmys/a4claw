@@ -27,16 +27,35 @@ type SortMode = 'newest' | 'priority' | 'dueDate';
 // Constants
 // ---------------------------------------------------------------------------
 
-const STORAGE_KEY = 'clawdagent_tasks';
+const STORAGE_KEY_PREFIX = 'a4claw_tasks';
 
-const CATEGORIES = ['Setup', 'Development', 'Content', 'Business', 'Other'] as const;
+function decodeJwtUserId(token: string | null): string | null {
+  if (!token) return null;
+  const parts = token.split('.');
+  if (parts.length < 2) return null;
+  try {
+    const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = payload.padEnd(Math.ceil(payload.length / 4) * 4, '=');
+    const parsed = JSON.parse(atob(padded)) as { userId?: string };
+    return typeof parsed.userId === 'string' && parsed.userId ? parsed.userId : null;
+  } catch {
+    return null;
+  }
+}
+
+function getStorageKey(): string {
+  const userId = decodeJwtUserId(localStorage.getItem('token')) ?? 'guest';
+  return `${STORAGE_KEY_PREFIX}:${userId}`;
+}
+
+const CATEGORIES = ['设置', '开发', '内容', '业务', '其他'] as const;
 
 const CATEGORY_COLORS: Record<string, { bg: string; text: string }> = {
-  Setup:       { bg: 'bg-cyan-500/15',    text: 'text-cyan-400'    },
-  Development: { bg: 'bg-violet-500/15',  text: 'text-violet-400'  },
-  Content:     { bg: 'bg-emerald-500/15', text: 'text-emerald-400' },
-  Business:    { bg: 'bg-amber-500/15',   text: 'text-amber-400'   },
-  Other:       { bg: 'bg-gray-500/15',    text: 'text-gray-400'    },
+  设置:       { bg: 'bg-cyan-500/15',    text: 'text-cyan-400'    },
+  开发: { bg: 'bg-violet-500/15',  text: 'text-violet-400'  },
+  内容:     { bg: 'bg-emerald-500/15', text: 'text-emerald-400' },
+  业务:    { bg: 'bg-amber-500/15',   text: 'text-amber-400'   },
+  其他:       { bg: 'bg-gray-500/15',    text: 'text-gray-400'    },
 };
 
 const PRIORITY_COLORS: Record<Task['priority'], { bg: string; text: string; border: string }> = {
@@ -63,17 +82,42 @@ const STATUS_CYCLE: Record<Task['status'], Task['status']> = {
 // Helpers
 // ---------------------------------------------------------------------------
 
+function isValidTask(input: unknown): input is Task {
+  if (!input || typeof input !== 'object') return false;
+  const task = input as Record<string, unknown>;
+  return typeof task.id === 'string'
+    && typeof task.title === 'string'
+    && (task.status === 'pending' || task.status === 'in_progress' || task.status === 'done')
+    && (task.priority === 'low' || task.priority === 'medium' || task.priority === 'high' || task.priority === 'urgent')
+    && typeof task.category === 'string'
+    && typeof task.createdAt === 'string'
+    && (task.dueDate === undefined || typeof task.dueDate === 'string');
+}
+
 function loadTasks(): Task[] {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    const raw = localStorage.getItem(getStorageKey());
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter(isValidTask) : [];
   } catch {
     return [];
   }
 }
 
 function saveTasks(tasks: Task[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+  try {
+    localStorage.setItem(getStorageKey(), JSON.stringify(tasks));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function createTaskId(): string {
+  const randomUUID = globalThis.crypto?.randomUUID?.bind(globalThis.crypto);
+  if (randomUUID) return randomUUID();
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 function isOverdue(dueDate?: string): boolean {
@@ -151,7 +195,7 @@ export default function Tasks() {
   // Quick-add
   const [newTitle, setNewTitle] = useState('');
   const [newPriority, setNewPriority] = useState<Task['priority']>('medium');
-  const [newCategory, setNewCategory] = useState<string>('Development');
+  const [newCategory, setNewCategory] = useState<string>('开发');
   const [newDueDate, setNewDueDate] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
 
@@ -163,10 +207,16 @@ export default function Tasks() {
 
   // Delete confirmation
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [storageError, setStorageError] = useState('');
 
   // -- Persistence ----------------------------------------------------------
   useEffect(() => {
-    saveTasks(tasks);
+    const ok = saveTasks(tasks);
+    if (!ok) {
+      setStorageError('浏览器存储不可用，任务无法保存。请关闭隐私模式或检查存储权限。');
+    } else if (storageError) {
+      setStorageError('');
+    }
   }, [tasks]);
 
   // -- Derived data ---------------------------------------------------------
@@ -219,7 +269,7 @@ export default function Tasks() {
     if (!title) return;
 
     const task: Task = {
-      id: crypto.randomUUID?.() ?? String(Date.now()),
+      id: createTaskId(),
       title,
       status: 'pending',
       priority: newPriority,
@@ -229,6 +279,11 @@ export default function Tasks() {
     };
 
     setTasks((prev) => [task, ...prev]);
+    // Ensure the newly created task is visible immediately.
+    setStatusFilter('all');
+    setPriorityFilter('all');
+    setCategoryFilter('all');
+    setSortMode('newest');
     setNewTitle('');
     setNewDueDate('');
   };
@@ -253,16 +308,16 @@ export default function Tasks() {
         {/* ---- Header ---------------------------------------------------- */}
         <div className="flex items-center gap-3 mb-6">
           <ListTodo className="w-7 h-7 text-primary-500" />
-          <h1 className="text-2xl font-bold">Tasks</h1>
+          <h1 className="text-2xl font-bold">任务</h1>
           <div className="flex items-center gap-2 ml-auto">
             <span className="text-xs bg-gray-500/15 text-gray-400 px-2.5 py-1 rounded-full">
-              {counts.pending} pending
+              {counts.pending} 待办
             </span>
             <span className="text-xs bg-blue-500/15 text-blue-400 px-2.5 py-1 rounded-full">
-              {counts.in_progress} in progress
+              {counts.in_progress} 进行中
             </span>
             <span className="text-xs bg-green-500/15 text-green-400 px-2.5 py-1 rounded-full">
-              {counts.done} done
+              {counts.done} 已完成
             </span>
           </div>
         </div>
@@ -274,7 +329,7 @@ export default function Tasks() {
               value={newTitle}
               onChange={(e) => setNewTitle(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && addTask()}
-              placeholder="Add a new task..."
+              placeholder="添加新任务..."
               className="flex-1 p-3 rounded-lg bg-dark-900 border border-gray-700 text-white
                          placeholder-gray-500 focus:border-primary-500 focus:outline-none
                          transition-colors text-sm"
@@ -285,10 +340,10 @@ export default function Tasks() {
               className="p-3 rounded-lg bg-dark-900 border border-gray-700 text-white text-sm
                          min-w-[110px] focus:border-primary-500 focus:outline-none transition-colors"
             >
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-              <option value="urgent">Urgent</option>
+              <option value="low">低</option>
+              <option value="medium">中</option>
+              <option value="high">高</option>
+              <option value="urgent">紧急</option>
             </select>
             <button
               onClick={addTask}
@@ -298,7 +353,7 @@ export default function Tasks() {
                          flex items-center gap-2 text-sm font-medium"
             >
               <Plus className="w-4 h-4" />
-              Add
+              添加
             </button>
           </div>
 
@@ -307,7 +362,7 @@ export default function Tasks() {
             onClick={() => setShowAdvanced(!showAdvanced)}
             className="text-xs text-gray-500 hover:text-gray-300 mt-3 transition-colors"
           >
-            {showAdvanced ? 'Hide options' : 'More options (category, due date)'}
+            {showAdvanced ? '收起选项' : '更多选项（分类、截止日期）'}
           </button>
 
           {showAdvanced && (
@@ -315,7 +370,7 @@ export default function Tasks() {
               <div className="flex-1">
                 <label className="text-xs text-gray-500 mb-1 block">
                   <Tag className="w-3 h-3 inline mr-1" />
-                  Category
+                  分类
                 </label>
                 <select
                   value={newCategory}
@@ -332,7 +387,7 @@ export default function Tasks() {
               <div className="flex-1">
                 <label className="text-xs text-gray-500 mb-1 block">
                   <Calendar className="w-3 h-3 inline mr-1" />
-                  Due date
+                  截止日期
                 </label>
                 <input
                   type="date"
@@ -345,13 +400,19 @@ export default function Tasks() {
               </div>
             </div>
           )}
+
+          {storageError && (
+            <div className="mt-3 text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+              {storageError}
+            </div>
+          )}
         </div>
 
         {/* ---- Filter bar ------------------------------------------------ */}
         <div className="bg-dark-800 rounded-xl border border-gray-800 p-4 mb-6">
           <div className="flex items-center gap-2 mb-3">
             <Filter className="w-4 h-4 text-gray-500" />
-            <span className="text-xs text-gray-500 font-medium uppercase tracking-wider">Filters</span>
+            <span className="text-xs text-gray-500 font-medium uppercase tracking-wider">筛选</span>
           </div>
 
           {/* Status chips */}
@@ -359,7 +420,7 @@ export default function Tasks() {
             {(['all', 'pending', 'in_progress', 'done'] as StatusFilter[]).map((s) => (
               <Chip
                 key={s}
-                label={s === 'all' ? 'All' : s === 'in_progress' ? 'In Progress' : s.charAt(0).toUpperCase() + s.slice(1)}
+                label={s === 'all' ? '全部' : s === 'in_progress' ? '进行中' : s === 'pending' ? '待办' : '已完成'}
                 active={statusFilter === s}
                 onClick={() => setStatusFilter(s)}
                 count={s === 'all' ? counts.all : counts[s]}
@@ -380,11 +441,11 @@ export default function Tasks() {
 
           {/* Priority & category chips */}
           <div className="flex flex-wrap gap-2 mb-3">
-            <span className="text-xs text-gray-600 self-center mr-1">Priority:</span>
+            <span className="text-xs text-gray-600 self-center mr-1">优先级：</span>
             {(['all', 'urgent', 'high', 'medium', 'low'] as PriorityFilter[]).map((p) => (
               <Chip
                 key={p}
-                label={p === 'all' ? 'Any' : p.charAt(0).toUpperCase() + p.slice(1)}
+                label={p === 'all' ? '不限' : p === 'urgent' ? '紧急' : p === 'high' ? '高' : p === 'medium' ? '中' : '低'}
                 active={priorityFilter === p}
                 onClick={() => setPriorityFilter(p)}
                 color={
@@ -397,8 +458,8 @@ export default function Tasks() {
           </div>
 
           <div className="flex flex-wrap gap-2 mb-3">
-            <span className="text-xs text-gray-600 self-center mr-1">Category:</span>
-            <Chip label="Any" active={categoryFilter === 'all'} onClick={() => setCategoryFilter('all')} />
+            <span className="text-xs text-gray-600 self-center mr-1">分类：</span>
+            <Chip label="不限" active={categoryFilter === 'all'} onClick={() => setCategoryFilter('all')} />
             {CATEGORIES.map((c) => (
               <Chip
                 key={c}
@@ -416,7 +477,7 @@ export default function Tasks() {
 
           {/* Sort */}
           <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-600">Sort:</span>
+            <span className="text-xs text-gray-600">排序：</span>
             <select
               value={sortMode}
               onChange={(e) => setSortMode(e.target.value as SortMode)}
@@ -424,9 +485,9 @@ export default function Tasks() {
                          text-gray-300 focus:outline-none focus:border-primary-500
                          transition-colors"
             >
-              <option value="newest">Newest first</option>
-              <option value="priority">Priority</option>
-              <option value="dueDate">Due date</option>
+              <option value="newest">最新优先</option>
+              <option value="priority">优先级</option>
+              <option value="dueDate">截止日期</option>
             </select>
           </div>
         </div>
@@ -435,7 +496,7 @@ export default function Tasks() {
         <div className="space-y-2">
           {filteredTasks.map((task) => {
             const prio = PRIORITY_COLORS[task.priority];
-            const cat = CATEGORY_COLORS[task.category] ?? CATEGORY_COLORS.Other;
+            const cat = CATEGORY_COLORS[task.category] ?? CATEGORY_COLORS.其他;
             const overdue = task.status !== 'done' && isOverdue(task.dueDate);
 
             return (
@@ -451,7 +512,7 @@ export default function Tasks() {
                 <button
                   onClick={() => toggleStatus(task.id)}
                   className="shrink-0 focus:outline-none"
-                  title={`Status: ${task.status} (click to cycle)`}
+                  title={`状态：${task.status}（点击切换）`}
                 >
                   <StatusIcon status={task.status} />
                 </button>
@@ -502,7 +563,7 @@ export default function Tasks() {
 
                     {/* Created date */}
                     <span className="text-[10px] text-gray-600 ml-auto hidden sm:inline">
-                      Created {formatCreatedDate(task.createdAt)}
+                      创建于 {formatCreatedDate(task.createdAt)}
                     </span>
                   </div>
                 </div>
@@ -515,14 +576,14 @@ export default function Tasks() {
                       className="text-xs px-2 py-1 rounded bg-red-500/20 text-red-400
                                  hover:bg-red-500/30 transition-colors"
                     >
-                      Confirm
+                      确认
                     </button>
                     <button
                       onClick={() => setDeleteId(null)}
                       className="text-xs px-2 py-1 rounded bg-dark-900 text-gray-400
                                  hover:text-gray-300 transition-colors"
                     >
-                      Cancel
+                      取消
                     </button>
                   </div>
                 ) : (
@@ -530,7 +591,7 @@ export default function Tasks() {
                     onClick={() => setDeleteId(task.id)}
                     className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity
                                text-gray-600 hover:text-red-400"
-                    title="Delete task"
+                    title="删除任务"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -545,16 +606,16 @@ export default function Tasks() {
               <ListTodo className="w-12 h-12 mx-auto mb-4 text-gray-700" />
               {tasks.length === 0 ? (
                 <>
-                  <p className="text-gray-400 text-lg font-medium">No tasks yet</p>
+                  <p className="text-gray-400 text-lg font-medium">暂无任务</p>
                   <p className="text-gray-600 text-sm mt-1">
-                    Add your first task above to get started
+                    添加 your first task above to get started
                   </p>
                 </>
               ) : (
                 <>
-                  <p className="text-gray-400 text-lg font-medium">No tasks match filters</p>
+                  <p className="text-gray-400 text-lg font-medium">没有符合筛选条件的任务</p>
                   <p className="text-gray-600 text-sm mt-1">
-                    Try changing your filter or sort options
+                    尝试调整筛选或排序条件
                   </p>
                   <button
                     onClick={() => {
@@ -565,7 +626,7 @@ export default function Tasks() {
                     className="mt-4 text-sm text-primary-500 hover:text-primary-400
                                transition-colors"
                   >
-                    Clear all filters
+                    清空全部筛选
                   </button>
                 </>
               )}

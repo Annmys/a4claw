@@ -7,6 +7,7 @@ import {
   Eye, EyeOff, CheckCircle, XCircle, Loader2, Save, TestTube, Terminal,
   Server, Plus, Trash2, Wifi, WifiOff, TrendingUp, Zap
 } from 'lucide-react';
+import { applyLanguage, persistLanguageChoice, type UILanguage } from '../utils/ui-language';
 
 export default function Settings() {
   const logout = useAuthStore((s) => s.logout);
@@ -16,7 +17,7 @@ export default function Settings() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [activeTab, setActiveTab] = useState<'keys' | 'services' | 'budget' | 'general' | 'cli' | 'servers' | 'exchanges' | 'evolution'>('keys');
-  const [cliStatus, setCliStatus] = useState<{ available: boolean; authenticated: boolean; cliPath: string; lastCheckAt: number } | null>(null);
+  const [cliStatus, setCli状态] = useState<{ available: boolean; authenticated: boolean; cliPath: string; lastCheckAt: number } | null>(null);
   const [cliLoading, setCLILoading] = useState(false);
   const [cliMessage, setCLIMessage] = useState('');
   const [cliAuthUrl, setCliAuthUrl] = useState<string | null>(null);
@@ -39,7 +40,7 @@ export default function Settings() {
   // Load CLI status when CLI tab is active
   useEffect(() => {
     if (activeTab === 'cli') {
-      api.cliStatus().then(setCliStatus).catch(() => {});
+      api.cliStatus().then(setCli状态).catch(() => {});
     }
     if (activeTab === 'servers') {
       api.getServers().then(setServers).catch(() => {});
@@ -50,6 +51,9 @@ export default function Settings() {
     try {
       const data = await api.getSettings();
       setSettings(data);
+      const language = (data?.language ?? 'auto') as UILanguage;
+      persistLanguageChoice(language);
+      applyLanguage(language);
     } catch (err) {
       console.error('Failed to load settings:', err);
     }
@@ -88,13 +92,13 @@ export default function Settings() {
     setTesting(prev => ({ ...prev, [provider]: false }));
   };
 
-  const getKeyValue = (section: string, provider: string, key: string): string => {
+  const getKey价值 = (section: string, provider: string, key: string): string => {
     const editKey = `${section}.${provider}.${key}`;
     if (editKeys[editKey] !== undefined) return editKeys[editKey];
     return settings?.[section]?.[provider]?.[key] ?? '';
   };
 
-  const setKeyValue = (section: string, provider: string, key: string, value: string) => {
+  const setKey价值 = (section: string, provider: string, key: string, value: string) => {
     setEditKeys(prev => ({ ...prev, [`${section}.${provider}.${key}`]: value }));
   };
 
@@ -107,14 +111,14 @@ export default function Settings() {
   }
 
   const tabs = [
-    { id: 'keys' as const, label: 'API Keys', icon: Key },
-    { id: 'services' as const, label: 'Services', icon: Globe },
-    { id: 'servers' as const, label: 'Servers', icon: Server },
-    { id: 'exchanges' as const, label: 'Exchanges', icon: TrendingUp },
-    { id: 'budget' as const, label: 'Budget', icon: DollarSign },
-    { id: 'cli' as const, label: 'Claude CLI', icon: Terminal },
-    { id: 'evolution' as const, label: 'Updates', icon: Zap },
-    { id: 'general' as const, label: 'General', icon: Bot },
+    { id: 'keys' as const, label: 'API 密钥', icon: Key },
+    { id: 'services' as const, label: '外部服务', icon: Globe },
+    { id: 'servers' as const, label: '服务器', icon: Server },
+    { id: 'exchanges' as const, label: '交易所', icon: TrendingUp },
+    { id: 'budget' as const, label: '预算', icon: DollarSign },
+    { id: 'cli' as const, label: 'Claude 命令行', icon: Terminal },
+    { id: 'evolution' as const, label: '更新', icon: Zap },
+    { id: 'general' as const, label: '通用', icon: Bot },
   ];
 
   const providerKeys = [
@@ -131,7 +135,7 @@ export default function Settings() {
   ];
 
   const renderKeyRow = (item: typeof providerKeys[0]) => {
-    const value = getKeyValue(item.section, item.provider, item.keyField);
+    const value = getKey价值(item.section, item.provider, item.keyField);
     const visible = showKeys[item.provider] ?? false;
     const isTesting = testing[item.provider];
     const result = testResults[item.provider];
@@ -143,7 +147,7 @@ export default function Settings() {
           <div className="flex items-center gap-3">
             <span className="font-medium">{item.label}</span>
             <span className={`text-xs px-2 py-0.5 rounded-full ${isEnabled ? 'bg-green-500/20 text-green-400' : 'bg-gray-700 text-gray-400'}`}>
-              {isEnabled ? 'Active' : 'Inactive'}
+              {isEnabled ? '已启用' : '未启用'}
             </span>
           </div>
           <label className="flex items-center gap-2 cursor-pointer">
@@ -158,7 +162,7 @@ export default function Settings() {
               }}
               className="w-4 h-4 rounded border-gray-600 bg-dark-900 accent-primary-600"
             />
-            <span className="text-xs text-gray-400">Enabled</span>
+            <span className="text-xs text-gray-400">启用</span>
           </label>
         </div>
 
@@ -167,7 +171,7 @@ export default function Settings() {
             <input
               type={visible ? 'text' : 'password'}
               value={value}
-              onChange={(e) => setKeyValue(item.section, item.provider, item.keyField, e.target.value)}
+              onChange={(e) => setKey价值(item.section, item.provider, item.keyField, e.target.value)}
               placeholder={item.placeholder}
               className="w-full p-2.5 pr-10 rounded bg-dark-900 border border-gray-700 text-white text-sm font-mono"
             />
@@ -189,7 +193,7 @@ export default function Settings() {
             className="px-3 py-2 bg-dark-900 border border-gray-700 rounded hover:bg-dark-800 transition-colors disabled:opacity-50 flex items-center gap-1.5"
           >
             {isTesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <TestTube className="w-4 h-4" />}
-            <span className="text-xs">Test</span>
+            <span className="text-xs">测试</span>
           </button>
         </div>
 
@@ -209,7 +213,7 @@ export default function Settings() {
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <SettingsIcon className="w-7 h-7 text-primary-500" />
-            <h1 className="text-2xl font-bold">Settings</h1>
+            <h1 className="text-2xl font-bold">设置</h1>
           </div>
           <button
             onClick={saveSettings}
@@ -217,7 +221,7 @@ export default function Settings() {
             className="flex items-center gap-2 px-4 py-2 bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 font-medium"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <CheckCircle className="w-4 h-4" /> : <Save className="w-4 h-4" />}
-            {saved ? 'Saved!' : 'Save Changes'}
+            {saved ? '已保存！' : '保存更改'}
           </button>
         </div>
 
@@ -239,8 +243,8 @@ export default function Settings() {
         {activeTab === 'keys' && (
           <div className="space-y-4">
             <div className="mb-4">
-              <h2 className="text-lg font-semibold mb-1">AI Provider Keys</h2>
-              <p className="text-sm text-gray-400">Configure API keys for AI model providers. Keys are encrypted and masked.</p>
+              <h2 className="text-lg font-semibold mb-1">AI 提供商密钥</h2>
+              <p className="text-sm text-gray-400">配置 AI 模型服务商的 API 密钥。密钥将被加密并掩码显示。</p>
             </div>
             {providerKeys.map(renderKeyRow)}
           </div>
@@ -249,8 +253,8 @@ export default function Settings() {
         {activeTab === 'services' && (
           <div className="space-y-4">
             <div className="mb-4">
-              <h2 className="text-lg font-semibold mb-1">External Services</h2>
-              <p className="text-sm text-gray-400">Configure API keys for GitHub, search, and messaging platforms.</p>
+              <h2 className="text-lg font-semibold mb-1">外部服务</h2>
+              <p className="text-sm text-gray-400">配置 GitHub、搜索与消息平台的 API 密钥。</p>
             </div>
             {serviceKeys.map(renderKeyRow)}
           </div>
@@ -260,54 +264,54 @@ export default function Settings() {
           <div className="space-y-4">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="text-lg font-semibold mb-1">SSH Servers</h2>
-                <p className="text-sm text-gray-400">Manage remote servers the agent can connect to and work on.</p>
+                <h2 className="text-lg font-semibold mb-1">SSH 服务器</h2>
+                <p className="text-sm text-gray-400">管理智能体可连接并执行任务的远程服务器。</p>
               </div>
               <button onClick={() => setShowAddServer(true)} className="flex items-center gap-2 px-3 py-2 bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors text-sm font-medium">
-                <Plus className="w-4 h-4" /> Add Server
+                <Plus className="w-4 h-4" /> 添加服务器
               </button>
             </div>
 
             {showAddServer && (
               <div className="p-5 bg-dark-800 rounded-lg border border-primary-600/50">
-                <h3 className="font-semibold mb-4">Add New Server</h3>
+                <h3 className="font-semibold mb-4">添加新服务器</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-sm text-gray-400 mb-1">Name</label>
+                    <label className="block text-sm text-gray-400 mb-1">名称</label>
                     <input value={newServer.name} onChange={e => setNewServer({ ...newServer, name: e.target.value })} placeholder="production-1" className="w-full p-2.5 rounded bg-dark-900 border border-gray-700 text-white text-sm" />
                   </div>
                   <div>
-                    <label className="block text-sm text-gray-400 mb-1">Host (IP / Domain)</label>
+                    <label className="block text-sm text-gray-400 mb-1">主机（IP / 域名）</label>
                     <input value={newServer.host} onChange={e => setNewServer({ ...newServer, host: e.target.value })} placeholder="1.2.3.4" className="w-full p-2.5 rounded bg-dark-900 border border-gray-700 text-white text-sm" />
                   </div>
                   <div>
-                    <label className="block text-sm text-gray-400 mb-1">Port</label>
+                    <label className="block text-sm text-gray-400 mb-1">端口</label>
                     <input type="number" value={newServer.port} onChange={e => setNewServer({ ...newServer, port: parseInt(e.target.value) || 22 })} className="w-full p-2.5 rounded bg-dark-900 border border-gray-700 text-white text-sm" />
                   </div>
                   <div>
-                    <label className="block text-sm text-gray-400 mb-1">Username</label>
+                    <label className="block text-sm text-gray-400 mb-1">用户名</label>
                     <input value={newServer.user} onChange={e => setNewServer({ ...newServer, user: e.target.value })} placeholder="root" className="w-full p-2.5 rounded bg-dark-900 border border-gray-700 text-white text-sm" />
                   </div>
                   <div className="md:col-span-2">
-                    <label className="block text-sm text-gray-400 mb-1">Auth Method</label>
+                    <label className="block text-sm text-gray-400 mb-1">认证方式</label>
                     <select value={newServer.authMethod} onChange={e => setNewServer({ ...newServer, authMethod: e.target.value as 'key' | 'password' })} className="w-full p-2.5 rounded bg-dark-900 border border-gray-700 text-white text-sm">
-                      <option value="password">Password</option>
-                      <option value="key">SSH Key</option>
+                      <option value="password">密码</option>
+                      <option value="key">SSH 密钥</option>
                     </select>
                   </div>
                   {newServer.authMethod === 'password' ? (
                     <div className="md:col-span-2">
-                      <label className="block text-sm text-gray-400 mb-1">Password</label>
-                      <input type="password" value={newServer.password} onChange={e => setNewServer({ ...newServer, password: e.target.value })} placeholder="Server password" className="w-full p-2.5 rounded bg-dark-900 border border-gray-700 text-white text-sm" />
+                      <label className="block text-sm text-gray-400 mb-1">密码</label>
+                      <input type="password" value={newServer.password} onChange={e => setNewServer({ ...newServer, password: e.target.value })} placeholder="服务器密码" className="w-full p-2.5 rounded bg-dark-900 border border-gray-700 text-white text-sm" />
                     </div>
                   ) : (
                     <div className="md:col-span-2">
-                      <label className="block text-sm text-gray-400 mb-1">SSH Key Path</label>
+                      <label className="block text-sm text-gray-400 mb-1">SSH 密钥路径</label>
                       <input value={newServer.keyPath} onChange={e => setNewServer({ ...newServer, keyPath: e.target.value })} placeholder="~/.ssh/id_rsa" className="w-full p-2.5 rounded bg-dark-900 border border-gray-700 text-white text-sm font-mono" />
                     </div>
                   )}
                   <div className="md:col-span-2">
-                    <label className="block text-sm text-gray-400 mb-1">Tags (comma-separated)</label>
+                    <label className="block text-sm text-gray-400 mb-1">标签（逗号分隔）</label>
                     <input value={newServer.tags} onChange={e => setNewServer({ ...newServer, tags: e.target.value })} placeholder="web, production" className="w-full p-2.5 rounded bg-dark-900 border border-gray-700 text-white text-sm" />
                   </div>
                 </div>
@@ -334,9 +338,9 @@ export default function Settings() {
                     disabled={serverLoading || !newServer.name || !newServer.host}
                     className="flex items-center gap-2 px-4 py-2 bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 text-sm font-medium"
                   >
-                    {serverLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Save Server
+                    {serverLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} 保存服务器
                   </button>
-                  <button onClick={() => setShowAddServer(false)} className="px-4 py-2 bg-dark-900 rounded-lg hover:bg-dark-800 text-gray-400 text-sm">Cancel</button>
+                  <button onClick={() => setShowAddServer(false)} className="px-4 py-2 bg-dark-900 rounded-lg hover:bg-dark-800 text-gray-400 text-sm">取消</button>
                 </div>
               </div>
             )}
@@ -362,19 +366,19 @@ export default function Settings() {
                           const health = await api.serverHealth(server.id);
                           const updated = await api.getServers();
                           setServers(updated);
-                          if (health.status === 'online') alert(`Server online!\n${health.raw?.join('\n') ?? ''}`);
-                          else alert(`Server offline: ${health.error}`);
+                          if (health.status === 'online') alert(`服务器在线！\n${health.raw?.join('\n') ?? ''}`);
+                          else alert(`服务器离线：${health.error}`);
                         } catch (err: any) { alert(err.message); }
                         setCheckingHealth(p => ({ ...p, [server.id]: false }));
                       }}
                       disabled={checkingHealth[server.id]}
                       className="px-3 py-1.5 text-xs bg-dark-900 border border-gray-700 rounded hover:bg-dark-700 disabled:opacity-50"
                     >
-                      {checkingHealth[server.id] ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Test'}
+                      {checkingHealth[server.id] ? <Loader2 className="w-3 h-3 animate-spin" /> : '检测'}
                     </button>
                     <button
                       onClick={async () => {
-                        if (!confirm(`Remove server "${server.name}"?`)) return;
+                        if (!confirm(`确认移除服务器“${server.name}”？`)) return;
                         await api.removeServer(server.id);
                         setServers(await api.getServers());
                       }}
@@ -389,14 +393,14 @@ export default function Settings() {
                     {server.tags.map((t: string) => <span key={t} className="text-xs px-2 py-0.5 bg-dark-900 rounded text-gray-400">{t}</span>)}
                   </div>
                 )}
-                {server.lastChecked && <p className="text-xs text-gray-500 mt-1">Last checked: {new Date(server.lastChecked).toLocaleString()}</p>}
+                {server.lastChecked && <p className="text-xs text-gray-500 mt-1">上次检测：{new Date(server.lastChecked).toLocaleString()}</p>}
               </div>
             ))}
             {servers.length === 0 && !showAddServer && (
               <div className="text-center text-gray-500 py-12">
                 <Server className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>No servers configured</p>
-                <p className="text-sm mt-1">Add SSH servers so the agent can manage them remotely</p>
+                <p>尚未配置服务器</p>
+                <p className="text-sm mt-1">添加 SSH 服务器后，智能体可远程管理它们</p>
               </div>
             )}
           </div>
@@ -405,8 +409,8 @@ export default function Settings() {
         {activeTab === 'exchanges' && (
           <div className="space-y-4">
             <div className="mb-4">
-              <h2 className="text-lg font-semibold mb-1">Exchange API Keys</h2>
-              <p className="text-sm text-gray-400">Configure API keys for cryptocurrency exchanges. Enable trading by providing your exchange credentials.</p>
+              <h2 className="text-lg font-semibold mb-1">交易所 API 密钥</h2>
+              <p className="text-sm text-gray-400">配置加密货币交易所 API 密钥。填写凭据后可开启实盘交易。</p>
             </div>
             {[
               { provider: 'binance', label: 'Binance', section: 'exchanges', keyField: 'apiKey', placeholder: 'Binance API Key' },
@@ -416,7 +420,7 @@ export default function Settings() {
               { provider: 'okx_passphrase', label: 'OKX Passphrase', section: 'exchanges', keyField: 'passphrase', placeholder: 'OKX Passphrase' },
             ].map(renderKeyRow)}
             <div className="p-4 bg-amber-500/5 border border-amber-500/20 rounded-lg">
-              <p className="text-sm text-amber-400">Tip: Start with Paper Trading mode enabled (in Trading page) to test strategies without risking real funds. Exchange keys are required only for live trading.</p>
+              <p className="text-sm text-amber-400">提示：建议先在交易页启用模拟交易模式，先验证策略再上实盘。仅实盘交易需要交易所密钥。</p>
             </div>
           </div>
         )}
@@ -424,12 +428,12 @@ export default function Settings() {
         {activeTab === 'budget' && (
           <div className="space-y-6">
             <div className="mb-4">
-              <h2 className="text-lg font-semibold mb-1">Budget & Cost Control</h2>
-              <p className="text-sm text-gray-400">Set spending limits and preferences for AI model usage.</p>
+              <h2 className="text-lg font-semibold mb-1">预算与成本控制</h2>
+              <p className="text-sm text-gray-400">设置 AI 模型使用的预算上限与偏好。</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="p-4 bg-dark-800 rounded-lg border border-gray-800">
-                <label className="block text-sm text-gray-400 mb-2">Daily Budget Limit ($)</label>
+                <label className="block text-sm text-gray-400 mb-2">每日预算上限（$）</label>
                 <input
                   type="number"
                   step="0.5"
@@ -440,7 +444,7 @@ export default function Settings() {
                 />
               </div>
               <div className="p-4 bg-dark-800 rounded-lg border border-gray-800">
-                <label className="block text-sm text-gray-400 mb-2">Monthly Budget Limit ($)</label>
+                <label className="block text-sm text-gray-400 mb-2">每月预算上限（$）</label>
                 <input
                   type="number"
                   step="5"
@@ -460,22 +464,22 @@ export default function Settings() {
                   className="w-4 h-4 rounded border-gray-600 bg-dark-900 accent-primary-600"
                 />
                 <div>
-                  <p className="font-medium">Prefer Free Models</p>
-                  <p className="text-sm text-gray-400">Use free OpenRouter models for simple/medium tasks when possible</p>
+                  <p className="font-medium">优先使用免费模型</p>
+                  <p className="text-sm text-gray-400">在可能情况下，简单/中等任务优先使用 OpenRouter 免费模型</p>
                 </div>
               </label>
             </div>
             <div className="p-4 bg-dark-800 rounded-lg border border-gray-800">
-              <label className="block text-sm text-gray-400 mb-2">Provider Mode</label>
+              <label className="block text-sm text-gray-400 mb-2">提供商模式</label>
               <select
                 value={settings?.providerMode ?? 'balanced'}
                 onChange={(e) => setSettings({ ...settings, providerMode: e.target.value })}
                 className="w-full p-2.5 rounded bg-dark-900 border border-gray-700 text-white"
               >
-                <option value="free">Free — Only free models (OpenRouter :free)</option>
-                <option value="cheap">Cheap — Free + budget models (DeepSeek, Haiku)</option>
-                <option value="balanced">Balanced — Smart routing based on complexity</option>
-                <option value="max">Max — Best model for every task (Claude Code CLI)</option>
+                <option value="free">免费 —— 仅使用免费模型（OpenRouter :free）</option>
+                <option value="cheap">低成本 —— 免费 + 经济模型（DeepSeek、Haiku）</option>
+                <option value="balanced">均衡 —— 按复杂度智能路由</option>
+                <option value="max">极致 —— 每次都用最强模型（Claude Code CLI）</option>
               </select>
             </div>
           </div>
@@ -485,10 +489,10 @@ export default function Settings() {
           <div className="space-y-6">
             <div className="mb-4">
               <h2 className="text-lg font-semibold mb-1">Claude Code CLI</h2>
-              <p className="text-sm text-gray-400">Connect your Claude Max subscription via CLI for free, unlimited AI usage.</p>
+              <p className="text-sm text-gray-400">通过 CLI 连接 Claude Max 订阅，免费无限使用 AI。</p>
             </div>
 
-            {/* Status Card */}
+            {/* 状态 Card */}
             <div className={`p-5 rounded-lg border ${cliStatus?.authenticated ? 'bg-green-500/5 border-green-500/20' : 'bg-amber-500/5 border-amber-500/20'}`}>
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
@@ -496,16 +500,16 @@ export default function Settings() {
                     <Terminal className={`w-5 h-5 ${cliStatus?.authenticated ? 'text-green-400' : 'text-amber-400'}`} />
                   </div>
                   <div>
-                    <p className="font-medium">{cliStatus?.authenticated ? 'CLI Connected' : 'CLI Not Connected'}</p>
+                    <p className="font-medium">{cliStatus?.authenticated ? 'CLI 已连接' : 'CLI 未连接'}</p>
                     <p className="text-xs text-gray-400">
                       {cliStatus?.authenticated
-                        ? 'Using Claude Max subscription (FREE)'
-                        : 'Click Authenticate to connect via browser'}
+                        ? '正在使用 Claude Max 订阅（免费）'
+                        : '点击“认证”后在浏览器完成连接'}
                     </p>
                   </div>
                 </div>
                 <span className={`text-xs px-3 py-1 rounded-full font-medium ${cliStatus?.authenticated ? 'bg-green-500/20 text-green-400' : 'bg-amber-500/20 text-amber-400'}`}>
-                  {cliStatus?.authenticated ? 'Active' : 'Disconnected'}
+                  {cliStatus?.authenticated ? '已连接' : '未连接'}
                 </span>
               </div>
 
@@ -526,16 +530,16 @@ export default function Settings() {
                           attempts++;
                           try {
                             const status = await api.cliRecheck();
-                            setCliStatus(status);
+                            setCli状态(status);
                             if (status.authenticated) {
                               clearInterval(poller);
                               setCLILoading(false);
                               setCliAuthUrl(null);
-                              setCLIMessage('Successfully connected!');
+                              setCLIMessage('连接成功！');
                             } else if (attempts >= 60) {
                               clearInterval(poller);
                               setCLILoading(false);
-                              setCLIMessage('Timeout — click Authenticate to try again');
+                              setCLIMessage('认证超时——请点击“认证”重试');
                             }
                           } catch {
                             if (attempts >= 60) { clearInterval(poller); setCLILoading(false); }
@@ -553,32 +557,32 @@ export default function Settings() {
                   className="flex items-center gap-2 px-4 py-2 bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 text-sm font-medium"
                 >
                   {cliLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Terminal className="w-4 h-4" />}
-                  {cliLoading ? 'Waiting for auth...' : cliStatus?.authenticated ? 'Reconnect' : 'Authenticate'}
+                  {cliLoading ? '等待认证中...' : cliStatus?.authenticated ? '重新连接' : '认证'}
                 </button>
                 <button
                   onClick={async () => {
                     try {
                       const status = await api.cliRecheck();
-                      setCliStatus(status);
+                      setCli状态(status);
                       if (status.authenticated) {
-                        setCLIMessage('Connected!');
+                        setCLIMessage('已连接！');
                         setCliAuthUrl(null);
                       } else {
-                        setCLIMessage('Not authenticated yet');
+                        setCLIMessage('尚未认证');
                       }
                       setTimeout(() => setCLIMessage(''), 3000);
                     } catch {}
                   }}
                   className="flex items-center gap-2 px-4 py-2 bg-dark-800 border border-gray-700 rounded-lg hover:bg-dark-700 transition-colors text-sm"
                 >
-                  Re-check
+                  重新检测
                 </button>
               </div>
 
               {/* Auth URL — clickable link for headless/VPS servers */}
               {cliAuthUrl && (
                 <div className="mt-4 p-4 bg-dark-900 rounded-lg border border-primary-500/30">
-                  <p className="text-sm text-gray-300 mb-2">Open this link in your browser to sign in:</p>
+                  <p className="text-sm text-gray-300 mb-2">请在浏览器打开以下链接完成登录：</p>
                   <a
                     href={cliAuthUrl}
                     target="_blank"
@@ -588,12 +592,12 @@ export default function Settings() {
                     {cliAuthUrl.length > 120 ? cliAuthUrl.slice(0, 120) + '...' : cliAuthUrl}
                   </a>
                   <button
-                    onClick={() => { navigator.clipboard.writeText(cliAuthUrl); setCLIMessage('Link copied!'); setTimeout(() => setCLIMessage(''), 2000); }}
+                    onClick={() => { navigator.clipboard.writeText(cliAuthUrl); setCLIMessage('链接已复制！'); setTimeout(() => setCLIMessage(''), 2000); }}
                     className="mt-2 flex items-center gap-1.5 px-3 py-1.5 bg-dark-800 border border-gray-700 rounded text-xs hover:bg-dark-700 transition-colors"
                   >
-                    Copy Link
+                    复制链接
                   </button>
-                  <p className="text-xs text-gray-500 mt-3">After signing in, the connection will update automatically. If not, click Re-check.</p>
+                  <p className="text-xs text-gray-500 mt-3">登录后会自动更新连接状态；若未更新，请点击“重新检测”。</p>
                 </div>
               )}
 
@@ -609,41 +613,41 @@ export default function Settings() {
 
             {/* Details */}
             <div className="p-4 bg-dark-800 rounded-lg border border-gray-800">
-              <h3 className="font-medium mb-3">Connection Details</h3>
+              <h3 className="font-medium mb-3">连接详情</h3>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-400">CLI Path</span>
+                  <span className="text-gray-400">CLI 路径</span>
                   <span className="font-mono text-gray-300">{cliStatus?.cliPath ?? 'claude'}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-400">Available</span>
-                  <span className={cliStatus?.available ? 'text-green-400' : 'text-red-400'}>{cliStatus?.available ? 'Yes' : 'No'}</span>
+                  <span className="text-gray-400">可用</span>
+                  <span className={cliStatus?.available ? 'text-green-400' : 'text-red-400'}>{cliStatus?.available ? '是' : '否'}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-400">Authenticated</span>
-                  <span className={cliStatus?.authenticated ? 'text-green-400' : 'text-red-400'}>{cliStatus?.authenticated ? 'Yes' : 'No'}</span>
+                  <span className="text-gray-400">已认证</span>
+                  <span className={cliStatus?.authenticated ? 'text-green-400' : 'text-red-400'}>{cliStatus?.authenticated ? '是' : '否'}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-400">Last Check</span>
-                  <span className="text-gray-300">{cliStatus?.lastCheckAt ? new Date(cliStatus.lastCheckAt).toLocaleTimeString() : 'Never'}</span>
+                  <span className="text-gray-400">上次检测</span>
+                  <span className="text-gray-300">{cliStatus?.lastCheckAt ? new Date(cliStatus.lastCheckAt).toLocaleTimeString() : '从未'}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-400">Cost</span>
-                  <span className="text-green-400 font-medium">FREE (Max subscription)</span>
+                  <span className="text-gray-400">费用</span>
+                  <span className="text-green-400 font-medium">免费（Max 订阅）</span>
                 </div>
               </div>
             </div>
 
             {/* How it works */}
             <div className="p-4 bg-dark-800 rounded-lg border border-gray-800">
-              <h3 className="font-medium mb-3">How It Works</h3>
+              <h3 className="font-medium mb-3">工作原理</h3>
               <ol className="space-y-2 text-sm text-gray-400 list-decimal list-inside">
-                <li>Click <strong className="text-white">Authenticate</strong> — a sign-in link will appear below</li>
-                <li>Open the link and sign in with your Anthropic account (Max subscription required)</li>
-                <li>The connection updates automatically — or click <strong className="text-white">Re-check</strong></li>
-                <li>All AI requests use your Max subscription at <strong className="text-green-400">zero cost</strong></li>
+                <li>点击 <strong className="text-white">认证</strong> —— 下方会出现登录链接</li>
+                <li>打开链接并使用 Anthropic 账号登录（需 Max 订阅）</li>
+                <li>连接状态会自动更新 —— 或点击 <strong className="text-white">重新检测</strong></li>
+                <li>所有 AI 请求都走你的 Max 订阅，<strong className="text-green-400">零额外费用</strong></li>
               </ol>
-              <p className="text-xs text-gray-500 mt-3">To disconnect, click Reconnect — it clears old credentials and generates a fresh link.</p>
+              <p className="text-xs text-gray-500 mt-3">若要断开，请点击“重新连接”——会清除旧凭据并生成新链接。</p>
             </div>
           </div>
         )}
@@ -651,18 +655,18 @@ export default function Settings() {
         {activeTab === 'evolution' && (
           <div className="space-y-6">
             <div className="mb-4">
-              <h2 className="text-lg font-semibold mb-1">Updates & Evolution</h2>
-              <p className="text-sm text-gray-400">Control how the system discovers and applies updates. Choose between automatic updates, notifications, or fully manual mode.</p>
+              <h2 className="text-lg font-semibold mb-1">更新与进化</h2>
+              <p className="text-sm text-gray-400">控制系统如何发现并应用更新。可选择自动更新、仅通知或完全手动模式。</p>
             </div>
 
             {/* Evolution Mode */}
             <div className="p-4 bg-dark-800 rounded-lg border border-gray-800">
-              <h3 className="font-medium mb-3">Evolution Mode</h3>
+              <h3 className="font-medium mb-3">进化模式</h3>
               <div className="space-y-3">
                 {[
-                  { value: 'auto', label: 'Auto', desc: 'System discovers and auto-applies safe updates (skills, models, tools)' },
-                  { value: 'notify', label: 'Notify Only', desc: 'System discovers updates but only sends notifications — you decide what to apply' },
-                  { value: 'disabled', label: 'Disabled', desc: 'No scanning, no notifications — fully manual' },
+                  { value: 'auto', label: '自动', desc: '系统发现并自动应用安全更新（技能、模型、工具）' },
+                  { value: 'notify', label: '仅通知', desc: '系统发现更新后只发送通知，由你决定是否应用' },
+                  { value: 'disabled', label: '关闭', desc: '不扫描、不通知——完全手动' },
                 ].map(opt => (
                   <label key={opt.value} className="flex items-start gap-3 cursor-pointer p-3 rounded-lg hover:bg-dark-900 transition-colors">
                     <input
@@ -684,14 +688,14 @@ export default function Settings() {
 
             {/* Notification Preferences */}
             <div className="p-4 bg-dark-800 rounded-lg border border-gray-800">
-              <h3 className="font-medium mb-3">Notification Preferences</h3>
+              <h3 className="font-medium mb-3">通知偏好</h3>
               <div className="space-y-3">
                 {[
-                  { key: 'notifyNewModels', label: 'New Models', desc: 'Notify when new AI models are released (Claude, GPT, Gemini, etc.)' },
-                  { key: 'notifyPriceChanges', label: 'Price Changes', desc: 'Notify when model pricing changes' },
-                  { key: 'notifyDeprecations', label: 'Deprecations', desc: 'Notify when models are removed or deprecated' },
-                  { key: 'autoUpdateSkills', label: 'Auto-Update Skills', desc: 'Automatically install new skills from configured sources' },
-                  { key: 'autoUpdateModels', label: 'Auto-Update Model Config', desc: 'Automatically update model routing when better models are found' },
+                  { key: 'notifyNewModels', label: '新模型', desc: '当有新 AI 模型发布时通知（Claude、GPT、Gemini 等）' },
+                  { key: 'notifyPriceChanges', label: '价格变动', desc: '模型价格变化时通知' },
+                  { key: 'notifyDeprecations', label: '弃用提醒', desc: '模型下线或弃用时通知' },
+                  { key: 'autoUpdateSkills', label: '自动更新技能', desc: '自动从已配置来源安装新技能' },
+                  { key: 'autoUpdateModels', label: '自动更新模型配置', desc: '发现更优模型时自动更新模型路由' },
                 ].map(item => (
                   <label key={item.key} className="flex items-center gap-3 cursor-pointer">
                     <input
@@ -711,10 +715,10 @@ export default function Settings() {
 
             {/* Scan Intervals */}
             <div className="p-4 bg-dark-800 rounded-lg border border-gray-800">
-              <h3 className="font-medium mb-3">Scan Intervals</h3>
+              <h3 className="font-medium mb-3">扫描间隔</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm text-gray-400 mb-1">LLM Model Scan (hours)</label>
+                  <label className="block text-sm text-gray-400 mb-1">LLM 模型扫描（小时）</label>
                   <input
                     type="number"
                     min="1"
@@ -723,10 +727,10 @@ export default function Settings() {
                     onChange={(e) => setSettings({ ...settings, evolution: { ...settings?.evolution, ecosystemScanIntervalHours: parseInt(e.target.value) || 6 } })}
                     className="w-full p-2.5 rounded bg-dark-900 border border-gray-700 text-white text-sm"
                   />
-                  <p className="text-[11px] text-gray-600 mt-1">How often to check for new models and price changes</p>
+                  <p className="text-[11px] text-gray-600 mt-1">检查新模型与价格变化的频率</p>
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-400 mb-1">Ecosystem Scan (hours)</label>
+                  <label className="block text-sm text-gray-400 mb-1">生态扫描（小时）</label>
                   <input
                     type="number"
                     min="1"
@@ -735,7 +739,7 @@ export default function Settings() {
                     onChange={(e) => setSettings({ ...settings, evolution: { ...settings?.evolution, skillScanIntervalHours: parseInt(e.target.value) || 24 } })}
                     className="w-full p-2.5 rounded bg-dark-900 border border-gray-700 text-white text-sm"
                   />
-                  <p className="text-[11px] text-gray-600 mt-1">How often to scan GitHub/npm for new tools and skills</p>
+                  <p className="text-[11px] text-gray-600 mt-1">扫描 GitHub/npm 新工具与技能的频率</p>
                 </div>
               </div>
             </div>
@@ -745,27 +749,34 @@ export default function Settings() {
         {activeTab === 'general' && (
           <div className="space-y-6">
             <div className="mb-4">
-              <h2 className="text-lg font-semibold mb-1">General Settings</h2>
-              <p className="text-sm text-gray-400">Language, behavior, and system preferences.</p>
+              <h2 className="text-lg font-semibold mb-1">通用设置</h2>
+              <p className="text-sm text-gray-400">语言、行为与系统偏好设置。</p>
             </div>
             <div className="p-4 bg-dark-800 rounded-lg border border-gray-800">
-              <label className="block text-sm text-gray-400 mb-2">Language</label>
+              <label className="block text-sm text-gray-400 mb-2">语言</label>
               <select
                 value={settings?.language ?? 'auto'}
-                onChange={(e) => setSettings({ ...settings, language: e.target.value })}
+                onChange={(e) => {
+                  const language = e.target.value as UILanguage;
+                  setSettings({ ...settings, language });
+                  persistLanguageChoice(language);
+                  applyLanguage(language);
+                }}
                 className="w-full p-2.5 rounded bg-dark-900 border border-gray-700 text-white"
               >
-                <option value="auto">Auto-detect (Hebrew/English)</option>
-                <option value="he">Hebrew</option>
-                <option value="en">English</option>
+                <option value="auto">自动检测（中文/英文/希伯来语）</option>
+                <option value="zh">中文</option>
+                <option value="he">希伯来语</option>
+                <option value="en">英语</option>
               </select>
+              <p className="text-xs text-gray-500 mt-2">切换后立即生效；少量页面可能需要刷新一次。</p>
             </div>
             <div className="p-4 bg-dark-800 rounded-lg border border-gray-800">
-              <h3 className="font-medium mb-3">System Info</h3>
+              <h3 className="font-medium mb-3">系统信息</h3>
               <div className="space-y-2 text-sm">
-                <div className="flex justify-between"><span className="text-gray-400">Version</span><span className="font-mono">6.0.0</span></div>
-                <div className="flex justify-between"><span className="text-gray-400">Dashboard</span><span className="font-mono">React + Vite + Tailwind</span></div>
-                <div className="flex justify-between"><span className="text-gray-400">Backend</span><span className="font-mono">Node.js + Express + TypeScript</span></div>
+                <div className="flex justify-between"><span className="text-gray-400">版本</span><span className="font-mono">6.0.0</span></div>
+                <div className="flex justify-between"><span className="text-gray-400">仪表盘</span><span className="font-mono">React + Vite + Tailwind</span></div>
+                <div className="flex justify-between"><span className="text-gray-400">后端</span><span className="font-mono">Node.js + Express + TypeScript</span></div>
               </div>
             </div>
           </div>
@@ -777,7 +788,7 @@ export default function Settings() {
             className="flex items-center gap-2 px-4 py-2.5 bg-red-600/20 text-red-400 rounded-lg hover:bg-red-600/30 transition-colors"
           >
             <LogOut className="w-4 h-4" />
-            Sign Out
+            退出登录
           </button>
         </div>
       </div>

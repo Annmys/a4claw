@@ -67,7 +67,7 @@ export default function Header() {
           if (status.authenticated || attempts >= 20) {
             clearInterval(poller);
             setAuthLoading(false);
-            setAuthMessage(status.authenticated ? 'Connected!' : 'Timeout — try again');
+            setAuthMessage(status.authenticated ? '已连接！' : '超时，请重试');
             setTimeout(() => setAuthMessage(''), 5000);
           }
         } catch {
@@ -78,7 +78,7 @@ export default function Header() {
         }
       }, 3000);
     } catch (err: any) {
-      setAuthMessage(err.message || 'Failed');
+      setAuthMessage(err.message || '失败');
       setAuthLoading(false);
     }
   }, []);
@@ -97,7 +97,7 @@ export default function Header() {
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-2">
           <Activity className="w-4 h-4 text-green-500" />
-          <span className="text-sm text-gray-400">Uptime: {uptime}</span>
+          <span className="text-sm text-gray-400">运行时长：{uptime}</span>
         </div>
 
         {/* CLI Status */}
@@ -107,17 +107,17 @@ export default function Header() {
             <button
               onClick={handleRecheck}
               className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-green-500/10 border border-green-500/20 text-sm cursor-pointer hover:bg-green-500/20 transition-colors"
-              title="Claude CLI connected (click to refresh)"
+              title="Claude CLI 已连接（点击刷新）"
             >
               <CheckCircle className="w-3.5 h-3.5 text-green-400" />
-              <span className="text-green-300 text-xs font-medium">CLI Connected</span>
+              <span className="text-green-300 text-xs font-medium">CLI 已连接</span>
             </button>
           ) : (
             <button
               onClick={handleAuth}
               disabled={authLoading}
               className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20 text-sm hover:bg-amber-500/20 transition-colors disabled:opacity-60"
-              title="Click to authenticate Claude CLI via browser"
+              title="点击通过浏览器完成 Claude CLI 认证"
             >
               {authLoading ? (
                 <Loader2 className="w-3.5 h-3.5 text-amber-400 animate-spin" />
@@ -125,13 +125,13 @@ export default function Header() {
                 <Terminal className="w-3.5 h-3.5 text-amber-400" />
               )}
               <span className="text-amber-300 text-xs font-medium">
-                {authLoading ? 'Waiting...' : 'Connect CLI'}
+                {authLoading ? '等待中...' : '连接 CLI'}
               </span>
             </button>
           )
         )}
         {authMessage && (
-          <span className={`text-xs ${authMessage.includes('Connected') ? 'text-green-400' : 'text-gray-400'}`}>
+          <span className={`text-xs ${authMessage.includes('已连接') ? 'text-green-400' : 'text-gray-400'}`}>
             {authMessage}
           </span>
         )}
@@ -140,7 +140,7 @@ export default function Header() {
         <NotificationBell />
         <button onClick={logout} className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors text-sm">
           <LogOut className="w-4 h-4" />
-          Logout
+          退出登录
         </button>
       </div>
     </header>

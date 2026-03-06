@@ -101,7 +101,7 @@ export default function Terminal() {
       setHistory(prev => [...prev, {
         id: crypto.randomUUID(),
         command: cmd,
-        output: `Error: ${err.message}`,
+        output: `错误：${err.message}`,
         exitCode: 1,
         timestamp: new Date(),
       }]);
@@ -158,9 +158,9 @@ export default function Terminal() {
             <TerminalIcon className="w-4 h-4 text-green-400" />
           </div>
           <div>
-            <h1 className="text-lg font-bold text-white font-mono">SSH Terminal</h1>
+            <h1 className="text-lg font-bold text-white font-mono">SSH 终端</h1>
             <p className="text-[10px] text-gray-500 font-mono">
-              {serverInfo ? `${prompt} · ${serverInfo.uptime}` : 'Connecting...'}
+              {serverInfo ? `${prompt} · ${serverInfo.uptime}` : '连接中...'}
             </p>
           </div>
         </div>
@@ -173,7 +173,7 @@ export default function Terminal() {
             onClick={(e) => { e.stopPropagation(); setHistory([]); }}
             disabled={history.length === 0}
             className="p-2 text-gray-400 hover:text-red-400 hover:bg-dark-800 rounded-lg transition-colors disabled:opacity-30"
-            title="Clear terminal (Ctrl+L)"
+            title="清空终端（Ctrl+L）"
           >
             <Trash2 className="w-4 h-4" />
           </button>
@@ -185,9 +185,9 @@ export default function Terminal() {
         {/* Welcome message */}
         {history.length === 0 && !loading && (
           <div className="text-gray-500 space-y-1">
-            <p className="text-green-400">ClawdAgent SSH Terminal v1.0</p>
-            <p className="text-gray-600">Type any command to execute on the server.</p>
-            <p className="text-gray-600">Use <span className="text-amber-400">Arrow Up/Down</span> for history, <span className="text-amber-400">Ctrl+L</span> to clear.</p>
+            <p className="text-green-400">a4claw SSH 终端 v1.0</p>
+            <p className="text-gray-600">输入任意命令即可在服务器执行。</p>
+            <p className="text-gray-600">使用 <span className="text-amber-400">方向键上/下</span> 浏览历史，按 <span className="text-amber-400">Ctrl+L</span> 清屏。</p>
             <p className="text-gray-700 mt-2">---</p>
           </div>
         )}
@@ -216,7 +216,7 @@ export default function Terminal() {
                 <button
                   onClick={(e) => { e.stopPropagation(); copyOutput(entry.output, entry.id); }}
                   className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 p-1 text-gray-500 hover:text-white bg-dark-800 rounded transition-all"
-                  title="Copy output"
+                  title="复制输出"
                 >
                   {copied === entry.id
                     ? <Check className="w-3.5 h-3.5 text-green-400" />
@@ -232,7 +232,7 @@ export default function Terminal() {
         {loading && (
           <div className="flex items-center gap-2 text-amber-400">
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            <span className="text-xs">Executing...</span>
+            <span className="text-xs">执行中...</span>
           </div>
         )}
 

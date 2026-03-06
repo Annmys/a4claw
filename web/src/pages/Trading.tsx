@@ -130,16 +130,16 @@ export default function Trading() {
   }, [token]);
 
   useEffect(() => {
-    document.title = 'ClawdAgent | Trading';
+    document.title = 'a4claw | 交易';
   }, []);
 
   const tabs: { id: TabId; label: string; icon: any }[] = [
-    { id: 'portfolio', label: 'Portfolio', icon: Wallet },
-    { id: 'trade', label: 'Trade', icon: ArrowUpDown },
-    { id: 'signals', label: 'Signals', icon: Activity },
-    { id: 'history', label: 'History', icon: Clock },
-    { id: 'stats', label: 'Stats', icon: BarChart3 },
-    { id: 'risk', label: 'Risk', icon: Shield },
+    { id: 'portfolio', label: '资产组合', icon: Wallet },
+    { id: 'trade', label: '下单', icon: ArrowUpDown },
+    { id: 'signals', label: '信号', icon: Activity },
+    { id: 'history', label: '历史记录', icon: Clock },
+    { id: 'stats', label: '统计', icon: BarChart3 },
+    { id: 'risk', label: '风控', icon: Shield },
   ];
 
   return (
@@ -153,14 +153,14 @@ export default function Trading() {
             </div>
             <div>
               <div className="flex items-center gap-3">
-                <h1 className="text-xl font-bold tracking-tight">Trading</h1>
+                <h1 className="text-xl font-bold tracking-tight">交易</h1>
                 {paperMode && (
                   <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/30 animate-pulse">
-                    PAPER TRADING
+                    模拟交易
                   </span>
                 )}
               </div>
-              <p className="text-[11px] text-gray-500">AI-powered trading dashboard</p>
+              <p className="text-[11px] text-gray-500">AI 驱动交易面板</p>
             </div>
           </div>
         </div>
@@ -231,8 +231,8 @@ function PortfolioTab({ fetchApi, onPaperMode }: { fetchApi: (path: string, opti
     return (
       <div className="text-center py-16 text-gray-500">
         <Wallet className="w-12 h-12 mx-auto mb-4 opacity-50" />
-        <p>Failed to load portfolio</p>
-        <button onClick={() => load()} className="mt-3 text-sm text-primary-400 hover:text-primary-300">Retry</button>
+        <p>加载投资组合失败</p>
+        <button onClick={() => load()} className="mt-3 text-sm text-primary-400 hover:text-primary-300">重试</button>
       </div>
     );
   }
@@ -243,14 +243,14 @@ function PortfolioTab({ fetchApi, onPaperMode }: { fetchApi: (path: string, opti
     <div>
       {/* Summary Cards */}
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-sm font-semibold text-gray-200">Portfolio Overview</h2>
+        <h2 className="text-sm font-semibold text-gray-200">投资组合概览</h2>
         <button
           onClick={() => load(true)}
           disabled={refreshing}
           className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs text-gray-400 hover:text-white hover:bg-dark-800 transition-colors disabled:opacity-50"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-          Refresh
+          刷新
         </button>
       </div>
 
@@ -258,7 +258,7 @@ function PortfolioTab({ fetchApi, onPaperMode }: { fetchApi: (path: string, opti
         <div className="p-5 bg-dark-800 rounded-lg border border-gray-800">
           <div className="flex items-center gap-2 mb-2">
             <Wallet className="w-4 h-4 text-primary-400" />
-            <span className="text-sm text-gray-400">Total Value</span>
+            <span className="text-sm text-gray-400">总计 价值</span>
           </div>
           <p className="text-3xl font-bold text-white">{formatUsd(totalValue)}</p>
         </div>
@@ -266,7 +266,7 @@ function PortfolioTab({ fetchApi, onPaperMode }: { fetchApi: (path: string, opti
         <div className={`p-5 rounded-lg border ${pnlBg(dayPnl)}`}>
           <div className="flex items-center gap-2 mb-2">
             {dayPnl >= 0 ? <TrendingUp className="w-4 h-4 text-green-400" /> : <TrendingDown className="w-4 h-4 text-red-400" />}
-            <span className="text-sm text-gray-400">Day P&L</span>
+            <span className="text-sm text-gray-400">当日盈亏</span>
           </div>
           <div className="flex items-baseline gap-2">
             <p className={`text-3xl font-bold ${pnlColor(dayPnl)}`}>{formatUsd(dayPnl)}</p>
@@ -277,29 +277,29 @@ function PortfolioTab({ fetchApi, onPaperMode }: { fetchApi: (path: string, opti
         <div className={`p-5 rounded-lg border ${pnlBg(realizedPnl)}`}>
           <div className="flex items-center gap-2 mb-2">
             <DollarSign className="w-4 h-4 text-amber-400" />
-            <span className="text-sm text-gray-400">Realized P&L</span>
+            <span className="text-sm text-gray-400">已实现盈亏</span>
           </div>
           <p className={`text-3xl font-bold ${pnlColor(realizedPnl)}`}>{formatUsd(realizedPnl)}</p>
         </div>
       </div>
 
-      {/* Holdings Table */}
+      {/* 持仓 Table */}
       <div className="bg-dark-800 rounded-lg border border-gray-800 overflow-hidden">
         <div className="px-4 py-3 border-b border-gray-800">
-          <h3 className="text-sm font-semibold text-gray-200">Holdings</h3>
+          <h3 className="text-sm font-semibold text-gray-200">持仓</h3>
         </div>
         {holdings && holdings.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-[11px] text-gray-500 uppercase tracking-wider border-b border-gray-800/50">
-                  <th className="text-left px-4 py-3 font-medium">Asset</th>
-                  <th className="text-right px-4 py-3 font-medium">Amount</th>
-                  <th className="text-right px-4 py-3 font-medium">Avg Entry</th>
-                  <th className="text-right px-4 py-3 font-medium">Current Price</th>
-                  <th className="text-right px-4 py-3 font-medium">Value</th>
-                  <th className="text-right px-4 py-3 font-medium">P&L</th>
-                  <th className="text-right px-4 py-3 font-medium">P&L %</th>
+                  <th className="text-left px-4 py-3 font-medium">资产</th>
+                  <th className="text-right px-4 py-3 font-medium">数量</th>
+                  <th className="text-right px-4 py-3 font-medium">平均开仓价</th>
+                  <th className="text-right px-4 py-3 font-medium">当前价格</th>
+                  <th className="text-right px-4 py-3 font-medium">价值</th>
+                  <th className="text-right px-4 py-3 font-medium">盈亏</th>
+                  <th className="text-right px-4 py-3 font-medium">盈亏 %</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-800/50">
@@ -320,7 +320,7 @@ function PortfolioTab({ fetchApi, onPaperMode }: { fetchApi: (path: string, opti
         ) : (
           <div className="text-center py-10 text-gray-500">
             <Wallet className="w-8 h-8 mx-auto mb-2 opacity-30" />
-            <p className="text-xs">No holdings found</p>
+            <p className="text-xs">暂无持仓</p>
           </div>
         )}
       </div>
@@ -375,15 +375,15 @@ function TradeTab({ fetchApi }: { fetchApi: (path: string, options?: RequestInit
       });
 
       if (data?.error || data?.rejected) {
-        setResult({ success: false, message: data.error || data.message || 'Trade rejected by risk manager' });
+        setResult({ success: false, message: data.error || data.message || '交易被风控拒绝' });
       } else {
-        setResult({ success: true, message: data.message || 'Trade executed successfully' });
+        setResult({ success: true, message: data.message || '交易执行成功' });
         setAmount('');
         setStopLoss('');
         setTakeProfit('');
       }
     } catch (err: any) {
-      setResult({ success: false, message: err.message || 'Failed to execute trade' });
+      setResult({ success: false, message: err.message || '交易执行失败' });
     }
     setSubmitting(false);
   };
@@ -395,13 +395,13 @@ function TradeTab({ fetchApi }: { fetchApi: (path: string, options?: RequestInit
         <div className="bg-dark-800 rounded-lg border border-gray-800 p-6">
           <h3 className="text-sm font-semibold text-gray-200 mb-4 flex items-center gap-2">
             <ArrowUpDown className="w-4 h-4 text-primary-400" />
-            New Trade
+            新建交易
           </h3>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Symbol */}
+            {/* 交易对 */}
             <div>
-              <label className="block text-sm text-gray-400 mb-1.5">Symbol</label>
+              <label className="block text-sm text-gray-400 mb-1.5">交易对</label>
               <input
                 type="text"
                 value={symbol}
@@ -411,9 +411,9 @@ function TradeTab({ fetchApi }: { fetchApi: (path: string, options?: RequestInit
               />
             </div>
 
-            {/* Side Toggle */}
+            {/* 方向 Toggle */}
             <div>
-              <label className="block text-sm text-gray-400 mb-1.5">Side</label>
+              <label className="block text-sm text-gray-400 mb-1.5">方向</label>
               <div className="flex gap-2">
                 <button
                   type="button"
@@ -425,7 +425,7 @@ function TradeTab({ fetchApi }: { fetchApi: (path: string, options?: RequestInit
                   }`}
                 >
                   <TrendingUp className="w-4 h-4 inline mr-1.5" />
-                  Buy / Long
+                  买入 / 做多
                 </button>
                 <button
                   type="button"
@@ -437,14 +437,14 @@ function TradeTab({ fetchApi }: { fetchApi: (path: string, options?: RequestInit
                   }`}
                 >
                   <TrendingDown className="w-4 h-4 inline mr-1.5" />
-                  Sell / Short
+                  卖出 / 做空
                 </button>
               </div>
             </div>
 
-            {/* Amount */}
+            {/* 数量 */}
             <div>
-              <label className="block text-sm text-gray-400 mb-1.5">Amount (USDT)</label>
+              <label className="block text-sm text-gray-400 mb-1.5">数量 (USDT)</label>
               <input
                 type="number"
                 step="any"
@@ -459,7 +459,7 @@ function TradeTab({ fetchApi }: { fetchApi: (path: string, options?: RequestInit
             {/* SL / TP */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm text-gray-400 mb-1.5">Stop Loss (optional)</label>
+                <label className="block text-sm text-gray-400 mb-1.5">止损（可选）</label>
                 <input
                   type="number"
                   step="any"
@@ -471,7 +471,7 @@ function TradeTab({ fetchApi }: { fetchApi: (path: string, options?: RequestInit
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1.5">Take Profit (optional)</label>
+                <label className="block text-sm text-gray-400 mb-1.5">止盈（可选）</label>
                 <input
                   type="number"
                   step="any"
@@ -511,7 +511,7 @@ function TradeTab({ fetchApi }: { fetchApi: (path: string, options?: RequestInit
               ) : (
                 <ArrowUpDown className="w-4 h-4" />
               )}
-              {submitting ? 'Executing...' : `${side === 'buy' ? 'Buy' : 'Sell'} ${symbol}`}
+              {submitting ? '执行中...' : `${side === 'buy' ? '买入' : '卖出'} ${symbol}`}
             </button>
           </form>
         </div>
@@ -522,7 +522,7 @@ function TradeTab({ fetchApi }: { fetchApi: (path: string, options?: RequestInit
         <div className="bg-dark-800 rounded-lg border border-gray-800 p-5">
           <h3 className="text-sm font-semibold text-gray-200 mb-4 flex items-center gap-2">
             <Activity className="w-4 h-4 text-cyan-400" />
-            Live Prices
+            实时价格
           </h3>
           {loadingPrices ? (
             <div className="flex items-center justify-center py-8">
@@ -545,7 +545,7 @@ function TradeTab({ fetchApi }: { fetchApi: (path: string, options?: RequestInit
           ) : (
             <div className="text-center py-8 text-gray-500">
               <Activity className="w-8 h-8 mx-auto mb-2 opacity-30" />
-              <p className="text-xs">No price data available</p>
+              <p className="text-xs">暂无价格数据</p>
             </div>
           )}
         </div>
@@ -583,8 +583,8 @@ function SignalsTab({ fetchApi }: { fetchApi: (path: string, options?: RequestIn
     return (
       <div className="text-center py-16 text-gray-500">
         <Zap className="w-12 h-12 mx-auto mb-4 opacity-50" />
-        <p>No active signals</p>
-        <p className="text-sm mt-1">Signals will appear here when the AI detects opportunities</p>
+        <p>暂无活跃信号</p>
+        <p className="text-sm mt-1">AI 识别到机会后会在此显示信号</p>
       </div>
     );
   }
@@ -602,16 +602,16 @@ function SignalsTab({ fetchApi }: { fetchApi: (path: string, options?: RequestIn
                   ? 'bg-green-500/20 text-green-400 border border-green-500/30'
                   : 'bg-red-500/20 text-red-400 border border-red-500/30'
               }`}>
-                {signal.direction === 'long' ? '\u{1F7E2} Long' : '\u{1F534} Short'}
+                {signal.direction === 'long' ? '\u{1F7E2} 做多' : '\u{1F534} 做空'}
               </span>
             </div>
             <span className="text-[11px] text-gray-500">{signal.strategy}</span>
           </div>
 
-          {/* Confidence Bar */}
+          {/* 置信度 Bar */}
           <div className="mb-3">
             <div className="flex items-center justify-between mb-1">
-              <span className="text-[11px] text-gray-500 uppercase tracking-wider">Confidence</span>
+              <span className="text-[11px] text-gray-500 uppercase tracking-wider">置信度</span>
               <span className="text-xs font-mono font-medium text-white">{signal.confidence}%</span>
             </div>
             <div className="h-2 bg-dark-900 rounded-full overflow-hidden">
@@ -626,18 +626,18 @@ function SignalsTab({ fetchApi }: { fetchApi: (path: string, options?: RequestIn
             </div>
           </div>
 
-          {/* Entry / SL / TP */}
+          {/* 入场 / SL / TP */}
           <div className="grid grid-cols-3 gap-2 mb-3">
             <div className="bg-dark-900 rounded p-2 text-center">
-              <p className="text-[10px] text-gray-500 uppercase mb-0.5">Entry</p>
+              <p className="text-[10px] text-gray-500 uppercase mb-0.5">入场</p>
               <p className="text-xs font-mono text-white">{formatUsd(signal.entry)}</p>
             </div>
             <div className="bg-dark-900 rounded p-2 text-center">
-              <p className="text-[10px] text-red-400 uppercase mb-0.5">Stop Loss</p>
+              <p className="text-[10px] text-red-400 uppercase mb-0.5">止损</p>
               <p className="text-xs font-mono text-red-400">{formatUsd(signal.stopLoss)}</p>
             </div>
             <div className="bg-dark-900 rounded p-2 text-center">
-              <p className="text-[10px] text-green-400 uppercase mb-0.5">Take Profit</p>
+              <p className="text-[10px] text-green-400 uppercase mb-0.5">止盈</p>
               <p className="text-xs font-mono text-green-400">{formatUsd(signal.takeProfit)}</p>
             </div>
           </div>
@@ -647,7 +647,7 @@ function SignalsTab({ fetchApi }: { fetchApi: (path: string, options?: RequestIn
             <p className="text-xs text-gray-400 leading-relaxed">{signal.reasoning}</p>
           </div>
 
-          {/* Timestamp */}
+          {/* 时间stamp */}
           {signal.timestamp && (
             <div className="mt-2 text-[10px] text-gray-600 flex items-center gap-1">
               <Clock className="w-3 h-3" />
@@ -705,10 +705,10 @@ function HistoryTab({ fetchApi }: { fetchApi: (path: string, options?: RequestIn
                 : 'bg-dark-800 text-gray-400 hover:text-white border border-gray-800 hover:border-gray-700'
             }`}
           >
-            {f.charAt(0).toUpperCase() + f.slice(1)}
+            {f === 'all' ? '全部' : f === 'open' ? '未平仓' : '已平仓'}
           </button>
         ))}
-        <span className="text-xs text-gray-500 self-center ml-2">{filtered.length} trades</span>
+        <span className="text-xs text-gray-500 self-center ml-2">{filtered.length} 笔交易</span>
       </div>
 
       {/* Trades Table */}
@@ -718,21 +718,21 @@ function HistoryTab({ fetchApi }: { fetchApi: (path: string, options?: RequestIn
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-[11px] text-gray-500 uppercase tracking-wider border-b border-gray-800/50">
-                  <th className="text-left px-4 py-3 font-medium">Date</th>
-                  <th className="text-left px-4 py-3 font-medium">Symbol</th>
-                  <th className="text-left px-4 py-3 font-medium">Side</th>
-                  <th className="text-right px-4 py-3 font-medium">Price</th>
-                  <th className="text-right px-4 py-3 font-medium">Amount</th>
-                  <th className="text-right px-4 py-3 font-medium">P&L</th>
-                  <th className="text-left px-4 py-3 font-medium">Strategy</th>
-                  <th className="text-left px-4 py-3 font-medium">Status</th>
+                  <th className="text-left px-4 py-3 font-medium">日期</th>
+                  <th className="text-left px-4 py-3 font-medium">交易对</th>
+                  <th className="text-left px-4 py-3 font-medium">方向</th>
+                  <th className="text-right px-4 py-3 font-medium">价格</th>
+                  <th className="text-right px-4 py-3 font-medium">数量</th>
+                  <th className="text-right px-4 py-3 font-medium">盈亏</th>
+                  <th className="text-left px-4 py-3 font-medium">策略</th>
+                  <th className="text-left px-4 py-3 font-medium">状态</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-800/50">
                 {filtered.map((t) => (
                   <tr key={t.id || `${t.date}-${t.symbol}`} className="hover:bg-dark-850/50 transition-colors">
                     <td className="px-4 py-3 text-gray-400 text-xs font-mono">
-                      {new Date(t.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      {new Date(t.date).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                     </td>
                     <td className="px-4 py-3 font-medium text-white">{t.symbol}</td>
                     <td className="px-4 py-3">
@@ -756,7 +756,7 @@ function HistoryTab({ fetchApi }: { fetchApi: (path: string, options?: RequestIn
                           : t.status === 'closed' ? 'bg-gray-700 text-gray-400'
                           : 'bg-amber-500/20 text-amber-400'
                       }`}>
-                        {t.status}
+                        {t.status === 'open' ? '未平仓' : t.status === 'closed' ? '已平仓' : '已取消'}
                       </span>
                     </td>
                   </tr>
@@ -767,7 +767,7 @@ function HistoryTab({ fetchApi }: { fetchApi: (path: string, options?: RequestIn
         ) : (
           <div className="text-center py-10 text-gray-500">
             <Clock className="w-8 h-8 mx-auto mb-2 opacity-30" />
-            <p className="text-xs">No trades found</p>
+            <p className="text-xs">暂无交易记录</p>
           </div>
         )}
       </div>
@@ -804,78 +804,78 @@ function StatsTab({ fetchApi }: { fetchApi: (path: string, options?: RequestInit
     return (
       <div className="text-center py-16 text-gray-500">
         <BarChart3 className="w-12 h-12 mx-auto mb-4 opacity-50" />
-        <p>No statistics available</p>
-        <p className="text-sm mt-1">Stats will appear after you start trading</p>
+        <p>暂无统计数据</p>
+        <p className="text-sm mt-1">开始交易后将显示统计数据</p>
       </div>
     );
   }
 
   const statCards: { label: string; value: string; icon: any; gradient: string; color: string }[] = [
     {
-      label: 'Total Trades',
+      label: '总交易数',
       value: stats.totalTrades.toString(),
       icon: BarChart3,
       gradient: 'from-blue-500 to-blue-600',
       color: 'text-white',
     },
     {
-      label: 'Win Rate',
+      label: '胜率',
       value: `${stats.winRate.toFixed(1)}%`,
       icon: Target,
       gradient: 'from-green-500 to-emerald-600',
       color: stats.winRate >= 50 ? 'text-green-400' : 'text-red-400',
     },
     {
-      label: 'Total P&L',
+      label: '总盈亏',
       value: formatUsd(stats.totalPnl),
       icon: DollarSign,
       gradient: stats.totalPnl >= 0 ? 'from-green-500 to-emerald-600' : 'from-red-500 to-red-600',
       color: pnlColor(stats.totalPnl),
     },
     {
-      label: 'Avg Win',
+      label: '平均盈利',
       value: formatUsd(stats.avgWin),
       icon: TrendingUp,
       gradient: 'from-green-500 to-emerald-600',
       color: 'text-green-400',
     },
     {
-      label: 'Avg Loss',
+      label: '平均亏损',
       value: formatUsd(stats.avgLoss),
       icon: TrendingDown,
       gradient: 'from-red-500 to-red-600',
       color: 'text-red-400',
     },
     {
-      label: 'Profit Factor',
+      label: '盈亏比',
       value: stats.profitFactor.toFixed(2),
       icon: Activity,
       gradient: 'from-purple-500 to-purple-600',
       color: stats.profitFactor >= 1 ? 'text-green-400' : 'text-red-400',
     },
     {
-      label: 'Sharpe Ratio',
+      label: '夏普比率',
       value: stats.sharpeRatio.toFixed(2),
       icon: LineChart,
       gradient: 'from-cyan-500 to-cyan-600',
       color: stats.sharpeRatio >= 1 ? 'text-green-400' : stats.sharpeRatio >= 0 ? 'text-amber-400' : 'text-red-400',
     },
     {
-      label: 'Max Drawdown',
+      label: '最大回撤',
       value: `${stats.maxDrawdown.toFixed(2)}%`,
       icon: AlertTriangle,
       gradient: 'from-amber-500 to-orange-600',
       color: 'text-amber-400',
     },
     {
-      label: 'Best Trade',
+      label: '最佳交易',
       value: formatUsd(stats.bestTrade),
       icon: TrendingUp,
       gradient: 'from-green-500 to-emerald-600',
       color: 'text-green-400',
     },
     {
-      label: 'Worst Trade',
+      label: '最差交易',
       value: formatUsd(stats.worstTrade),
       icon: TrendingDown,
       gradient: 'from-red-500 to-red-600',
@@ -939,7 +939,7 @@ function RiskTab({ fetchApi }: { fetchApi: (path: string, options?: RequestInit)
         setTimeout(() => setSaved(false), 3000);
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to save risk config');
+      setError(err.message || '保存风控配置失败');
     }
     setSaving(false);
   };
@@ -956,7 +956,7 @@ function RiskTab({ fetchApi }: { fetchApi: (path: string, options?: RequestInit)
     return (
       <div className="text-center py-16 text-gray-500">
         <Shield className="w-12 h-12 mx-auto mb-4 opacity-50" />
-        <p>Failed to load risk configuration</p>
+        <p>加载风控配置失败</p>
       </div>
     );
   }
@@ -971,9 +971,9 @@ function RiskTab({ fetchApi }: { fetchApi: (path: string, options?: RequestInit)
         <div>
           <h2 className="text-lg font-semibold flex items-center gap-2">
             <Shield className="w-5 h-5 text-amber-400" />
-            Risk Management
+            风控管理
           </h2>
-          <p className="text-sm text-gray-400 mt-1">Configure risk parameters and trading safeguards</p>
+          <p className="text-sm text-gray-400 mt-1">配置风控参数与交易保护策略</p>
         </div>
         <button
           onClick={handleSave}
@@ -981,7 +981,7 @@ function RiskTab({ fetchApi }: { fetchApi: (path: string, options?: RequestInit)
           className="flex items-center gap-2 px-4 py-2 bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 font-medium text-sm"
         >
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <CheckCircle className="w-4 h-4" /> : <Save className="w-4 h-4" />}
-          {saved ? 'Saved!' : 'Save Changes'}
+          {saved ? '已保存' : '保存更改'}
         </button>
       </div>
 
@@ -997,8 +997,8 @@ function RiskTab({ fetchApi }: { fetchApi: (path: string, options?: RequestInit)
         <div className="p-4 bg-dark-800 rounded-lg border border-gray-800">
           <label className="flex items-center justify-between cursor-pointer">
             <div>
-              <p className="font-medium text-white">Paper Trading Mode</p>
-              <p className="text-sm text-gray-400 mt-0.5">Execute simulated trades without risking real funds</p>
+              <p className="font-medium text-white">模拟交易模式</p>
+              <p className="text-sm text-gray-400 mt-0.5">执行模拟交易，不承担真实资金风险</p>
             </div>
             <div
               role="switch"
@@ -1020,7 +1020,7 @@ function RiskTab({ fetchApi }: { fetchApi: (path: string, options?: RequestInit)
           {config.paperMode && (
             <div className="mt-3 p-2 bg-amber-500/10 border border-amber-500/20 rounded text-[11px] text-amber-400 flex items-center gap-2">
               <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-              Paper mode is active. No real trades will be executed.
+              已启用模拟交易模式，不会执行真实交易。
             </div>
           )}
         </div>
@@ -1028,7 +1028,7 @@ function RiskTab({ fetchApi }: { fetchApi: (path: string, options?: RequestInit)
         {/* Position Sizing */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="p-4 bg-dark-800 rounded-lg border border-gray-800">
-            <label className="block text-sm text-gray-400 mb-1.5">Max Position Size (%)</label>
+            <label className="block text-sm text-gray-400 mb-1.5">最大仓位比例（%）</label>
             <input
               type="number"
               step="1"
@@ -1038,11 +1038,11 @@ function RiskTab({ fetchApi }: { fetchApi: (path: string, options?: RequestInit)
               onChange={(e) => updateConfig('maxPositionPercent', parseFloat(e.target.value) || 0)}
               className="w-full p-2.5 rounded bg-dark-900 border border-gray-700 text-white text-sm font-mono focus:border-primary-500 focus:outline-none transition-colors"
             />
-            <p className="text-[11px] text-gray-600 mt-1">Maximum portfolio % per single position</p>
+            <p className="text-[11px] text-gray-600 mt-1">单一仓位占组合的最大百分比</p>
           </div>
 
           <div className="p-4 bg-dark-800 rounded-lg border border-gray-800">
-            <label className="block text-sm text-gray-400 mb-1.5">Max Open Positions</label>
+            <label className="block text-sm text-gray-400 mb-1.5">最大持仓数</label>
             <input
               type="number"
               step="1"
@@ -1052,13 +1052,13 @@ function RiskTab({ fetchApi }: { fetchApi: (path: string, options?: RequestInit)
               onChange={(e) => updateConfig('maxOpenPositions', parseInt(e.target.value) || 0)}
               className="w-full p-2.5 rounded bg-dark-900 border border-gray-700 text-white text-sm font-mono focus:border-primary-500 focus:outline-none transition-colors"
             />
-            <p className="text-[11px] text-gray-600 mt-1">Maximum simultaneous open positions</p>
+            <p className="text-[11px] text-gray-600 mt-1">最多同时持有的仓位数</p>
           </div>
         </div>
 
         {/* Loss Limit */}
         <div className="p-4 bg-dark-800 rounded-lg border border-gray-800">
-          <label className="block text-sm text-gray-400 mb-1.5">Daily Loss Limit (USDT)</label>
+          <label className="block text-sm text-gray-400 mb-1.5">每日亏损上限（USDT）</label>
           <input
             type="number"
             step="10"
@@ -1067,13 +1067,13 @@ function RiskTab({ fetchApi }: { fetchApi: (path: string, options?: RequestInit)
             onChange={(e) => updateConfig('dailyLossLimit', parseFloat(e.target.value) || 0)}
             className="w-full p-2.5 rounded bg-dark-900 border border-gray-700 text-white text-sm font-mono focus:border-primary-500 focus:outline-none transition-colors"
           />
-          <p className="text-[11px] text-gray-600 mt-1">Trading halts after this daily loss threshold</p>
+          <p className="text-[11px] text-gray-600 mt-1">达到该日亏损阈值后停止交易</p>
         </div>
 
         {/* Default SL / TP */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="p-4 bg-dark-800 rounded-lg border border-gray-800">
-            <label className="block text-sm text-gray-400 mb-1.5">Default Stop Loss (%)</label>
+            <label className="block text-sm text-gray-400 mb-1.5">默认止损（%）</label>
             <input
               type="number"
               step="0.5"
@@ -1083,11 +1083,11 @@ function RiskTab({ fetchApi }: { fetchApi: (path: string, options?: RequestInit)
               onChange={(e) => updateConfig('defaultStopLoss', parseFloat(e.target.value) || 0)}
               className="w-full p-2.5 rounded bg-dark-900 border border-gray-700 text-white text-sm font-mono focus:border-primary-500 focus:outline-none transition-colors"
             />
-            <p className="text-[11px] text-gray-600 mt-1">Auto-applied SL when none is specified</p>
+            <p className="text-[11px] text-gray-600 mt-1">未指定时自动应用止损</p>
           </div>
 
           <div className="p-4 bg-dark-800 rounded-lg border border-gray-800">
-            <label className="block text-sm text-gray-400 mb-1.5">Default Take Profit (%)</label>
+            <label className="block text-sm text-gray-400 mb-1.5">默认止盈（%）</label>
             <input
               type="number"
               step="0.5"
@@ -1097,13 +1097,13 @@ function RiskTab({ fetchApi }: { fetchApi: (path: string, options?: RequestInit)
               onChange={(e) => updateConfig('defaultTakeProfit', parseFloat(e.target.value) || 0)}
               className="w-full p-2.5 rounded bg-dark-900 border border-gray-700 text-white text-sm font-mono focus:border-primary-500 focus:outline-none transition-colors"
             />
-            <p className="text-[11px] text-gray-600 mt-1">Auto-applied TP when none is specified</p>
+            <p className="text-[11px] text-gray-600 mt-1">未指定时自动应用止盈</p>
           </div>
         </div>
 
         {/* Cooldown */}
         <div className="p-4 bg-dark-800 rounded-lg border border-gray-800">
-          <label className="block text-sm text-gray-400 mb-1.5">Cooldown Between Trades (minutes)</label>
+          <label className="block text-sm text-gray-400 mb-1.5">交易冷却时间（分钟）</label>
           <input
             type="number"
             step="1"
@@ -1113,7 +1113,7 @@ function RiskTab({ fetchApi }: { fetchApi: (path: string, options?: RequestInit)
             onChange={(e) => updateConfig('cooldownMinutes', parseInt(e.target.value) || 0)}
             className="w-full p-2.5 rounded bg-dark-900 border border-gray-700 text-white text-sm font-mono focus:border-primary-500 focus:outline-none transition-colors"
           />
-          <p className="text-[11px] text-gray-600 mt-1">Minimum wait time between consecutive trades (0 = no cooldown)</p>
+          <p className="text-[11px] text-gray-600 mt-1">连续交易最小间隔（0 表示无冷却）</p>
         </div>
       </div>
     </div>

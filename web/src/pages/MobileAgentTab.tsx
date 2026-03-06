@@ -5,8 +5,8 @@ import {
   Loader2, AlertTriangle, CheckCircle, Camera, Settings, Zap
 } from 'lucide-react';
 
-interface ConnectionStatus { connected: boolean; url: string; status?: unknown; error?: string }
-interface DeviceInfo { id: string; status: string; model: string; device: string; product: string }
+interface Connection状态 { connected: boolean; url: string; status?: unknown; error?: string }
+interface 设备Info { id: string; status: string; model: string; device: string; product: string }
 interface AgentStatus {
   id: string; app: string; deviceId: string;
   state: 'stopped' | 'running' | 'paused' | 'error';
@@ -15,11 +15,11 @@ interface AgentStatus {
   lastError: string | null;
   startedAt: string | null;
   lastAction: string | null;
-  lastActionTime: string | null;
-  nextActionTime: string | null;
+  lastAction时间: string | null;
+  nextAction时间: string | null;
   config: Record<string, unknown>;
 }
-interface LogEntry { timestamp: string; action: string; status: string; message: string; details?: string }
+interface Log入场 { timestamp: string; action: string; status: string; message: string; details?: string }
 
 const APP_OPTIONS = [
   { value: 'tiktok', label: 'TikTok', color: 'pink' },
@@ -28,24 +28,24 @@ const APP_OPTIONS = [
 ];
 
 export default function MobileAgentTab() {
-  const [connection, setConnection] = useState<ConnectionStatus | null>(null);
+  const [connection, setConnection] = useState<Connection状态 | null>(null);
   const [testUrl, setTestUrl] = useState('http://localhost:4723');
   const [testing, setTesting] = useState(false);
-  const [devices, setDevices] = useState<DeviceInfo[]>([]);
-  const [loadingDevices, setLoadingDevices] = useState(false);
+  const [devices, set设备s] = useState<设备Info[]>([]);
+  const [loading设备s, setLoading设备s] = useState(false);
   const [agents, setAgents] = useState<AgentStatus[]>([]);
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
-  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [logs, setLogs] = useState<Log入场[]>([]);
   const [screenshot, setScreenshot] = useState<string | null>(null);
   const [screenshotLoading, setScreenshotLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Launch form
-  const [launchApp, setLaunchApp] = useState<string>('tiktok');
-  const [launchDevice, setLaunchDevice] = useState('');
+  const [launch应用, setLaunch应用] = useState<string>('tiktok');
+  const [launch设备, setLaunch设备] = useState('');
   const [launchTestMode, setLaunchTestMode] = useState(true);
-  const [launchActions, setLaunchActions] = useState<string[]>(['like', 'scroll']);
-  const [launchTone, setLaunchTone] = useState('Authentic, friendly, engaged');
+  const [launch动作, setLaunch动作] = useState<string[]>(['like', 'scroll']);
+  const [launch语气, setLaunch语气] = useState('Authentic, friendly, engaged');
   const [launchTopics, setLaunchTopics] = useState('AI, technology');
   const [launchLang, setLaunchLang] = useState('English');
   const logsEndRef = useRef<HTMLDivElement>(null);
@@ -58,15 +58,15 @@ export default function MobileAgentTab() {
     } catch { setConnection(null); }
   }, []);
 
-  const fetchDevices = useCallback(async () => {
-    setLoadingDevices(true);
+  const fetch设备s = useCallback(async () => {
+    setLoading设备s(true);
     try {
       const data = await api.get('/mobile-agent/devices');
-      setDevices(data.devices || []);
-      if (data.devices?.length && !launchDevice) setLaunchDevice(data.devices[0].id);
-    } catch { setDevices([]); }
-    setLoadingDevices(false);
-  }, [launchDevice]);
+      set设备s(data.devices || []);
+      if (data.devices?.length && !launch设备) setLaunch设备(data.devices[0].id);
+    } catch { set设备s([]); }
+    setLoading设备s(false);
+  }, [launch设备]);
 
   const fetchAgents = useCallback(async () => {
     try {
@@ -117,12 +117,12 @@ export default function MobileAgentTab() {
     setCreating(true); setError(null);
     try {
       const data = await api.post('/mobile-agent/agents', {
-        app: launchApp,
-        deviceId: launchDevice,
+        app: launch应用,
+        deviceId: launch设备,
         appiumUrl: testUrl,
         config: {
-          actions: launchActions,
-          content: { tone: launchTone, language: launchLang, topics: launchTopics.split(',').map(s => s.trim()) },
+          actions: launch动作,
+          content: { tone: launch语气, language: launchLang, topics: launchTopics.split(',').map(s => s.trim()) },
           testMode: launchTestMode,
         },
       });
@@ -174,7 +174,7 @@ export default function MobileAgentTab() {
       <div className="bg-dark-800 rounded-xl border border-gray-800/50 p-5">
         <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
           <Smartphone className="w-4 h-4 text-green-400" />
-          Appium Connection
+          应用ium Connection
         </h3>
         <div className="flex items-center gap-3">
           <input
@@ -195,24 +195,24 @@ export default function MobileAgentTab() {
         {connection && (
           <div className={`mt-3 flex items-center gap-2 text-sm ${connection.connected ? 'text-green-400' : 'text-red-400'}`}>
             {connection.connected ? <CheckCircle className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
-            {connection.connected ? 'Connected to Appium server' : `Not connected: ${connection.error || 'Unknown error'}`}
+            {connection.connected ? 'Connected to 应用ium server' : `Not connected: ${connection.error || 'Unknown error'}`}
           </div>
         )}
       </div>
 
-      {/* ── Devices ──────────────────────────────────────────── */}
+      {/* ── 设备s ──────────────────────────────────────────── */}
       <div className="bg-dark-800 rounded-xl border border-gray-800/50 p-5">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-semibold text-white flex items-center gap-2">
             <Zap className="w-4 h-4 text-yellow-400" />
-            Devices
+            设备s
           </h3>
-          <button onClick={fetchDevices} disabled={loadingDevices} className="text-xs text-gray-400 hover:text-white flex items-center gap-1">
-            <RefreshCw className={`w-3 h-3 ${loadingDevices ? 'animate-spin' : ''}`} /> Refresh
+          <button onClick={fetch设备s} disabled={loading设备s} className="text-xs text-gray-400 hover:text-white flex items-center gap-1">
+            <RefreshCw className={`w-3 h-3 ${loading设备s ? 'animate-spin' : ''}`} /> 刷新
           </button>
         </div>
         {devices.length === 0 ? (
-          <p className="text-gray-500 text-sm">No devices found. Ensure ADB is running or click Refresh.</p>
+          <p className="text-gray-500 text-sm">未找到设备。请确认 ADB 已运行，或点击刷新。</p>
         ) : (
           <div className="space-y-2">
             {devices.map(d => (
@@ -237,37 +237,37 @@ export default function MobileAgentTab() {
         </h3>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="text-xs text-gray-400 mb-1 block">App</label>
+            <label className="text-xs text-gray-400 mb-1 block">应用</label>
             <select
-              value={launchApp}
-              onChange={e => { setLaunchApp(e.target.value); setLaunchActions(['like', 'scroll']); }}
+              value={launch应用}
+              onChange={e => { setLaunch应用(e.target.value); setLaunch动作(['like', 'scroll']); }}
               className="w-full bg-dark-700 text-white text-sm rounded-lg px-3 py-2 border border-gray-700"
             >
               {APP_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </div>
           <div>
-            <label className="text-xs text-gray-400 mb-1 block">Device</label>
+            <label className="text-xs text-gray-400 mb-1 block">设备</label>
             <select
-              value={launchDevice}
-              onChange={e => setLaunchDevice(e.target.value)}
+              value={launch设备}
+              onChange={e => setLaunch设备(e.target.value)}
               className="w-full bg-dark-700 text-white text-sm rounded-lg px-3 py-2 border border-gray-700"
             >
-              {devices.length === 0 && <option value="">No devices</option>}
+              {devices.length === 0 && <option value="">无设备</option>}
               {devices.map(d => <option key={d.id} value={d.id}>{d.id} — {d.model}</option>)}
             </select>
           </div>
           <div className="col-span-2">
-            <label className="text-xs text-gray-400 mb-1 block">Actions</label>
+            <label className="text-xs text-gray-400 mb-1 block">动作</label>
             <div className="flex flex-wrap gap-2">
-              {(actionOptions[launchApp] || []).map(act => (
+              {(actionOptions[launch应用] || []).map(act => (
                 <label key={act} className="flex items-center gap-1.5 text-sm text-gray-300 cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={launchActions.includes(act)}
+                    checked={launch动作.includes(act)}
                     onChange={e => {
-                      if (e.target.checked) setLaunchActions([...launchActions, act]);
-                      else setLaunchActions(launchActions.filter(a => a !== act));
+                      if (e.target.checked) setLaunch动作([...launch动作, act]);
+                      else setLaunch动作(launch动作.filter(a => a !== act));
                     }}
                     className="rounded border-gray-600 bg-dark-700 text-primary-500"
                   />
@@ -277,41 +277,41 @@ export default function MobileAgentTab() {
             </div>
           </div>
           <div>
-            <label className="text-xs text-gray-400 mb-1 block">Tone</label>
-            <input value={launchTone} onChange={e => setLaunchTone(e.target.value)} className="w-full bg-dark-700 text-white text-sm rounded-lg px-3 py-2 border border-gray-700" />
+            <label className="text-xs text-gray-400 mb-1 block">语气</label>
+            <input value={launch语气} onChange={e => setLaunch语气(e.target.value)} className="w-full bg-dark-700 text-white text-sm rounded-lg px-3 py-2 border border-gray-700" />
           </div>
           <div>
-            <label className="text-xs text-gray-400 mb-1 block">Language</label>
+            <label className="text-xs text-gray-400 mb-1 block">语言</label>
             <input value={launchLang} onChange={e => setLaunchLang(e.target.value)} className="w-full bg-dark-700 text-white text-sm rounded-lg px-3 py-2 border border-gray-700" />
           </div>
           <div>
-            <label className="text-xs text-gray-400 mb-1 block">Topics (comma-separated)</label>
+            <label className="text-xs text-gray-400 mb-1 block">主题（逗号分隔）</label>
             <input value={launchTopics} onChange={e => setLaunchTopics(e.target.value)} className="w-full bg-dark-700 text-white text-sm rounded-lg px-3 py-2 border border-gray-700" />
           </div>
           <div className="flex items-end">
             <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
               <input type="checkbox" checked={launchTestMode} onChange={e => setLaunchTestMode(e.target.checked)} className="rounded border-gray-600 bg-dark-700 text-yellow-500" />
-              Test Mode (simulate actions)
+              测试模式 (simulate actions)
             </label>
           </div>
         </div>
         {error && <div className="mt-3 text-sm text-red-400 flex items-center gap-2"><AlertTriangle className="w-4 h-4" />{error}</div>}
         <button
           onClick={handleLaunchAgent}
-          disabled={creating || !launchDevice || !connection?.connected}
+          disabled={creating || !launch设备 || !connection?.connected}
           className="mt-4 px-5 py-2.5 bg-primary-600 hover:bg-primary-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm rounded-lg font-medium flex items-center gap-2"
         >
           {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-          Start Agent
+          启动智能体
         </button>
       </div>
 
-      {/* ── Running Agents ───────────────────────────────────── */}
+      {/* ── 运行ning Agents ───────────────────────────────────── */}
       {agents.length > 0 && (
         <div className="bg-dark-800 rounded-xl border border-gray-800/50 p-5">
           <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
             <Settings className="w-4 h-4 text-gray-400 animate-spin" style={{ animationDuration: '3s' }} />
-            Running Agents
+            运行ning Agents
           </h3>
           <div className="space-y-2">
             {agents.map(a => (
@@ -340,7 +340,7 @@ export default function MobileAgentTab() {
                       <Play className="w-4 h-4" />
                     </button>
                   )}
-                  <button onClick={e => { e.stopPropagation(); handleStop(a.id); }} className="p-1 text-red-400 hover:text-red-300" title="Stop">
+                  <button onClick={e => { e.stopPropagation(); handleStop(a.id); }} className="p-1 text-red-400 hover:text-red-300" title="停止">
                     <Square className="w-4 h-4" />
                   </button>
                 </div>
@@ -380,15 +380,15 @@ export default function MobileAgentTab() {
           {/* Screenshot */}
           {screenshot && (
             <div className="rounded-lg overflow-hidden border border-gray-700">
-              <img src={`data:image/png;base64,${screenshot}`} alt="Device screenshot" className="w-full max-h-96 object-contain bg-black" />
+              <img src={`data:image/png;base64,${screenshot}`} alt="设备 screenshot" className="w-full max-h-96 object-contain bg-black" />
             </div>
           )}
 
           {/* Logs */}
           <div>
-            <h4 className="text-xs font-semibold text-gray-400 mb-2">Live Logs</h4>
+            <h4 className="text-xs font-semibold text-gray-400 mb-2">实时日志</h4>
             <div className="bg-dark-900 rounded-lg p-3 max-h-64 overflow-y-auto font-mono text-xs space-y-1">
-              {logs.length === 0 && <p className="text-gray-600">No logs yet...</p>}
+              {logs.length === 0 && <p className="text-gray-600">暂无日志...</p>}
               {logs.map((log, i) => (
                 <div key={i} className={`flex gap-2 ${log.status === 'error' ? 'text-red-400' : log.status === 'skipped' ? 'text-yellow-400' : log.status === 'success' ? 'text-green-400' : 'text-gray-400'}`}>
                   <span className="text-gray-600 shrink-0">{new Date(log.timestamp).toLocaleTimeString()}</span>
