@@ -6,6 +6,7 @@ import { readFile } from 'fs/promises';
 import { Engine } from '../../../core/engine.js';
 import { analyzeImage } from '../../../actions/vision/analyze.js';
 import { getAllModels } from '../../../core/model-router.js';
+import { publishFileToUserShare } from '../../../core/shared-artifacts.js';
 import logger from '../../../utils/logger.js';
 
 const UPLOAD_DIR = pathResolve(process.cwd(), 'uploads');
@@ -52,6 +53,7 @@ export function setupApiRoutes(engine: Engine): Router {
     let attachments: Array<{ type: string; url: string }> | undefined;
     let enrichedText = text;
     let renamedFilePath: string | undefined;
+    let uploadedArtifact: any | undefined;
 
     try {
       if (file) {
@@ -70,6 +72,16 @@ export function setupApiRoutes(engine: Engine): Router {
         const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext);
 
         if (isImage) {
+          try {
+            uploadedArtifact = await publishFileToUserShare(file.path, user.userId, file.originalname);
+          } catch (artifactErr: any) {
+            logger.warn('Failed to publish uploaded image to shared output', {
+              userId: user.userId,
+              fileName: file.originalname,
+              error: artifactErr.message,
+            });
+          }
+
           // Analyze image with vision AI and include description in message
           const buffer = await readFile(file.path);
           const mimeType = file.mimetype || 'image/jpeg';
@@ -96,6 +108,16 @@ export function setupApiRoutes(engine: Engine): Router {
           const newPath = `${file.path}.${ext}`;
           renameSync(file.path, newPath);
           renamedFilePath = newPath;
+
+          try {
+            uploadedArtifact = await publishFileToUserShare(newPath, user.userId, file.originalname);
+          } catch (artifactErr: any) {
+            logger.warn('Failed to publish uploaded document to shared output', {
+              userId: user.userId,
+              fileName: file.originalname,
+              error: artifactErr.message,
+            });
+          }
 
           if (ragEngine) {
             const result = await ragEngine.ingestDocument(newPath, user.userId);
@@ -146,10 +168,18 @@ export function setupApiRoutes(engine: Engine): Router {
         model,
       });
 
+      const responseArtifacts = Array.isArray(response.artifacts) ? [...response.artifacts] : [];
+      if (uploadedArtifact) {
+        const alreadyIncluded = responseArtifacts.some(a =>
+          a?.path === uploadedArtifact.path || a?.url === uploadedArtifact.url
+        );
+        if (!alreadyIncluded) responseArtifacts.unshift(uploadedArtifact);
+      }
+
       res.json({
         message: response.text,
         thinking: response.thinking,
-        artifacts: response.artifacts,
+        artifacts: responseArtifacts.length > 0 ? responseArtifacts : undefined,
         agent: response.agentUsed,
         provider: response.provider,
         model: response.modelUsed,
