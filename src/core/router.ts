@@ -387,6 +387,11 @@ export class IntentRouter {
       return { intent: Intent.BUILD_PROJECT, confidence: 0.9, agentId: 'project-builder', extractedParams: {} };
     }
 
+    // File save/export/attachment handling — should use file tool via code-assistant
+    if (/save.*file|export.*file|download.*file|attach.*file|send.*file|write.*to.*(path|folder|directory)|保存|另存|导出|下载|附件|发送文件|保存到|路径|目录|文件夹|共享|gongxiang|\/data\/gongxiang|\\\\192\.168\.1\.99\\gongxiang/i.test(message)) {
+      return { intent: Intent.CODE_WRITE, confidence: 0.88, agentId: 'code-assistant', extractedParams: {} };
+    }
+
     // Code
     if (/תכתוב.*קוד|write.*code|fix.*bug|תתקן.*באג|code.*review|PR|pull.*request/i.test(message)) {
       return { intent: Intent.CODE_WRITE, confidence: 0.7, agentId: 'code-assistant', extractedParams: {} };
