@@ -426,6 +426,7 @@ export default function Chat() {
           } finally {
             pendingConvRef.current = null;
             pendingWsRequestRef.current = null;
+            clearWsFallbackTimer();
             progressLogRef.current = [];
             setProgressLog([]);
             setStreamingText('');
@@ -625,6 +626,11 @@ export default function Chat() {
         addMessageTo(convId, { role: 'assistant', content: `Error: ${err.message}` });
       }
       pendingConvRef.current = null;
+      pendingWsRequestRef.current = null;
+      if (wsFallbackTimerRef.current) {
+        clearTimeout(wsFallbackTimerRef.current);
+        wsFallbackTimerRef.current = null;
+      }
       setConversationLoading(null);
       return;
     }
@@ -636,9 +642,56 @@ export default function Chat() {
       try {
         pendingWsRequestRef.current = { text, conversationId: convId, responseMode: modeArg, model: modelArg };
         wsRef.current.send(text, convId, modeArg, modelArg);
+        if (wsFallbackTimerRef.current) {
+          clearTimeout(wsFallbackTimerRef.current);
+          wsFallbackTimerRef.current = null;
+        }
+        // WS may appear connected but still stall on some LAN/proxy paths.
+        // If no reply arrives in time, auto-fallback to REST and unlock UI.
+        wsFallbackTimerRef.current = setTimeout(async () => {
+          const latest = pendingWsRequestRef.current;
+          if (!latest || latest.conversationId !== convId) return;
+          try {
+            setWsError('WebSocket无响应，自动切换HTTP重试...');
+            const res = await api.chat(latest.text, latest.conversationId, latest.responseMode, latest.model);
+            addMessageTo(latest.conversationId, {
+              role: 'assistant',
+              content: res.message,
+              thinking: res.thinking,
+              artifacts: res.artifacts,
+              agent: res.agent,
+              provider: res.provider,
+              model: res.model,
+              tokens: res.tokens ? { ...res.tokens, total: res.tokens.input + res.tokens.output } : undefined,
+              elapsed: res.elapsed,
+            });
+            suppressedRecoveredRef.current = {
+              conversationId: latest.conversationId,
+              text: res.message,
+              expiresAt: Date.now() + 15000,
+            };
+          } catch (err: any) {
+            addMessageTo(latest.conversationId, { role: 'assistant', content: `Error: ${err.message}` });
+          } finally {
+            pendingConvRef.current = null;
+            pendingWsRequestRef.current = null;
+            if (wsFallbackTimerRef.current) {
+              clearTimeout(wsFallbackTimerRef.current);
+              wsFallbackTimerRef.current = null;
+            }
+            progressLogRef.current = [];
+            setProgressLog([]);
+            setStreamingText('');
+            setConversationLoading(null);
+          }
+        }, 12000);
         return; // Response will arrive via WS event handler
       } catch {
         pendingWsRequestRef.current = null;
+        if (wsFallbackTimerRef.current) {
+          clearTimeout(wsFallbackTimerRef.current);
+          wsFallbackTimerRef.current = null;
+        }
         setWsConnected(false);
       }
     }
@@ -651,6 +704,11 @@ export default function Chat() {
       addMessageTo(convId, { role: 'assistant', content: `Error: ${err.message}` });
     }
     pendingConvRef.current = null;
+    pendingWsRequestRef.current = null;
+    if (wsFallbackTimerRef.current) {
+      clearTimeout(wsFallbackTimerRef.current);
+      wsFallbackTimerRef.current = null;
+    }
     setConversationLoading(null);
   }, [input, attachedFile, loadingConversationId, wsConnected, activeConversationId, addMessage, addMessageTo, setConversationLoading, newConversation, responseMode, selectedModel]);
 
