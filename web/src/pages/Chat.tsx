@@ -295,7 +295,7 @@ export default function Chat() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [wsConnected, setWsConnected] = useState(false);
-  const [wsError, setWsError] = useState<string | null>(null);
+  const [, setWsError] = useState<string | null>(null);
   const [expandedThinking, setExpandedThinking] = useState<Set<string>>(new Set());
   const [showConversations, setShowConversations] = useState(true);
   const [contextMenu, setContextMenu] = useState<string | null>(null);
@@ -324,11 +324,6 @@ export default function Chat() {
   const [showWhatsAppQR, setShowWhatsAppQR] = useState(false);
   const [whatsappQR, setWhatsappQR] = useState<{ qrDataUrl: string | null; status: string } | null>(null);
   const [whatsappLoading, setWhatsappLoading] = useState(false);
-  const forceRestMode = useMemo(() => {
-    if (typeof window === 'undefined') return false;
-    const host = window.location.hostname;
-    return host !== '127.0.0.1' && host !== 'localhost';
-  }, []);
 
   const {
     conversations, activeConversationId, isLoading, loadingConversationId,
@@ -381,12 +376,6 @@ export default function Chat() {
 
   // ── WebSocket lifecycle ──────────────────────────────────────────
   useEffect(() => {
-    if (forceRestMode) {
-      setWsConnected(false);
-      setWsError('内网模式：已切换为 HTTP 稳定通道');
-      return;
-    }
-
     const token = localStorage.getItem('token');
     if (!token) return;
 
@@ -540,7 +529,7 @@ export default function Chat() {
       ws.disconnect();
       wsRef.current = null;
     };
-  }, [addMessageTo, setConversationLoading, forceRestMode]);
+  }, [addMessageTo, setConversationLoading]);
 
   // ── Auto-scroll on new messages ──────────────────────────────────
   useEffect(() => {
@@ -658,7 +647,7 @@ export default function Chat() {
     }
 
     // Try WebSocket first
-    if (!forceRestMode && wsRef.current && wsConnected) {
+    if (wsRef.current && wsConnected) {
       const modeArg = responseMode === 'auto' ? undefined : responseMode;
       const modelArg = selectedModel === 'auto' ? undefined : selectedModel;
       try {
@@ -732,7 +721,7 @@ export default function Chat() {
       wsFallbackTimerRef.current = null;
     }
     setConversationLoading(null);
-  }, [input, attachedFile, loadingConversationId, wsConnected, activeConversationId, conversations, addMessageTo, setConversationLoading, newConversation, responseMode, selectedModel, forceRestMode]);
+  }, [input, attachedFile, loadingConversationId, wsConnected, activeConversationId, conversations, addMessageTo, setConversationLoading, newConversation, responseMode, selectedModel]);
 
   // Global fail-safe: if UI stays locked for too long, auto-unlock and show a clear error.
   useEffect(() => {
@@ -1203,20 +1192,6 @@ export default function Chat() {
                 找到 {filteredMessages.length} 条结果
               </p>
             )}
-          </div>
-        )}
-
-        {/* ── WS Error Banner ────────────────────────────────── */}
-        {wsError && (
-          <div className="flex items-center gap-2 px-4 py-2 bg-red-500/10 border-b border-red-500/20 text-red-400 text-sm">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>{wsError} —— 正在使用 REST 接口兜底</span>
-            <button
-              onClick={() => setWsError(null)}
-              className="ml-auto text-red-400 hover:text-red-300"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
           </div>
         )}
 
@@ -1971,7 +1946,7 @@ export default function Chat() {
             )}
           </div>
           <p className="text-center text-[11px] text-gray-600 mt-2 hidden sm:block" dir="ltr">
-            回车发送 · Shift+回车换行 · 粘贴/拖拽图片与文件{!wsConnected && ' · REST 接口兜底'}
+            回车发送 · Shift+回车换行 · 粘贴/拖拽图片与文件
           </p>
         </div>
       </div>
