@@ -49,7 +49,7 @@ function isStrongPassword(password: string): { valid: boolean; reason?: string }
 export function setupAuthRoutes(): Router {
   const router = Router();
 
-  // POST /register — First user becomes admin, subsequent require admin token
+  // POST /register — First user becomes admin, subsequent self-register as regular user
   router.post('/register', async (req: Request, res: Response) => {
     try {
       const { username, password } = req.body;
@@ -73,23 +73,6 @@ export function setupAuthRoutes(): Router {
       // Check if any user exists (first user = admin)
       const allUsers = await db.select().from(webCredentials).limit(1);
       const isFirstUser = allUsers.length === 0;
-
-      if (!isFirstUser) {
-        // Only admin can register new users
-        const authHeader = req.headers.authorization;
-        if (!authHeader?.startsWith('Bearer ')) {
-          res.status(403).json({ error: 'Registration requires admin token' });
-          return;
-        }
-        try {
-          const { verifyToken } = await import('../../../security/auth.js');
-          const payload = verifyToken(authHeader.slice(7));
-          if (payload.role !== 'admin') { res.status(403).json({ error: 'Admin only' }); return; }
-        } catch {
-          res.status(403).json({ error: 'Invalid admin token' });
-          return;
-        }
-      }
 
       const role = isFirstUser ? 'admin' : 'user';
       const pwHash = await hashPassword(password);
