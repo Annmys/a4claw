@@ -332,7 +332,7 @@ export default function Chat() {
 
   const {
     conversations, activeConversationId, isLoading, loadingConversationId,
-    getMessages, addMessage, addMessageTo, setConversationLoading, clear,
+    getMessages, addMessageTo, setConversationLoading, clear,
     newConversation, switchConversation, deleteConversation, renameConversation,
     syncWithServer, loadConversationFromServer,
   } = useChatStore();
@@ -613,13 +613,17 @@ export default function Chat() {
     // If loading flag is stale (no pending request refs), auto-clear it instead of silently blocking send.
     if (loadingConversationId) {
       const hasPending = !!pendingConvRef.current || !!pendingWsRequestRef.current;
-      if (hasPending) return;
+      if (hasPending) {
+        setWsError('上一条消息仍在处理中，请先等待或点击 Stop。');
+        return;
+      }
       setConversationLoading(null);
     }
 
-    // Auto-create conversation if none active
+    // Ensure we always send into a valid conversation id.
+    // activeConversationId can become stale after sync/delete edge-cases.
     let convId = activeConversationId;
-    if (!convId) {
+    if (!convId || !conversations.some(c => c.id === convId)) {
       convId = newConversation();
     }
 
@@ -631,7 +635,7 @@ export default function Chat() {
     const displayText = file
       ? `${text}${text ? '\n' : ''}[${file.name}]`
       : text;
-    addMessage({ role: 'user', content: displayText });
+    addMessageTo(convId, { role: 'user', content: displayText });
     pendingConvRef.current = convId;
     setConversationLoading(convId);
 
@@ -728,7 +732,7 @@ export default function Chat() {
       wsFallbackTimerRef.current = null;
     }
     setConversationLoading(null);
-  }, [input, attachedFile, loadingConversationId, wsConnected, activeConversationId, addMessage, addMessageTo, setConversationLoading, newConversation, responseMode, selectedModel, forceRestMode]);
+  }, [input, attachedFile, loadingConversationId, wsConnected, activeConversationId, conversations, addMessageTo, setConversationLoading, newConversation, responseMode, selectedModel, forceRestMode]);
 
   // Global fail-safe: if UI stays locked for too long, auto-unlock and show a clear error.
   useEffect(() => {
