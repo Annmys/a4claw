@@ -391,7 +391,9 @@ export default function Chat() {
     ws.onStatus((connected) => {
       setWsConnected(connected);
       if (connected) {
-        clearWsFallbackTimer();
+        // Keep fallback timer alive while a request is still pending.
+        // In flaky LAN conditions, a quick reconnect can otherwise cancel the only recovery path.
+        if (!pendingWsRequestRef.current) clearWsFallbackTimer();
         setWsError(null);
         return;
       }
@@ -711,6 +713,29 @@ export default function Chat() {
     }
     setConversationLoading(null);
   }, [input, attachedFile, loadingConversationId, wsConnected, activeConversationId, addMessage, addMessageTo, setConversationLoading, newConversation, responseMode, selectedModel]);
+
+  // Global fail-safe: if UI stays locked for too long, auto-unlock and show a clear error.
+  useEffect(() => {
+    if (!loadingConversationId) return;
+    const timer = setTimeout(() => {
+      if (!pendingConvRef.current && !pendingWsRequestRef.current) return;
+      const targetConv = pendingConvRef.current || loadingConversationId;
+      if (targetConv) {
+        addMessageTo(targetConv, { role: 'assistant', content: 'Error: 请求超时，已自动解锁。请重试一次。' });
+      }
+      pendingConvRef.current = null;
+      pendingWsRequestRef.current = null;
+      if (wsFallbackTimerRef.current) {
+        clearTimeout(wsFallbackTimerRef.current);
+        wsFallbackTimerRef.current = null;
+      }
+      progressLogRef.current = [];
+      setProgressLog([]);
+      setStreamingText('');
+      setConversationLoading(null);
+    }, 90000);
+    return () => clearTimeout(timer);
+  }, [loadingConversationId, addMessageTo, setConversationLoading]);
 
   // ── Cancel / Stop processing ────────────────────────────────────
   const handleCancel = useCallback(() => {
