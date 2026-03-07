@@ -324,6 +324,11 @@ export default function Chat() {
   const [showWhatsAppQR, setShowWhatsAppQR] = useState(false);
   const [whatsappQR, setWhatsappQR] = useState<{ qrDataUrl: string | null; status: string } | null>(null);
   const [whatsappLoading, setWhatsappLoading] = useState(false);
+  const forceRestMode = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    const host = window.location.hostname;
+    return host !== '127.0.0.1' && host !== 'localhost';
+  }, []);
 
   const {
     conversations, activeConversationId, isLoading, loadingConversationId,
@@ -376,6 +381,12 @@ export default function Chat() {
 
   // ── WebSocket lifecycle ──────────────────────────────────────────
   useEffect(() => {
+    if (forceRestMode) {
+      setWsConnected(false);
+      setWsError('内网模式：已切换为 HTTP 稳定通道');
+      return;
+    }
+
     const token = localStorage.getItem('token');
     if (!token) return;
 
@@ -529,7 +540,7 @@ export default function Chat() {
       ws.disconnect();
       wsRef.current = null;
     };
-  }, [addMessageTo, setConversationLoading]);
+  }, [addMessageTo, setConversationLoading, forceRestMode]);
 
   // ── Auto-scroll on new messages ──────────────────────────────────
   useEffect(() => {
@@ -638,7 +649,7 @@ export default function Chat() {
     }
 
     // Try WebSocket first
-    if (wsRef.current && wsConnected) {
+    if (!forceRestMode && wsRef.current && wsConnected) {
       const modeArg = responseMode === 'auto' ? undefined : responseMode;
       const modelArg = selectedModel === 'auto' ? undefined : selectedModel;
       try {
@@ -712,7 +723,7 @@ export default function Chat() {
       wsFallbackTimerRef.current = null;
     }
     setConversationLoading(null);
-  }, [input, attachedFile, loadingConversationId, wsConnected, activeConversationId, addMessage, addMessageTo, setConversationLoading, newConversation, responseMode, selectedModel]);
+  }, [input, attachedFile, loadingConversationId, wsConnected, activeConversationId, addMessage, addMessageTo, setConversationLoading, newConversation, responseMode, selectedModel, forceRestMode]);
 
   // Global fail-safe: if UI stays locked for too long, auto-unlock and show a clear error.
   useEffect(() => {
