@@ -332,8 +332,18 @@ export default function Chat() {
     syncWithServer, loadConversationFromServer,
   } = useChatStore();
 
+  type PendingWsRequest = {
+    text: string;
+    conversationId: string;
+    responseMode?: string;
+    model?: string;
+  };
+
   // Track which conversation is awaiting a WS response
   const pendingConvRef = useRef<string | null>(null);
+  const pendingWsRequestRef = useRef<PendingWsRequest | null>(null);
+  const wsFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const suppressedRecoveredRef = useRef<{ conversationId: string; text: string; expiresAt: number } | null>(null);
   // Ref to capture progress log for saving into final message
   const progressLogRef = useRef<Array<{ type: string; message: string; agent?: string; tool?: string; time: number }>>([]);
 
@@ -371,30 +381,75 @@ export default function Chat() {
 
     const ws = new WsClient();
     wsRef.current = ws;
+    const clearWsFallbackTimer = () => {
+      if (wsFallbackTimerRef.current) {
+        clearTimeout(wsFallbackTimerRef.current);
+        wsFallbackTimerRef.current = null;
+      }
+    };
 
     ws.onStatus((connected) => {
       setWsConnected(connected);
       if (connected) {
+        clearWsFallbackTimer();
         setWsError(null);
         return;
       }
 
-      // If socket drops while a request is in-flight, unlock UI to prevent a stuck send state.
-      const pendingConv = pendingConvRef.current;
-      if (pendingConv) {
-        pendingConvRef.current = null;
-        progressLogRef.current = [];
-        setProgressLog([]);
-        setStreamingText('');
-        addMessageTo(pendingConv, { role: 'assistant', content: 'Error: 连接中断，请重试发送。' });
-        setConversationLoading(null);
+      const pending = pendingWsRequestRef.current;
+      if (pending) {
+        setWsError('连接中断，正在自动重试...');
+        clearWsFallbackTimer();
+        wsFallbackTimerRef.current = setTimeout(async () => {
+          const latest = pendingWsRequestRef.current;
+          if (!latest) return;
+          try {
+            const res = await api.chat(latest.text, latest.conversationId, latest.responseMode, latest.model);
+            addMessageTo(latest.conversationId, {
+              role: 'assistant',
+              content: res.message,
+              thinking: res.thinking,
+              artifacts: res.artifacts,
+              agent: res.agent,
+              provider: res.provider,
+              model: res.model,
+              tokens: res.tokens ? { ...res.tokens, total: res.tokens.input + res.tokens.output } : undefined,
+              elapsed: res.elapsed,
+            });
+            suppressedRecoveredRef.current = {
+              conversationId: latest.conversationId,
+              text: res.message,
+              expiresAt: Date.now() + 15000,
+            };
+          } catch (err: any) {
+            addMessageTo(latest.conversationId, { role: 'assistant', content: `Error: ${err.message}` });
+          } finally {
+            pendingConvRef.current = null;
+            pendingWsRequestRef.current = null;
+            progressLogRef.current = [];
+            setProgressLog([]);
+            setStreamingText('');
+            setConversationLoading(null);
+          }
+        }, 1500);
       }
     });
 
     ws.on('message', (data: { text: string; thinking?: string; artifacts?: ChatArtifact[]; agent?: string; tokens?: { input: number; output: number; total: number }; provider?: string; model?: string; elapsed?: number; conversationId?: string }) => {
+      const suppressed = suppressedRecoveredRef.current;
+      if (suppressed && Date.now() < suppressed.expiresAt && data.conversationId === suppressed.conversationId && data.text === suppressed.text) {
+        suppressedRecoveredRef.current = null;
+        return;
+      }
+      if (suppressed && Date.now() >= suppressed.expiresAt) {
+        suppressedRecoveredRef.current = null;
+      }
+
       // Use conversationId from response (for recovered messages) or from pending ref
       const targetConv = data.conversationId || pendingConvRef.current;
       pendingConvRef.current = null;
+      pendingWsRequestRef.current = null;
+      clearWsFallbackTimer();
       // Capture progress log before clearing
       const savedProgress = progressLogRef.current.filter(ev =>
         !/^(Still working|Working\.\.\.)/.test(ev.message) && ev.message !== 'Processing your message...'
@@ -422,6 +477,8 @@ export default function Chat() {
     ws.on('error', (data: { message: string }) => {
       const targetConv = pendingConvRef.current;
       pendingConvRef.current = null;
+      pendingWsRequestRef.current = null;
+      clearWsFallbackTimer();
       progressLogRef.current = [];
       setProgressLog([]);
       if (targetConv) {
@@ -441,6 +498,8 @@ export default function Chat() {
 
     ws.on('cancelled', () => {
       pendingConvRef.current = null;
+      pendingWsRequestRef.current = null;
+      clearWsFallbackTimer();
       progressLogRef.current = [];
       setProgressLog([]);
       setStreamingText('');
@@ -463,6 +522,7 @@ export default function Chat() {
     ws.connect(token);
 
     return () => {
+      clearWsFallbackTimer();
       ws.disconnect();
       wsRef.current = null;
     };
@@ -571,10 +631,14 @@ export default function Chat() {
 
     // Try WebSocket first
     if (wsRef.current && wsConnected) {
+      const modeArg = responseMode === 'auto' ? undefined : responseMode;
+      const modelArg = selectedModel === 'auto' ? undefined : selectedModel;
       try {
-        wsRef.current.send(text, convId, responseMode === 'auto' ? undefined : responseMode, selectedModel === 'auto' ? undefined : selectedModel);
+        pendingWsRequestRef.current = { text, conversationId: convId, responseMode: modeArg, model: modelArg };
+        wsRef.current.send(text, convId, modeArg, modelArg);
         return; // Response will arrive via WS event handler
       } catch {
+        pendingWsRequestRef.current = null;
         setWsConnected(false);
       }
     }
@@ -596,6 +660,11 @@ export default function Chat() {
       wsRef.current.cancel();
     }
     pendingConvRef.current = null;
+    pendingWsRequestRef.current = null;
+    if (wsFallbackTimerRef.current) {
+      clearTimeout(wsFallbackTimerRef.current);
+      wsFallbackTimerRef.current = null;
+    }
     setProgressLog([]);
     setConversationLoading(null);
   }, [wsConnected, setConversationLoading]);
