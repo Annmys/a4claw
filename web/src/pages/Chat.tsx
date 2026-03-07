@@ -374,7 +374,21 @@ export default function Chat() {
 
     ws.onStatus((connected) => {
       setWsConnected(connected);
-      if (connected) setWsError(null);
+      if (connected) {
+        setWsError(null);
+        return;
+      }
+
+      // If socket drops while a request is in-flight, unlock UI to prevent a stuck send state.
+      const pendingConv = pendingConvRef.current;
+      if (pendingConv) {
+        pendingConvRef.current = null;
+        progressLogRef.current = [];
+        setProgressLog([]);
+        setStreamingText('');
+        addMessageTo(pendingConv, { role: 'assistant', content: 'Error: 连接中断，请重试发送。' });
+        setConversationLoading(null);
+      }
     });
 
     ws.on('message', (data: { text: string; thinking?: string; artifacts?: ChatArtifact[]; agent?: string; tokens?: { input: number; output: number; total: number }; provider?: string; model?: string; elapsed?: number; conversationId?: string }) => {
