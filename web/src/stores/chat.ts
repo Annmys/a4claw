@@ -238,9 +238,27 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   // Add message to a SPECIFIC conversation (even if not active)
   addMessageTo: (conversationId, msg) => set(state => {
-    const updated = addMessageToConversation(state.conversations, conversationId, msg);
+    let conversations = state.conversations;
+
+    // If conversation is missing locally (e.g. WS response after reconnect), create it first.
+    if (!conversations.find(c => c.id === conversationId)) {
+      const conv: Conversation = {
+        id: conversationId,
+        title: 'New Chat',
+        messages: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      conversations = [conv, ...conversations];
+      api.createConversationOnServer(conversationId, conv.title).catch(() => {});
+    }
+
+    const updated = addMessageToConversation(conversations, conversationId, msg);
     saveToStorage(state.storageKey, updated);
-    return { conversations: updated };
+    return {
+      conversations: updated,
+      activeConversationId: state.activeConversationId ?? conversationId,
+    };
   }),
 
   // Set loading for active conversation (backward compat)

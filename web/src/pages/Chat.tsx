@@ -346,11 +346,16 @@ export default function Chat() {
   const suppressedRecoveredRef = useRef<{ conversationId: string; text: string; expiresAt: number } | null>(null);
   // Ref to capture progress log for saving into final message
   const progressLogRef = useRef<Array<{ type: string; message: string; agent?: string; tool?: string; time: number }>>([]);
+  const activeConversationRef = useRef<string | null>(activeConversationId);
 
   const messages = useMemo(() => {
     return getMessages();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversations, activeConversationId, getMessages]);
+
+  useEffect(() => {
+    activeConversationRef.current = activeConversationId;
+  }, [activeConversationId]);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -448,8 +453,8 @@ export default function Chat() {
         suppressedRecoveredRef.current = null;
       }
 
-      // Use conversationId from response (for recovered messages) or from pending ref
-      const targetConv = data.conversationId || pendingConvRef.current;
+      // Use response conversationId first, then pending ref, then current active conversation as final fallback.
+      const targetConv = data.conversationId || pendingConvRef.current || activeConversationRef.current;
       pendingConvRef.current = null;
       pendingWsRequestRef.current = null;
       clearWsFallbackTimer();
