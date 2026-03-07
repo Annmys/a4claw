@@ -18,8 +18,7 @@ async function resolveDbUserId(jwtUserId: string): Promise<string> {
 export function setupHistoryRoutes(): Router {
   const router = Router();
 
-  // GET /api/history — list all conversations for user
-  router.get('/', async (req: Request, res: Response) => {
+  const listConversations = async (req: Request, res: Response) => {
     const user = (req as any).user;
     const { platform, limit: limitStr, offset: offsetStr } = req.query;
     const limit = Math.min(parseInt(limitStr as string) || 50, 100);
@@ -37,7 +36,12 @@ export function setupHistoryRoutes(): Router {
       logger.error('Failed to list conversations', { error: err.message });
       res.status(500).json({ error: `Failed to load conversations: ${err.message}` });
     }
-  });
+  };
+
+  // GET /api/history — list all conversations for user
+  router.get('/', listConversations);
+  // Legacy compatibility for older frontend bundles
+  router.get('/conversations', listConversations);
 
   // GET /api/history/:id — get single conversation with messages
   router.get('/:id', async (req: Request, res: Response) => {
