@@ -609,8 +609,13 @@ export default function Chat() {
     const file = attachedFile;
     if (!text && !file) return;
 
-    // Backend processes one request at a time — block if ANY conversation is loading
-    if (loadingConversationId) return;
+    // Backend processes one request at a time.
+    // If loading flag is stale (no pending request refs), auto-clear it instead of silently blocking send.
+    if (loadingConversationId) {
+      const hasPending = !!pendingConvRef.current || !!pendingWsRequestRef.current;
+      if (hasPending) return;
+      setConversationLoading(null);
+    }
 
     // Auto-create conversation if none active
     let convId = activeConversationId;
@@ -729,7 +734,6 @@ export default function Chat() {
   useEffect(() => {
     if (!loadingConversationId) return;
     const timer = setTimeout(() => {
-      if (!pendingConvRef.current && !pendingWsRequestRef.current) return;
       const targetConv = pendingConvRef.current || loadingConversationId;
       if (targetConv) {
         addMessageTo(targetConv, { role: 'assistant', content: 'Error: 请求超时，已自动解锁。请重试一次。' });
