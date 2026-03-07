@@ -608,8 +608,17 @@ export default function Chat() {
     if (loadingConversationId) {
       const hasPending = !!pendingConvRef.current || !!pendingWsRequestRef.current;
       if (hasPending) {
-        setWsError('上一条消息仍在处理中，请先等待或点击 Stop。');
-        return;
+        // Stale lock recovery: never silently block user sends.
+        pendingConvRef.current = null;
+        pendingWsRequestRef.current = null;
+        if (wsFallbackTimerRef.current) {
+          clearTimeout(wsFallbackTimerRef.current);
+          wsFallbackTimerRef.current = null;
+        }
+        progressLogRef.current = [];
+        setProgressLog([]);
+        setStreamingText('');
+        setWsError('检测到旧请求卡住，已自动解锁并继续发送。');
       }
       setConversationLoading(null);
     }
@@ -1896,7 +1905,7 @@ export default function Chat() {
                   e.preventDefault();
                   handleCancel();
                 }
-                if (e.key === 'Enter' && !e.shiftKey && !loadingConversationId) {
+                if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
                   send();
                 }
@@ -1931,7 +1940,7 @@ export default function Chat() {
               }`}
               style={{ maxHeight: '160px' }}
             />
-            {loadingConversationId ? (
+            {loadingConversationId && !input.trim() && !attachedFile ? (
               <button
                 onClick={handleCancel}
                 className="p-3 rounded-xl bg-red-600 text-white hover:bg-red-700 transition-colors shrink-0"
