@@ -3,6 +3,7 @@ import multer from 'multer';
 import { resolve as pathResolve } from 'path';
 import { mkdirSync, existsSync, unlinkSync } from 'fs';
 import { readFile } from 'fs/promises';
+import { randomUUID } from 'crypto';
 import { Engine } from '../../../core/engine.js';
 import { analyzeImage } from '../../../actions/vision/analyze.js';
 import { getAllModels } from '../../../core/model-router.js';
@@ -43,6 +44,7 @@ export function setupApiRoutes(engine: Engine): Router {
 
   // POST /api/chat — Send message with optional file attachment
   router.post('/chat', upload.single('file'), async (req: Request, res: Response) => {
+    const requestId = randomUUID().slice(0, 8);
     const user = (req as any).user;
     const text = req.body.text ?? '';
     const conversationId = req.body.conversationId as string | undefined;
@@ -56,6 +58,16 @@ export function setupApiRoutes(engine: Engine): Router {
     let uploadedArtifact: any | undefined;
 
     try {
+      logger.info('Chat API request', {
+        requestId,
+        userId: user?.userId,
+        conversationId: conversationId ?? null,
+        hasFile: !!file,
+        textLength: typeof text === 'string' ? text.length : 0,
+        responseMode: responseMode ?? 'auto',
+        model: model ?? 'auto',
+      });
+
       if (file) {
         // Validate file content matches claimed type (magic bytes)
         const headerBuf = await readFile(file.path, { flag: 'r' }).then(b => b.subarray(0, 12));
@@ -168,6 +180,15 @@ export function setupApiRoutes(engine: Engine): Router {
         model,
       });
 
+      logger.info('Chat API response', {
+        requestId,
+        userId: user?.userId,
+        conversationId: conversationId ?? null,
+        provider: response.provider ?? null,
+        model: response.modelUsed ?? null,
+        elapsed: response.elapsed ?? null,
+      });
+
       const responseArtifacts = Array.isArray(response.artifacts) ? [...response.artifacts] : [];
       if (uploadedArtifact) {
         const alreadyIncluded = responseArtifacts.some(a =>
@@ -187,9 +208,15 @@ export function setupApiRoutes(engine: Engine): Router {
         elapsed: response.elapsed,
       });
     } catch (error: any) {
-      logger.error('Chat API error', { error: error.message });
+      logger.error('Chat API error', {
+        requestId,
+        userId: user?.userId,
+        conversationId: conversationId ?? null,
+        error: error.message,
+      });
       // Clean up file on error
       if (file) try { unlinkSync(renamedFilePath ?? file.path); } catch {}
+      if (res.headersSent) return;
       res.status(500).json({ error: 'Failed to process message', details: error.message });
     }
   });

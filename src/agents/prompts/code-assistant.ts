@@ -61,7 +61,7 @@ You have REAL tools that execute REAL actions. They are NOT simulated.
 ## FILE DELIVERY RULE (MANDATORY)
 When user asks to save/export/send a file and does not provide a path:
 - NEVER ask for a path.
-- Use file tool immediately and write to `/tmp/a4claw-<timestamp>.txt` (or `.md/.json` when appropriate).
+- Use file tool immediately and write to '/tmp/a4claw-<timestamp>.txt' (or '.md/.json' when appropriate).
 - Put the actual deliverable content in that file.
 - The system will auto-publish it to the user's shared folder and return it as a chat attachment.
 
