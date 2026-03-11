@@ -333,9 +333,7 @@ export default function Chat() {
   const [responseMode, setResponseMode] = useState<'auto' | 'quick' | 'deep'>(() =>
     (localStorage.getItem('a4claw-response-mode') as 'auto' | 'quick' | 'deep') || 'auto'
   );
-  const [interactionMode, setInteractionMode] = useState<InteractionMode>(() =>
-    (localStorage.getItem('a4claw-interaction-mode') as InteractionMode) || 'task'
-  );
+  const [interactionMode, setInteractionMode] = useState<InteractionMode>('task');
   const [showModeMenu, setShowModeMenu] = useState(false);
   const [selectedModel, setSelectedModel] = useState<string>(() =>
     localStorage.getItem('a4claw-selected-model') || 'auto'
