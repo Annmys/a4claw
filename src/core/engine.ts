@@ -24,6 +24,7 @@ import type { CrewOrchestrator } from './crew-orchestrator.js';
 import { onMessageProcessed, onError, getIntelligenceContext, isBridgeReady } from './intelligence-bridge.js';
 import { getApprovalGate } from './approval-gate.js';
 import type { EvolutionEngine } from './evolution-engine.js';
+import { audit } from '../security/audit-log.js';
 import config from '../config.js';
 import { extractJSON } from '../utils/helpers.js';
 import logger from '../utils/logger.js';
@@ -1108,6 +1109,14 @@ If they want to check a running project, use "status" with projectName.`,
 
       // 3. Select agent
       const agent = getAgent(routing.agentId) ?? getAgent('general')!;
+      if (routing.intent === Intent.AUTONOMOUS_TASK || agent.id === 'task-executor') {
+        await audit(incoming.userId, 'task_executor.dispatched', {
+          intent: routing.intent,
+          agentId: agent.id,
+          responseMode: effectiveMode,
+          textPreview: incoming.text.slice(0, 300),
+        }, incoming.platform);
+      }
       incoming.onProgress?.({ type: 'agent', message: `🤖 ${agent.name} — handling request`, agent: agent.id });
 
       // 3a. Deep mode — remove token limits, notify user with cost estimate
@@ -1332,6 +1341,13 @@ If they want to check a running project, use "status" with projectName.`,
       // ── Crew Orchestrator: detect multi-agent tasks ──
       const crewConfig = this.shouldUseCrew(routing.intent, incoming.text, agent.id);
       if (crewConfig && this.crewOrchestrator) {
+        await audit(incoming.userId, 'task_executor.crew_triggered', {
+          reason: crewConfig.reason,
+          mode: crewConfig.mode,
+          crewId: crewConfig.id,
+          members: crewConfig.members.map(m => ({ agentId: m.agentId, role: m.role ?? null })),
+          taskPreview: crewConfig.task.slice(0, 500),
+        }, incoming.platform);
         incoming.onProgress?.({ type: 'status', message: `${crewConfig.reason} → ${crewConfig.mode} crew (${crewConfig.members.map(m => m.agentId).join(', ')})` });
         logger.info('Crew triggered', { reason: crewConfig.reason, mode: crewConfig.mode, members: crewConfig.members.map(m => m.agentId), task: crewConfig.task.slice(0, 80) });
         const crewResult = await this.crewOrchestrator.runCrew(crewConfig);
