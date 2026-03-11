@@ -1,11 +1,28 @@
 import { Router, Request, Response } from 'express';
 import { readFileSync, existsSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
+import { getTaskExecutorAuditTrailForPrincipal } from '../../../memory/repositories/audit.js';
 
 const LOGS_DIR = join(process.cwd(), 'logs');
 
 export function setupLogsRoutes(): Router {
   const router = Router();
+
+  router.get('/task-executor', async (req: Request, res: Response) => {
+    try {
+      const user = (req as any).user;
+      const principal = user?.userId;
+      if (!principal) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+      const limit = Math.min(parseInt(req.query.limit as string) || 30, 100);
+      const items = await getTaskExecutorAuditTrailForPrincipal(principal, limit);
+      res.json({ items });
+    } catch (err: any) {
+      res.status(500).json({ error: `Failed to load task executor audit trail: ${err.message}` });
+    }
+  });
 
   // GET /api/logs — get recent logs
   router.get('/', (req: Request, res: Response) => {

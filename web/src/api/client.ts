@@ -132,6 +132,17 @@ export interface CommandCenterTaskDetail {
   events: CommandCenterTaskEvent[];
 }
 
+export interface TaskExecutorAuditItem {
+  id: string;
+  userId: string | null;
+  action: string;
+  resource: string | null;
+  details: Record<string, unknown>;
+  ip: string | null;
+  platform: string | null;
+  createdAt: string;
+}
+
 export async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = localStorage.getItem('token');
   const response = await fetch(`${BASE_URL}${path}`, {
@@ -265,6 +276,8 @@ export const api = {
     if (params?.search) qs.set('search', params.search);
     return apiRequest<any>(`/logs?${qs.toString()}`);
   },
+  getTaskExecutorAuditTrail: (limit = 30) =>
+    apiRequest<{ items: TaskExecutorAuditItem[] }>(`/logs/task-executor?limit=${limit}`),
 
   // Costs
   getCostsToday: () => apiRequest<any>('/costs/today'),

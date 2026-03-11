@@ -437,6 +437,14 @@ export class Engine {
       const keywordRouting = (this.router as any).keywordClassify?.(incoming.text);
       const agentId = keywordRouting?.agentId ?? 'general';
       const agent = getAgent(agentId) ?? getAgent('general')!;
+      if (agent.id === 'task-executor') {
+        await audit(incoming.userId, 'task_executor.dispatched', {
+          intent: keywordRouting?.intent ?? Intent.AUTONOMOUS_TASK,
+          agentId: agent.id,
+          responseMode: 'quick',
+          textPreview: incoming.text.slice(0, 300),
+        }, incoming.platform);
+      }
 
       // Guard: tool-heavy agents (project-builder, code-assistant, server-manager, etc.)
       // should NEVER run in quick mode — they need tool execution. Upgrade to auto.

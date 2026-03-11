@@ -7,6 +7,7 @@ import {
   type CommandCenterOverview,
   type CommandCenterTask,
   type CommandCenterTaskDetail,
+  type TaskExecutorAuditItem,
 } from '../api/client';
 import {
   AlertCircle,
@@ -64,6 +65,17 @@ function statusLabel(status: CommandCenterTask['status']) {
   return STATUS_META.find((item) => item.key === status)?.label ?? status;
 }
 
+function formatAuditAction(action: string) {
+  switch (action) {
+    case 'task_executor.dispatched':
+      return '任务已派发';
+    case 'task_executor.crew_triggered':
+      return '触发多智能体调度';
+    default:
+      return action;
+  }
+}
+
 export default function CommandCenter() {
   const [overview, setOverview] = useState<CommandCenterOverview | null>(null);
   const [detail, setDetail] = useState<CommandCenterTaskDetail | null>(null);
@@ -74,6 +86,7 @@ export default function CommandCenter() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [executorAudit, setExecutorAudit] = useState<TaskExecutorAuditItem[]>([]);
 
   const [centerForm, setCenterForm] = useState({ name: '', code: '', description: '' });
   const [departmentForm, setDepartmentForm] = useState({ centerId: '', name: '', code: '' });
@@ -94,8 +107,12 @@ export default function CommandCenter() {
 
   const loadOverview = async (keepSelection = true) => {
     try {
-      const data = await api.commandCenterOverview();
+      const [data, auditTrail] = await Promise.all([
+        api.commandCenterOverview(),
+        api.getTaskExecutorAuditTrail(20).catch(() => ({ items: [] as TaskExecutorAuditItem[] })),
+      ]);
       setOverview(data);
+      setExecutorAudit(auditTrail.items);
       setError('');
       if (!keepSelection || !selectedTaskId || !data.tasks.some((task) => task.id === selectedTaskId)) {
         setSelectedTaskId(data.tasks[0]?.id ?? null);
@@ -674,6 +691,60 @@ export default function CommandCenter() {
                 创建任务
               </button>
             </div>
+          </section>
+
+          <section className="rounded-3xl border border-gray-800 bg-dark-900/90 p-4">
+            <div className="flex items-center gap-2 mb-4">
+              <ArrowRight className="w-4 h-4 text-sky-400" />
+              <h2 className="text-sm font-semibold text-white">执行轨迹</h2>
+            </div>
+
+            {executorAudit.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-gray-700 px-4 py-5 text-sm text-gray-500">
+                还没有记录到任务执行轨迹。后续命中 `task-executor` 或触发多智能体调度后，会在这里显示。
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {executorAudit.map((item) => {
+                  const details = item.details ?? {};
+                  const reason = typeof details.reason === 'string' ? details.reason : '';
+                  const responseMode = typeof details.responseMode === 'string' ? details.responseMode : '';
+                  const agentId = typeof details.agentId === 'string' ? details.agentId : '';
+                  const mode = typeof details.mode === 'string' ? details.mode : '';
+                  const members = Array.isArray(details.members) ? details.members as Array<{ agentId?: string; role?: string | null }> : [];
+                  const textPreview = typeof details.textPreview === 'string'
+                    ? details.textPreview
+                    : typeof details.taskPreview === 'string'
+                      ? details.taskPreview
+                      : '';
+
+                  return (
+                    <div key={item.id} className="rounded-2xl border border-gray-800 bg-dark-800/70 p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-sm font-medium text-white">{formatAuditAction(item.action)}</div>
+                        <div className="text-[11px] text-gray-500">{formatDateTime(item.createdAt)}</div>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
+                        {agentId && <span className="rounded-full bg-sky-500/15 px-2 py-1 text-sky-300">{agentId}</span>}
+                        {responseMode && <span className="rounded-full bg-violet-500/15 px-2 py-1 text-violet-300">{responseMode}</span>}
+                        {mode && <span className="rounded-full bg-amber-500/15 px-2 py-1 text-amber-300">{mode}</span>}
+                      </div>
+                      {reason && <div className="mt-2 text-xs text-amber-200">原因：{reason}</div>}
+                      {members.length > 0 && (
+                        <div className="mt-2 text-xs text-gray-300">
+                          调度成员：{members.map((member) => `${member.agentId}${member.role ? `(${member.role})` : ''}`).join('、')}
+                        </div>
+                      )}
+                      {textPreview && (
+                        <div className="mt-2 rounded-xl bg-dark-900/80 px-3 py-2 text-xs text-gray-400 line-clamp-4 whitespace-pre-wrap">
+                          {textPreview}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </section>
 
           <section className="rounded-3xl border border-gray-800 bg-dark-900/90 p-4">
