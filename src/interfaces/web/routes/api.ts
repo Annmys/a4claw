@@ -1,8 +1,8 @@
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
-import { resolve as pathResolve } from 'path';
+import { basename, extname, resolve as pathResolve } from 'path';
 import { mkdirSync, existsSync, unlinkSync } from 'fs';
-import { readFile } from 'fs/promises';
+import { readFile, writeFile } from 'fs/promises';
 import { randomUUID } from 'crypto';
 import { Engine } from '../../../core/engine.js';
 import { analyzeImage } from '../../../actions/vision/analyze.js';
@@ -19,6 +19,7 @@ import { saveMessage as saveConversationMessage } from '../../../memory/reposito
 import logger from '../../../utils/logger.js';
 
 const UPLOAD_DIR = pathResolve(process.cwd(), 'uploads');
+const DOCUMENT_PDF_FONT_PATH = '/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf';
 
 function normalizeDocumentText(input: string): string {
   return input
@@ -69,6 +70,177 @@ function isDocumentDirectRequest(text: string): boolean {
   return /总结|摘要|概括|总结一下|summar|summary|extract|提炼|主要内容|内容|看一下|看看|readme|说明书|翻译|translate|translation|译成|译为|全文|完整翻译|中文|分析|analysis|解释|问答|qa|q&a|校对|润色|整理|表格|excel/.test(normalized);
 }
 
+function classifyDocumentOutputAction(text: string): 'translation' | 'summary' | 'rewrite' | 'analysis' | 'result' {
+  const normalized = text.trim().toLowerCase();
+  if (!normalized) return 'result';
+  if (/翻译|translate|translation|译成|译为|中文|英文/.test(normalized)) return 'translation';
+  if (/总结|摘要|概括|summary|summar|提炼|要点/.test(normalized)) return 'summary';
+  if (/改写|重写|rewrite|润色|整理|排版|编辑/.test(normalized)) return 'rewrite';
+  if (/分析|analysis|解释|问答|qa|q&a|校对/.test(normalized)) return 'analysis';
+  return 'result';
+}
+
+function buildDocumentOutputFileName(fileName: string, userText: string, extension: 'pdf' | 'md'): string {
+  const stem = basename(fileName, extname(fileName)).replace(/[^\w.-]+/g, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '') || 'document';
+  const suffixMap = {
+    translation: 'translated',
+    summary: 'summary',
+    rewrite: 'rewritten',
+    analysis: 'analysis',
+    result: 'result',
+  } as const;
+  const suffix = suffixMap[classifyDocumentOutputAction(userText)];
+  return `${stem}-${suffix}.${extension}`;
+}
+
+function buildDocumentArtifactBody(fileName: string, userText: string, content: string): string {
+  const requestLine = userText.trim() || '自动处理文档';
+  return [
+    `文件名：${fileName}`,
+    `处理要求：${requestLine}`,
+    `生成时间：${new Date().toLocaleString('zh-CN', { hour12: false })}`,
+    '',
+    content.trim(),
+  ].join('\n');
+}
+
+function wrapPdfLine(text: string, maxWidth: number, measure: (line: string) => number): string[] {
+  if (!text.trim()) return [''];
+
+  const segments = text.split(/(\s+)/).filter(Boolean);
+  const hasWordBoundaries = segments.some((segment) => /\s+/.test(segment));
+  const units = hasWordBoundaries ? segments : Array.from(text);
+  const lines: string[] = [];
+  let current = '';
+
+  for (const unit of units) {
+    const next = `${current}${unit}`;
+    if (!current || measure(next) <= maxWidth) {
+      current = next;
+      continue;
+    }
+
+    if (current.trim()) lines.push(current.trimEnd());
+    current = unit.trimStart();
+
+    if (measure(current) <= maxWidth) continue;
+
+    let charLine = '';
+    for (const char of Array.from(unit)) {
+      const candidate = `${charLine}${char}`;
+      if (!charLine || measure(candidate) <= maxWidth) {
+        charLine = candidate;
+      } else {
+        lines.push(charLine);
+        charLine = char;
+      }
+    }
+    current = charLine;
+  }
+
+  if (current.trim() || text.endsWith(' ')) {
+    lines.push(current.trimEnd());
+  }
+
+  return lines.length > 0 ? lines : [''];
+}
+
+async function writeTextPdf(targetPath: string, title: string, body: string): Promise<void> {
+  const pdfLib = await import('pdf-lib');
+  const fontkitMod = await import('@pdf-lib/fontkit');
+  const PDFDocument = (pdfLib as any).PDFDocument as typeof import('pdf-lib').PDFDocument;
+  const rgb = (pdfLib as any).rgb as typeof import('pdf-lib').rgb;
+  const fontkit = (fontkitMod as any).default ?? fontkitMod;
+
+  const pdfDoc = await PDFDocument.create();
+  pdfDoc.registerFontkit(fontkit);
+
+  const fontBytes = await readFile(DOCUMENT_PDF_FONT_PATH);
+  const font = await pdfDoc.embedFont(fontBytes, { subset: true });
+
+  const pageWidth = 595.28;
+  const pageHeight = 841.89;
+  const marginX = 48;
+  const marginTop = 54;
+  const marginBottom = 54;
+  const titleSize = 16;
+  const textSize = 11;
+  const titleLineHeight = 24;
+  const textLineHeight = 18;
+  const maxWidth = pageWidth - marginX * 2;
+
+  let page = pdfDoc.addPage([pageWidth, pageHeight]);
+  let cursorY = pageHeight - marginTop;
+
+  const ensureSpace = (heightNeeded: number) => {
+    if (cursorY - heightNeeded < marginBottom) {
+      page = pdfDoc.addPage([pageWidth, pageHeight]);
+      cursorY = pageHeight - marginTop;
+    }
+  };
+
+  ensureSpace(titleLineHeight);
+  page.drawText(title, {
+    x: marginX,
+    y: cursorY,
+    size: titleSize,
+    font,
+    color: rgb(0.1, 0.1, 0.1),
+  });
+  cursorY -= titleLineHeight;
+
+  const paragraphs = body.replace(/\r/g, '').split('\n');
+  for (const paragraph of paragraphs) {
+    const lines = wrapPdfLine(paragraph, maxWidth, (line) => font.widthOfTextAtSize(line, textSize));
+    for (const line of lines) {
+      ensureSpace(textLineHeight);
+      page.drawText(line || ' ', {
+        x: marginX,
+        y: cursorY,
+        size: textSize,
+        font,
+        color: rgb(0.16, 0.16, 0.16),
+      });
+      cursorY -= textLineHeight;
+    }
+  }
+
+  const bytes = await pdfDoc.save();
+  await writeFile(targetPath, bytes);
+}
+
+async function createDocumentResultArtifact(params: {
+  userId: string;
+  fileName: string;
+  userText: string;
+  content: string;
+}): Promise<{ artifact: any; format: 'pdf' | 'md' }> {
+  const artifactBody = buildDocumentArtifactBody(params.fileName, params.userText, params.content);
+  const preferredPdfName = buildDocumentOutputFileName(params.fileName, params.userText, 'pdf');
+  const tmpPdfPath = `/tmp/${randomUUID()}-${preferredPdfName}`;
+
+  try {
+    await writeTextPdf(tmpPdfPath, preferredPdfName.replace(/\.pdf$/i, ''), artifactBody);
+    const artifact = await publishFileToUserShare(tmpPdfPath, params.userId, preferredPdfName);
+    try { unlinkSync(tmpPdfPath); } catch {}
+    return { artifact, format: 'pdf' };
+  } catch (pdfErr: any) {
+    logger.warn('Failed to generate PDF artifact for document result, falling back to markdown', {
+      userId: params.userId,
+      fileName: params.fileName,
+      error: pdfErr.message,
+    });
+    try { unlinkSync(tmpPdfPath); } catch {}
+  }
+
+  const preferredMdName = buildDocumentOutputFileName(params.fileName, params.userText, 'md');
+  const tmpMdPath = `/tmp/${randomUUID()}-${preferredMdName}`;
+  await writeFile(tmpMdPath, artifactBody, 'utf-8');
+  const artifact = await publishFileToUserShare(tmpMdPath, params.userId, preferredMdName);
+  try { unlinkSync(tmpMdPath); } catch {}
+  return { artifact, format: 'md' };
+}
+
 function looksLikeModelFailure(text: string | undefined): boolean {
   if (!text) return false;
   return [
@@ -92,6 +264,33 @@ async function resolveDbUserId(jwtUserId: string): Promise<string> {
 
 async function ensureConversationExists(conversationId: string, dbUserId: string) {
   return getOrCreateConversation(dbUserId, 'web', conversationId);
+}
+
+async function saveDocumentConversationExchange(params: {
+  conversationId?: string;
+  jwtUserId: string;
+  fileName: string;
+  userText: string;
+  assistantText: string;
+  metadata: Record<string, unknown>;
+}) {
+  if (!params.conversationId) return;
+
+  const dbUserId = await resolveDbUserId(params.jwtUserId);
+  await ensureConversationExists(params.conversationId, dbUserId);
+
+  const userMessageText = params.userText.trim()
+    ? `${params.userText.trim()}\n[${params.fileName}]`
+    : `[${params.fileName}]`;
+
+  await saveConversationMessage(params.conversationId, dbUserId, 'user', userMessageText, {
+    _conversationId: params.conversationId,
+    source: params.metadata.source ?? 'document-direct',
+  });
+  await saveConversationMessage(params.conversationId, dbUserId, 'assistant', params.assistantText, {
+    _conversationId: params.conversationId,
+    ...params.metadata,
+  });
 }
 
 async function getConversationDocumentContext(conversationId: string, dbUserId: string): Promise<null | {
@@ -408,28 +607,48 @@ export function setupApiRoutes(engine: Engine): Router {
             model,
           });
 
-          if (conversationId && dbUserId) {
-            const userMessageText = text.trim()
-              ? `${text.trim()}\n[${activeDocumentFileName}]`
-              : `[${activeDocumentFileName}]`;
-            await saveConversationMessage(conversationId, dbUserId, 'user', userMessageText, {
-              _conversationId: conversationId,
-              source: 'document-direct',
+          let generatedArtifact: any | undefined;
+          try {
+            const generated = await createDocumentResultArtifact({
+              userId: user.userId,
+              fileName: activeDocumentFileName,
+              userText: text,
+              content: direct.message,
             });
-            await saveConversationMessage(conversationId, dbUserId, 'assistant', direct.message, {
-              _conversationId: conversationId,
-              agent: 'document-direct',
-              provider: direct.provider,
-              model: direct.model,
-              tokens: direct.tokens,
+            generatedArtifact = generated.artifact;
+          } catch (artifactErr: any) {
+            logger.warn('Failed to generate document result artifact', {
+              requestId,
+              userId: user.userId,
+              fileName: activeDocumentFileName,
+              error: artifactErr.message,
             });
           }
 
-          const responseArtifacts = uploadedArtifact ? [uploadedArtifact] : undefined;
+          const responseArtifacts = [generatedArtifact, uploadedArtifact].filter(Boolean);
+
+          if (conversationId && dbUserId) {
+            await saveDocumentConversationExchange({
+              conversationId,
+              jwtUserId: user.userId,
+              fileName: activeDocumentFileName,
+              userText: text,
+              assistantText: direct.message,
+              metadata: {
+                agent: 'document-direct',
+                provider: direct.provider,
+                model: direct.model,
+                tokens: direct.tokens,
+                artifacts: responseArtifacts.length > 0 ? responseArtifacts : undefined,
+                source: 'document-direct',
+              },
+            });
+          }
+
           res.json({
             message: direct.message,
             thinking: direct.thinking,
-            artifacts: responseArtifacts,
+            artifacts: responseArtifacts.length > 0 ? responseArtifacts : undefined,
             agent: 'document-direct',
             provider: direct.provider,
             model: direct.model,
@@ -447,10 +666,51 @@ export function setupApiRoutes(engine: Engine): Router {
       }
 
       if (file && extractedDocumentText.trim() && isDocumentSummaryRequest(text || '')) {
-        const responseArtifacts = uploadedArtifact ? [uploadedArtifact] : undefined;
+        const fallbackMessage = buildLocalDocumentFallback(text, file.originalname, extractedDocumentText);
+        const responseArtifacts = [];
+        try {
+          const generated = await createDocumentResultArtifact({
+            userId: user.userId,
+            fileName: file.originalname,
+            userText: text,
+            content: fallbackMessage,
+          });
+          responseArtifacts.push(generated.artifact);
+        } catch (artifactErr: any) {
+          logger.warn('Failed to generate fallback document artifact', {
+            requestId,
+            userId: user.userId,
+            fileName: file.originalname,
+            error: artifactErr.message,
+          });
+        }
+        if (uploadedArtifact) responseArtifacts.push(uploadedArtifact);
+        try {
+          await saveDocumentConversationExchange({
+            conversationId,
+            jwtUserId: user.userId,
+            fileName: file.originalname,
+            userText: text,
+            assistantText: fallbackMessage,
+            metadata: {
+              agent: 'document-fallback',
+              provider: 'local',
+              model: 'local-document-fallback',
+              artifacts: responseArtifacts.length > 0 ? responseArtifacts : undefined,
+              source: 'document-fallback',
+            },
+          });
+        } catch (saveErr: any) {
+          logger.warn('Failed to persist fallback document conversation', {
+            requestId,
+            userId: user.userId,
+            conversationId: conversationId ?? null,
+            error: saveErr.message,
+          });
+        }
         res.json({
-          message: buildLocalDocumentFallback(text, file.originalname, extractedDocumentText),
-          artifacts: responseArtifacts,
+          message: fallbackMessage,
+          artifacts: responseArtifacts.length > 0 ? responseArtifacts : undefined,
           agent: 'document-fallback',
           provider: 'local',
           model: 'local-document-fallback',
@@ -477,11 +737,52 @@ export function setupApiRoutes(engine: Engine): Router {
         && looksLikeModelFailure(response.text);
 
       if (shouldUseLocalFallback) {
-        const responseArtifacts = uploadedArtifact ? [uploadedArtifact] : undefined;
+        const fallbackMessage = buildLocalDocumentFallback(text, file!.originalname, extractedDocumentText);
+        const responseArtifacts = [];
+        try {
+          const generated = await createDocumentResultArtifact({
+            userId: user.userId,
+            fileName: file!.originalname,
+            userText: text,
+            content: fallbackMessage,
+          });
+          responseArtifacts.push(generated.artifact);
+        } catch (artifactErr: any) {
+          logger.warn('Failed to generate fallback artifact after model failure', {
+            requestId,
+            userId: user.userId,
+            fileName: file!.originalname,
+            error: artifactErr.message,
+          });
+        }
+        if (uploadedArtifact) responseArtifacts.push(uploadedArtifact);
+        try {
+          await saveDocumentConversationExchange({
+            conversationId,
+            jwtUserId: user.userId,
+            fileName: file!.originalname,
+            userText: text,
+            assistantText: fallbackMessage,
+            metadata: {
+              agent: 'document-fallback',
+              provider: 'local',
+              model: 'local-document-fallback',
+              artifacts: responseArtifacts.length > 0 ? responseArtifacts : undefined,
+              source: 'document-fallback',
+            },
+          });
+        } catch (saveErr: any) {
+          logger.warn('Failed to persist local fallback after model failure', {
+            requestId,
+            userId: user.userId,
+            conversationId: conversationId ?? null,
+            error: saveErr.message,
+          });
+        }
         res.json({
-          message: buildLocalDocumentFallback(text, file!.originalname, extractedDocumentText),
+          message: fallbackMessage,
           thinking: response.thinking,
-          artifacts: responseArtifacts,
+          artifacts: responseArtifacts.length > 0 ? responseArtifacts : undefined,
           agent: 'document-fallback',
           provider: 'local',
           model: 'local-document-fallback',
@@ -529,10 +830,51 @@ export function setupApiRoutes(engine: Engine): Router {
       if (res.headersSent) return;
 
       if (file && extractedDocumentText.trim()) {
-        const responseArtifacts = uploadedArtifact ? [uploadedArtifact] : undefined;
+        const fallbackMessage = buildLocalDocumentFallback(text, file.originalname, extractedDocumentText);
+        const responseArtifacts = [];
+        try {
+          const generated = await createDocumentResultArtifact({
+            userId: user.userId,
+            fileName: file.originalname,
+            userText: text,
+            content: fallbackMessage,
+          });
+          responseArtifacts.push(generated.artifact);
+        } catch (artifactErr: any) {
+          logger.warn('Failed to generate document artifact in error fallback', {
+            requestId,
+            userId: user.userId,
+            fileName: file.originalname,
+            error: artifactErr.message,
+          });
+        }
+        if (uploadedArtifact) responseArtifacts.push(uploadedArtifact);
+        try {
+          await saveDocumentConversationExchange({
+            conversationId,
+            jwtUserId: user.userId,
+            fileName: file.originalname,
+            userText: text,
+            assistantText: fallbackMessage,
+            metadata: {
+              agent: 'document-fallback',
+              provider: 'local',
+              model: 'local-document-fallback',
+              artifacts: responseArtifacts.length > 0 ? responseArtifacts : undefined,
+              source: 'document-fallback',
+            },
+          });
+        } catch (saveErr: any) {
+          logger.warn('Failed to persist error fallback document conversation', {
+            requestId,
+            userId: user.userId,
+            conversationId: conversationId ?? null,
+            error: saveErr.message,
+          });
+        }
         res.status(200).json({
-          message: buildLocalDocumentFallback(text, file.originalname, extractedDocumentText),
-          artifacts: responseArtifacts,
+          message: fallbackMessage,
+          artifacts: responseArtifacts.length > 0 ? responseArtifacts : undefined,
           agent: 'document-fallback',
           provider: 'local',
           model: 'local-document-fallback',

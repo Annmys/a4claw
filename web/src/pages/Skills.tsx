@@ -51,7 +51,7 @@ export default function Skills() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this skill?')) return;
+    if (!confirm('确定删除这个技能吗？')) return;
     try {
       await api.deleteSkill(id);
       await loadSkills();
@@ -85,11 +85,11 @@ export default function Skills() {
             className="flex items-center gap-2 px-4 py-2 bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors font-medium"
           >
             <Plus className="w-4 h-4" />
-            New Skill
+            新建技能
           </button>
         </div>
 
-        {/* Edit/Create Modal */}
+        {/* 编辑/创建弹窗 */}
         {editingSkill && (
           <div className="mb-6 p-5 bg-dark-800 rounded-lg border border-primary-600/50">
             <div className="flex items-center justify-between mb-4">
@@ -104,7 +104,7 @@ export default function Skills() {
                 <input
                   value={editingSkill.name ?? ''}
                   onChange={(e) => setEditingSkill({ ...editingSkill, name: e.target.value })}
-                  placeholder="Morning Briefing"
+                  placeholder="例如：晨报生成"
                   className="w-full p-2.5 rounded bg-dark-900 border border-gray-700 text-white text-sm"
                 />
               </div>
@@ -113,7 +113,7 @@ export default function Skills() {
                 <input
                   value={editingSkill.description ?? ''}
                   onChange={(e) => setEditingSkill({ ...editingSkill, description: e.target.value })}
-                  placeholder="Generate a daily morning briefing"
+                  placeholder="例如：生成每日晨报"
                   className="w-full p-2.5 rounded bg-dark-900 border border-gray-700 text-white text-sm"
                 />
               </div>
@@ -131,7 +131,7 @@ export default function Skills() {
                 <textarea
                   value={editingSkill.prompt ?? ''}
                   onChange={(e) => setEditingSkill({ ...editingSkill, prompt: e.target.value })}
-                  placeholder="You are executing the Morning Briefing skill..."
+                  placeholder="例如：你正在执行晨报技能，请直接输出结果……"
                   rows={5}
                   className="w-full p-2.5 rounded bg-dark-900 border border-gray-700 text-white text-sm font-mono resize-y"
                 />
@@ -143,17 +143,17 @@ export default function Skills() {
                   className="flex items-center gap-2 px-4 py-2 bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 font-medium"
                 >
                   {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                  {isNew ? 'Create' : 'Save'}
+                  {isNew ? '创建' : '保存'}
                 </button>
                 <button onClick={() => setEditingSkill(null)} className="px-4 py-2 bg-dark-900 rounded-lg hover:bg-dark-800 transition-colors text-gray-400">
-                  Cancel
+                  取消
                 </button>
               </div>
             </div>
           </div>
         )}
 
-        {/* Skills List */}
+        {/* 技能列表 */}
         <div className="space-y-3">
           {skills.map(skill => (
             <div key={skill.id} className="p-4 bg-dark-800 rounded-lg border border-gray-800 hover:border-gray-700 transition-colors">
@@ -168,7 +168,7 @@ export default function Skills() {
                     </span>
                   </div>
                   <p className="text-sm text-gray-400 mb-2">{skill.description}</p>
-                  <p className="text-xs text-gray-500 font-mono">Trigger: {skill.trigger}</p>
+                  <p className="text-xs text-gray-500 font-mono">触发器：{skill.trigger}</p>
                 </div>
                 <div className="flex gap-1 ml-4">
                   <button
