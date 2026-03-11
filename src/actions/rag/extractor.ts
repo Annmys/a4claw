@@ -1,5 +1,9 @@
 import { readFile } from 'fs/promises';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
 import logger from '../../utils/logger.js';
+
+const execFileAsync = promisify(execFile);
 
 export async function extractText(filePath: string): Promise<string> {
   const ext = filePath.split('.').pop()?.toLowerCase();
@@ -23,7 +27,14 @@ export async function extractText(filePath: string): Promise<string> {
         return data.text;
       } catch (err: any) {
         logger.warn('pdf-parse failed', { error: err.message });
-        throw new Error('Cannot extract text from PDF. Install pdf-parse.');
+        try {
+          const { stdout } = await execFileAsync('pdftotext', [filePath, '-']);
+          const text = stdout?.trim();
+          if (text) return text;
+        } catch (cliErr: any) {
+          logger.warn('pdftotext fallback failed', { error: cliErr.message });
+        }
+        throw new Error('Cannot extract text from PDF.');
       }
     }
 

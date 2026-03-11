@@ -1,4 +1,4 @@
-import { Queue, Worker, Job } from 'bullmq';
+import { Queue, Worker, Job, type ConnectionOptions } from 'bullmq';
 import { Redis } from 'ioredis';
 import config from '../config.js';
 import logger from '../utils/logger.js';
@@ -28,13 +28,14 @@ const QUEUE_PREFIX = 'clawdagent-agent';
 export class AgentQueueManager {
   private queues: Map<string, Queue> = new Map();
   private workers: Map<string, Worker> = new Map();
-  private connection: Redis;
+  private connection: ConnectionOptions;
+  private redisClient: Redis;
   private handler: AgentHandler | null = null;
   private initialized = false;
   private redisAvailable = false;
 
   constructor() {
-    this.connection = new Redis(config.REDIS_URL, {
+    const redis = new Redis(config.REDIS_URL, {
       maxRetriesPerRequest: null,
       enableReadyCheck: false,
       lazyConnect: true,
@@ -43,13 +44,17 @@ export class AgentQueueManager {
         return Math.min(times * 500, 3000);
       },
     });
+    this.redisClient = redis;
+    // BullMQ accepts an ioredis client at runtime, but its ConnectionOptions type
+    // can resolve through a different bundled ioredis version than our direct import.
+    this.connection = redis as unknown as ConnectionOptions;
     // Suppress unhandled ioredis error events
-    this.connection.on('error', () => { /* handled — Redis unavailable */ });
+    this.redisClient.on('error', () => { /* handled — Redis unavailable */ });
   }
 
   async init(agentIds: string[]): Promise<void> {
     try {
-      await this.connection.connect();
+      await this.redisClient.connect();
       this.redisAvailable = true;
     } catch {
       logger.warn('Redis unavailable — agent queues disabled (in-memory processing only)');
@@ -209,7 +214,7 @@ export class AgentQueueManager {
     }
     this.workers.clear();
     this.queues.clear();
-    this.connection.disconnect();
+    this.redisClient.disconnect();
   }
 
   isReady(): boolean { return this.initialized; }

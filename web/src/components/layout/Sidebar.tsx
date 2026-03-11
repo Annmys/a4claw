@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import {
   MessageSquare, ListTodo, Server, Bot, Clock, Settings,
-  LayoutDashboard, Sparkles, DollarSign, ScrollText, Timer, LineChart, Database, Brain, Network, Terminal, Zap, Monitor, Phone, Users
+  LayoutDashboard, Sparkles, DollarSign, ScrollText, Timer, LineChart, Database, Brain, Network, Terminal, Zap, Monitor, Users, KanbanSquare
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAuthStore } from '../../stores/auth';
@@ -19,9 +19,9 @@ const links: NavItem[] = [
   { to: '/', icon: MessageSquare, label: '聊天' },
   { to: '/openclaw', icon: Terminal, label: 'OpenClaw', adminOnly: true },
   { to: '/tasks', icon: ListTodo, label: '任务' },
+  { to: '/command-center', icon: KanbanSquare, label: '旨意看板' },
   { to: '/skills', icon: Sparkles, label: '技能' },
   { to: '/browser', icon: Monitor, label: '浏览器', adminOnly: true },
-  { to: '/voice-agent', icon: Phone, label: '语音助手', adminOnly: true },
   { to: '/terminal', icon: Terminal, label: 'SSH 终端', adminOnly: true },
   { to: '/servers', icon: Server, label: '服务器' },
   { to: '/agents', icon: Bot, label: '智能体' },

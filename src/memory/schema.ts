@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, integer, boolean, jsonb, uuid, varchar, index, serial, real, doublePrecision } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, integer, boolean, jsonb, uuid, varchar, index, serial, real, doublePrecision, uniqueIndex } from 'drizzle-orm/pg-core';
 
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -298,4 +298,159 @@ export const auditLog = pgTable('audit_log', {
 }, (table) => [
   index('idx_audit_user').on(table.userId),
   index('idx_audit_action').on(table.action),
+]);
+
+export const commandCenterCenters = pgTable('command_center_centers', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  ownerUserId: uuid('owner_user_id').references(() => users.id).notNull(),
+  name: varchar('name', { length: 120 }).notNull(),
+  code: varchar('code', { length: 60 }),
+  description: text('description'),
+  metadata: jsonb('metadata').default({}),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => [
+  index('idx_command_center_centers_owner').on(table.ownerUserId),
+  index('idx_command_center_centers_code').on(table.code),
+]);
+
+export const commandCenterDepartments = pgTable('command_center_departments', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  ownerUserId: uuid('owner_user_id').references(() => users.id).notNull(),
+  centerId: uuid('center_id').references(() => commandCenterCenters.id).notNull(),
+  name: varchar('name', { length: 120 }).notNull(),
+  code: varchar('code', { length: 60 }),
+  description: text('description'),
+  metadata: jsonb('metadata').default({}),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => [
+  index('idx_command_center_departments_owner').on(table.ownerUserId),
+  index('idx_command_center_departments_center').on(table.centerId),
+]);
+
+export const commandCenterMembers = pgTable('command_center_members', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  ownerUserId: uuid('owner_user_id').references(() => users.id).notNull(),
+  centerId: uuid('center_id').references(() => commandCenterCenters.id).notNull(),
+  departmentId: uuid('department_id').references(() => commandCenterDepartments.id),
+  displayName: varchar('display_name', { length: 120 }).notNull(),
+  employeeCode: varchar('employee_code', { length: 60 }),
+  roleTitle: varchar('role_title', { length: 120 }),
+  employmentStatus: varchar('employment_status', { length: 30 }).default('active').notNull(),
+  metadata: jsonb('metadata').default({}),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => [
+  index('idx_command_center_members_owner').on(table.ownerUserId),
+  index('idx_command_center_members_center').on(table.centerId),
+  index('idx_command_center_members_department').on(table.departmentId),
+]);
+
+export const commandCenterUserBindings = pgTable('command_center_user_bindings', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  ownerUserId: uuid('owner_user_id').references(() => users.id).notNull(),
+  webCredentialId: uuid('web_credential_id').references(() => webCredentials.id).notNull(),
+  memberId: uuid('member_id').references(() => commandCenterMembers.id).notNull(),
+  title: varchar('title', { length: 120 }),
+  isPrimary: boolean('is_primary').default(true).notNull(),
+  status: varchar('status', { length: 30 }).default('active').notNull(),
+  metadata: jsonb('metadata').default({}),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => [
+  index('idx_command_center_user_bindings_owner').on(table.ownerUserId),
+  uniqueIndex('uidx_command_center_user_bindings_web_credential').on(table.webCredentialId),
+  uniqueIndex('uidx_command_center_user_bindings_member').on(table.memberId),
+  index('idx_command_center_user_bindings_status').on(table.status),
+]);
+
+export const commandCenterSkillAssignments = pgTable('command_center_skill_assignments', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  ownerUserId: uuid('owner_user_id').references(() => users.id).notNull(),
+  skillId: varchar('skill_id', { length: 160 }).notNull(),
+  skillName: varchar('skill_name', { length: 160 }).notNull(),
+  scopeType: varchar('scope_type', { length: 30 }).notNull(),
+  scopeId: uuid('scope_id').notNull(),
+  proficiency: integer('proficiency').default(80).notNull(),
+  priority: integer('priority').default(100).notNull(),
+  isPrimary: boolean('is_primary').default(false).notNull(),
+  status: varchar('status', { length: 30 }).default('active').notNull(),
+  metadata: jsonb('metadata').default({}),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => [
+  index('idx_command_center_skill_assignments_owner').on(table.ownerUserId),
+  index('idx_command_center_skill_assignments_skill').on(table.skillId),
+  index('idx_command_center_skill_assignments_scope').on(table.scopeType, table.scopeId),
+  index('idx_command_center_skill_assignments_status').on(table.status),
+  uniqueIndex('uidx_command_center_skill_assignments_scope_skill').on(table.scopeType, table.scopeId, table.skillId),
+]);
+
+export const commandCenterTasks = pgTable('command_center_tasks', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  ownerUserId: uuid('owner_user_id').references(() => users.id).notNull(),
+  centerId: uuid('center_id').references(() => commandCenterCenters.id).notNull(),
+  departmentId: uuid('department_id').references(() => commandCenterDepartments.id),
+  assigneeMemberId: uuid('assignee_member_id').references(() => commandCenterMembers.id),
+  title: varchar('title', { length: 200 }).notNull(),
+  description: text('description'),
+  status: varchar('status', { length: 30 }).default('incoming').notNull(),
+  priority: varchar('priority', { length: 20 }).default('medium').notNull(),
+  source: varchar('source', { length: 40 }).default('manual').notNull(),
+  requestedBy: varchar('requested_by', { length: 120 }),
+  dueAt: timestamp('due_at'),
+  startedAt: timestamp('started_at'),
+  completedAt: timestamp('completed_at'),
+  tags: jsonb('tags').default([]),
+  metadata: jsonb('metadata').default({}),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => [
+  index('idx_command_center_tasks_owner').on(table.ownerUserId),
+  index('idx_command_center_tasks_center').on(table.centerId),
+  index('idx_command_center_tasks_department').on(table.departmentId),
+  index('idx_command_center_tasks_assignee').on(table.assigneeMemberId),
+  index('idx_command_center_tasks_status').on(table.status),
+]);
+
+export const commandCenterTaskRuns = pgTable('command_center_task_runs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  ownerUserId: uuid('owner_user_id').references(() => users.id).notNull(),
+  taskId: uuid('task_id').references(() => commandCenterTasks.id).notNull(),
+  skillId: varchar('skill_id', { length: 160 }),
+  skillName: varchar('skill_name', { length: 160 }),
+  executorType: varchar('executor_type', { length: 30 }).default('member').notNull(),
+  executorMemberId: uuid('executor_member_id').references(() => commandCenterMembers.id),
+  status: varchar('status', { length: 30 }).default('pending').notNull(),
+  inputSummary: text('input_summary'),
+  outputSummary: text('output_summary'),
+  artifacts: jsonb('artifacts').default([]).notNull(),
+  metadata: jsonb('metadata').default({}),
+  startedAt: timestamp('started_at'),
+  completedAt: timestamp('completed_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => [
+  index('idx_command_center_task_runs_owner').on(table.ownerUserId),
+  index('idx_command_center_task_runs_task').on(table.taskId),
+  index('idx_command_center_task_runs_skill').on(table.skillId),
+  index('idx_command_center_task_runs_executor').on(table.executorMemberId),
+  index('idx_command_center_task_runs_status').on(table.status),
+]);
+
+export const commandCenterTaskEvents = pgTable('command_center_task_events', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  ownerUserId: uuid('owner_user_id').references(() => users.id).notNull(),
+  taskId: uuid('task_id').references(() => commandCenterTasks.id).notNull(),
+  eventType: varchar('event_type', { length: 40 }).notNull(),
+  actorType: varchar('actor_type', { length: 30 }).default('user').notNull(),
+  actorId: varchar('actor_id', { length: 120 }),
+  content: text('content').notNull(),
+  metadata: jsonb('metadata').default({}),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => [
+  index('idx_command_center_task_events_owner').on(table.ownerUserId),
+  index('idx_command_center_task_events_task').on(table.taskId),
+  index('idx_command_center_task_events_type').on(table.eventType),
 ]);

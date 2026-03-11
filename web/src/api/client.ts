@@ -18,6 +18,118 @@ export interface WebUser {
   role: 'admin' | 'user';
   lastLogin: string | null;
   createdAt: string;
+  binding: CommandCenterUserBinding | null;
+}
+
+export interface CommandCenterCenter {
+  id: string;
+  ownerUserId: string;
+  name: string;
+  code: string | null;
+  description: string | null;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CommandCenterDepartment {
+  id: string;
+  ownerUserId: string;
+  centerId: string;
+  name: string;
+  code: string | null;
+  description: string | null;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CommandCenterMember {
+  id: string;
+  ownerUserId: string;
+  centerId: string;
+  departmentId: string | null;
+  displayName: string;
+  employeeCode: string | null;
+  roleTitle: string | null;
+  employmentStatus: string;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CommandCenterUserBinding {
+  id: string;
+  memberId: string;
+  memberName: string;
+  centerId: string;
+  centerName: string;
+  departmentId: string | null;
+  departmentName: string | null;
+  title: string | null;
+  status: string;
+  isPrimary: boolean;
+  updatedAt: string;
+}
+
+export interface CommandCenterOrgOptions {
+  centers: CommandCenterCenter[];
+  departments: CommandCenterDepartment[];
+  members: CommandCenterMember[];
+}
+
+export interface CommandCenterTaskEvent {
+  id: string;
+  ownerUserId: string;
+  taskId: string;
+  eventType: string;
+  actorType: string;
+  actorId: string | null;
+  content: string;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface CommandCenterTask {
+  id: string;
+  ownerUserId: string;
+  centerId: string;
+  departmentId: string | null;
+  assigneeMemberId: string | null;
+  title: string;
+  description: string | null;
+  status: 'incoming' | 'triage' | 'assigned' | 'in_progress' | 'review' | 'done' | 'blocked';
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  source: string;
+  requestedBy: string | null;
+  dueAt: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  tags: string[];
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+  latestEvent?: CommandCenterTaskEvent | null;
+}
+
+export interface CommandCenterOverview {
+  centers: CommandCenterCenter[];
+  departments: CommandCenterDepartment[];
+  members: CommandCenterMember[];
+  tasks: CommandCenterTask[];
+  recentEvents: CommandCenterTaskEvent[];
+  summary: {
+    centers: number;
+    departments: number;
+    members: number;
+    tasks: number;
+    byStatus: Record<CommandCenterTask['status'], number>;
+  };
+}
+
+export interface CommandCenterTaskDetail {
+  task: CommandCenterTask;
+  events: CommandCenterTaskEvent[];
 }
 
 export async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -76,14 +188,43 @@ export const api = {
 
   // User Management (Admin)
   getUsers: () => apiRequest<{ users: WebUser[] }>('/users'),
+  getUserOrgOptions: () => apiRequest<CommandCenterOrgOptions>('/users/org-options'),
   createUser: (data: { username: string; password: string; role?: 'admin' | 'user' }) =>
     apiRequest<{ user: WebUser }>('/users', { method: 'POST', body: JSON.stringify(data) }),
   updateUserRole: (id: string, role: 'admin' | 'user') =>
     apiRequest<{ success: boolean; user: WebUser }>(`/users/${id}/role`, { method: 'PUT', body: JSON.stringify({ role }) }),
   resetUserPassword: (id: string, password: string) =>
     apiRequest<{ success: boolean }>(`/users/${id}/password`, { method: 'PUT', body: JSON.stringify({ password }) }),
+  updateUserBinding: (id: string, data: { memberId?: string | null; title?: string }) =>
+    apiRequest<{ success: boolean; user: WebUser }>(`/users/${id}/binding`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteUser: (id: string) =>
     apiRequest<{ success: boolean }>(`/users/${id}`, { method: 'DELETE' }),
+
+  // Command Center
+  commandCenterOverview: () => apiRequest<CommandCenterOverview>('/command-center/overview'),
+  commandCenterCreateCenter: (data: { name: string; code?: string; description?: string }) =>
+    apiRequest<{ center: CommandCenterCenter }>('/command-center/centers', { method: 'POST', body: JSON.stringify(data) }),
+  commandCenterCreateDepartment: (data: { centerId: string; name: string; code?: string; description?: string }) =>
+    apiRequest<{ department: CommandCenterDepartment }>('/command-center/departments', { method: 'POST', body: JSON.stringify(data) }),
+  commandCenterCreateMember: (data: { centerId: string; departmentId?: string | null; displayName: string; employeeCode?: string; roleTitle?: string }) =>
+    apiRequest<{ member: CommandCenterMember }>('/command-center/members', { method: 'POST', body: JSON.stringify(data) }),
+  commandCenterCreateTask: (data: {
+    centerId: string;
+    departmentId?: string | null;
+    assigneeMemberId?: string | null;
+    title: string;
+    description?: string;
+    status?: CommandCenterTask['status'];
+    priority?: CommandCenterTask['priority'];
+    dueAt?: string | null;
+    requestedBy?: string;
+    tags?: string[];
+  }) => apiRequest<{ task: CommandCenterTask }>('/command-center/tasks', { method: 'POST', body: JSON.stringify(data) }),
+  commandCenterTaskDetail: (id: string) => apiRequest<CommandCenterTaskDetail>(`/command-center/tasks/${id}`),
+  commandCenterUpdateTaskStatus: (id: string, status: CommandCenterTask['status'], note?: string) =>
+    apiRequest<{ task: CommandCenterTask }>(`/command-center/tasks/${id}/status`, { method: 'POST', body: JSON.stringify({ status, note }) }),
+  commandCenterAddTaskEvent: (id: string, content: string, eventType = 'note') =>
+    apiRequest<{ event: CommandCenterTaskEvent }>(`/command-center/tasks/${id}/events`, { method: 'POST', body: JSON.stringify({ content, eventType }) }),
 
   // Chat
   chat: (text: string, conversationId?: string, responseMode?: string, model?: string) => apiRequest<{ message: string; thinking?: string; artifacts?: ChatArtifact[]; agent: string; provider?: string; model?: string; tokens?: { input: number; output: number }; elapsed?: number }>('/chat', { method: 'POST', body: JSON.stringify({ text, conversationId, responseMode, model }) }),
@@ -196,6 +337,19 @@ export const api = {
   // OpenClaw (direct chat)
   openclawChat: (text: string) => apiRequest<{ message: string; success: boolean }>('/openclaw/chat', { method: 'POST', body: JSON.stringify({ text }) }),
   openclawStatus: () => apiRequest<{ status: string; connected: boolean; data?: any; error?: string; scope?: { sessionKey: string; agentId: string } }>('/openclaw/status'),
+  openclawHistory: (limit = 100) => apiRequest<{
+    success: boolean;
+    scope: { sessionKey: string; agentId: string };
+    sessionKey: string;
+    sessionId: string | null;
+    messages: Array<{
+      role: 'user' | 'assistant' | 'system';
+      content?: Array<{ type?: string; text?: string }>;
+      timestamp?: number;
+      provider?: string;
+      model?: string;
+    }>;
+  }>(`/openclaw/history?limit=${limit}`),
   openclawContext: () => apiRequest<{
     userId: string;
     role: 'admin' | 'user';

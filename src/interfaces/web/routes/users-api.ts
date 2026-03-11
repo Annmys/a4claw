@@ -4,6 +4,14 @@ import { hashPassword } from '../../../security/auth.js';
 import { audit } from '../../../security/audit-log.js';
 import { getDb } from '../../../memory/database.js';
 import { webCredentials } from '../../../memory/schema.js';
+import { findOrCreateUser } from '../../../memory/repositories/users.js';
+import {
+  CommandCenterBindingError,
+  listCommandCenterOrgOptions,
+  listCommandCenterUserBindings,
+  removeCommandCenterUserBinding,
+  upsertCommandCenterUserBinding,
+} from '../../../memory/repositories/command-center.js';
 import logger from '../../../utils/logger.js';
 
 type UserRole = 'admin' | 'user';
@@ -25,19 +33,37 @@ function isStrongPassword(password: string): { valid: boolean; reason?: string }
   return { valid: true };
 }
 
+async function resolveOwnerUserId(jwtUserId: string): Promise<string> {
+  const user = await findOrCreateUser(jwtUserId, 'web', jwtUserId);
+  return user.masterUserId ?? user.id;
+}
+
 function toSafeUser(user: {
   id: string;
   username: string;
   role: string;
   lastLogin: Date | null;
   createdAt: Date;
-}) {
+}, binding: {
+  id: string;
+  memberId: string;
+  memberName: string;
+  centerId: string;
+  centerName: string;
+  departmentId: string | null;
+  departmentName: string | null;
+  title: string | null;
+  status: string;
+  isPrimary: boolean;
+  updatedAt: Date;
+} | null = null) {
   return {
     id: user.id,
     username: user.username,
     role: user.role,
     lastLogin: user.lastLogin,
     createdAt: user.createdAt,
+    binding,
   };
 }
 
@@ -53,22 +79,51 @@ async function countAdmins(): Promise<number> {
 export function setupUsersRoutes(): Router {
   const router = Router();
 
-  // GET /api/users — list users (admin only)
+  router.get('/org-options', async (req: Request, res: Response) => {
+    const actor = requireAdmin(req, res);
+    if (!actor) return;
+
+    try {
+      const ownerUserId = await resolveOwnerUserId(actor.userId);
+      const options = await listCommandCenterOrgOptions(ownerUserId);
+      res.json(options);
+    } catch (err: any) {
+      logger.error('Failed to load user org options', { error: err.message });
+      res.status(500).json({ error: 'Failed to load org options' });
+    }
+  });
+
   router.get('/', async (req: Request, res: Response) => {
     const actor = requireAdmin(req, res);
     if (!actor) return;
 
     try {
       const db = getDb();
-      const users = await db.select().from(webCredentials).orderBy(desc(webCredentials.createdAt));
-      res.json({ users: users.map(toSafeUser) });
+      const ownerUserId = await resolveOwnerUserId(actor.userId);
+      const [users, bindings] = await Promise.all([
+        db.select().from(webCredentials).orderBy(desc(webCredentials.createdAt)),
+        listCommandCenterUserBindings(ownerUserId),
+      ]);
+      const bindingMap = new Map(bindings.map((binding) => [binding.webCredentialId, {
+        id: binding.id,
+        memberId: binding.memberId,
+        memberName: binding.memberName,
+        centerId: binding.centerId,
+        centerName: binding.centerName,
+        departmentId: binding.departmentId,
+        departmentName: binding.departmentName,
+        title: binding.title ?? binding.memberRoleTitle ?? null,
+        status: binding.status,
+        isPrimary: binding.isPrimary,
+        updatedAt: binding.updatedAt,
+      }]));
+      res.json({ users: users.map((user) => toSafeUser(user, bindingMap.get(user.id) ?? null)) });
     } catch (err: any) {
       logger.error('Failed to list users', { error: err.message });
       res.status(500).json({ error: 'Failed to list users' });
     }
   });
 
-  // POST /api/users — create user (admin only)
   router.post('/', async (req: Request, res: Response) => {
     const actor = requireAdmin(req, res);
     if (!actor) return;
@@ -126,7 +181,6 @@ export function setupUsersRoutes(): Router {
     }
   });
 
-  // PUT /api/users/:id/role — update user role (admin only)
   router.put('/:id/role', async (req: Request, res: Response) => {
     const actor = requireAdmin(req, res);
     if (!actor) return;
@@ -175,7 +229,6 @@ export function setupUsersRoutes(): Router {
     }
   });
 
-  // PUT /api/users/:id/password — reset password (admin only)
   router.put('/:id/password', async (req: Request, res: Response) => {
     const actor = requireAdmin(req, res);
     if (!actor) return;
@@ -215,7 +268,71 @@ export function setupUsersRoutes(): Router {
     }
   });
 
-  // DELETE /api/users/:id — delete user (admin only)
+  router.put('/:id/binding', async (req: Request, res: Response) => {
+    const actor = requireAdmin(req, res);
+    if (!actor) return;
+
+    try {
+      const targetId = req.params.id as string;
+      const memberId = typeof req.body?.memberId === 'string' ? req.body.memberId.trim() : '';
+      const title = typeof req.body?.title === 'string' ? req.body.title.trim() : undefined;
+      const db = getDb();
+      const [target] = await db.select().from(webCredentials).where(eq(webCredentials.id, targetId)).limit(1);
+      if (!target) {
+        res.status(404).json({ error: 'User not found' });
+        return;
+      }
+
+      const ownerUserId = await resolveOwnerUserId(actor.userId);
+
+      if (!memberId) {
+        await removeCommandCenterUserBinding(ownerUserId, target.id);
+        await audit(actor.userId, 'web.user.binding_cleared', { targetUsername: target.username }, 'web');
+      } else {
+        await upsertCommandCenterUserBinding(ownerUserId, {
+          webCredentialId: target.id,
+          memberId,
+          title,
+          metadata: {
+            boundBy: actor.userId,
+          },
+        });
+        await audit(actor.userId, 'web.user.bound_to_member', {
+          targetUsername: target.username,
+          memberId,
+        }, 'web');
+      }
+
+      const [binding] = await listCommandCenterUserBindings(ownerUserId)
+        .then((items) => items.filter((item) => item.webCredentialId === target.id).slice(0, 1));
+
+      res.json({
+        success: true,
+        user: toSafeUser(target, binding ? {
+          id: binding.id,
+          memberId: binding.memberId,
+          memberName: binding.memberName,
+          centerId: binding.centerId,
+          centerName: binding.centerName,
+          departmentId: binding.departmentId,
+          departmentName: binding.departmentName,
+          title: binding.title ?? binding.memberRoleTitle ?? null,
+          status: binding.status,
+          isPrimary: binding.isPrimary,
+          updatedAt: binding.updatedAt,
+        } : null),
+      });
+    } catch (err: any) {
+      if (err instanceof CommandCenterBindingError) {
+        const status = err.code === 'member_already_bound' ? 409 : 404;
+        res.status(status).json({ error: err.message });
+        return;
+      }
+      logger.error('Failed to update user binding', { error: err.message });
+      res.status(500).json({ error: 'Failed to update user binding' });
+    }
+  });
+
   router.delete('/:id', async (req: Request, res: Response) => {
     const actor = requireAdmin(req, res);
     if (!actor) return;

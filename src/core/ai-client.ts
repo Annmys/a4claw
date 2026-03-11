@@ -75,6 +75,24 @@ interface ProviderClient {
   chat(request: AIRequest): Promise<AIResponse>;
 }
 
+function normalizeOpenAIModelId(model?: string): string {
+  const fallback = (config.MODEL_OVERRIDE || config.AI_MODEL || 'gpt-4o').replace(/^openai\//, '');
+  if (!model || model === 'undefined') return fallback;
+
+  const normalized = model.replace(/^openai\//, '');
+  const obviouslyForeignModel =
+    normalized.includes('/') ||
+    normalized.startsWith('claude-') ||
+    normalized.startsWith('anthropic-') ||
+    normalized.startsWith('meta-') ||
+    normalized.startsWith('google-') ||
+    normalized.startsWith('qwen-') ||
+    normalized.startsWith('deepseek-') ||
+    normalized.startsWith('z-ai-');
+
+  return obviouslyForeignModel ? fallback : normalized;
+}
+
 // ── Anthropic Provider ──────────────────────────────────────────────
 class AnthropicProvider implements ProviderClient {
   name = 'anthropic';
@@ -262,7 +280,7 @@ class OpenAIProvider implements ProviderClient {
   }
 
   async chat(request: AIRequest): Promise<AIResponse> {
-    const model = (request.model ?? config.MODEL_OVERRIDE ?? config.AI_MODEL ?? 'gpt-4o').replace(/^openai\//, '');
+    const model = normalizeOpenAIModelId(request.model);
     const messages = [
       { role: 'system' as const, content: request.systemPrompt },
       ...request.messages.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
@@ -1096,11 +1114,7 @@ export class AIClient {
           }
         }
         if (providerName === 'openai') {
-          if (!modelStr || modelStr === 'undefined') {
-            requestForProvider = { ...sanitizedRequest, model: (config.MODEL_OVERRIDE || config.AI_MODEL || 'gpt-4o').replace(/^openai\//, '') };
-          } else if (modelStr.startsWith('openai/')) {
-            requestForProvider = { ...sanitizedRequest, model: modelStr.replace(/^openai\//, '') };
-          }
+          requestForProvider = { ...sanitizedRequest, model: normalizeOpenAIModelId(modelStr) };
         }
 
         try {

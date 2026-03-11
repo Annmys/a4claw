@@ -70,6 +70,13 @@ interface ChatState {
 
 const STORAGE_KEY_PREFIX = 'a4claw-conversations';
 
+function generateId(): string {
+  const randomUUID = globalThis.crypto?.randomUUID?.bind(globalThis.crypto);
+  if (randomUUID) return randomUUID();
+  const rand = Math.random().toString(36).slice(2, 10);
+  return `id_${Date.now()}_${rand}`;
+}
+
 function decodeJwtUserId(token: string | null): string | null {
   if (!token) return null;
   const parts = token.split('.');
@@ -125,7 +132,7 @@ function generateTitle(text: string): string {
 
 function createConversation(): Conversation {
   return {
-    id: crypto.randomUUID(),
+    id: generateId(),
     title: 'New Chat',
     messages: [],
     createdAt: new Date(),
@@ -138,7 +145,7 @@ function addMessageToConversation(
   conversationId: string,
   msg: Omit<Message, 'id' | 'timestamp'>,
 ): Conversation[] {
-  const newMessage: Message = { ...msg, id: crypto.randomUUID(), timestamp: new Date() };
+  const newMessage: Message = { ...msg, id: generateId(), timestamp: new Date() };
   return conversations.map(c => {
     if (c.id !== conversationId) return c;
     const messages = [...c.messages, newMessage];

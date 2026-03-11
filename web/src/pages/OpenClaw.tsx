@@ -25,6 +25,7 @@ export default function OpenClaw() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(true);
   const [elapsed, setElapsed] = useState(0);
   const [connected, setConnected] = useState<boolean | null>(null);
   const [connectError, setConnectError] = useState('');
@@ -41,13 +42,40 @@ export default function OpenClaw() {
 
   // Check OpenClaw status on mount
   useEffect(() => {
-    checkStatus();
+    void refreshOpenClaw();
   }, []);
 
   // Auto-scroll
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  const mapHistoryToMessages = (items: Array<{
+    role: 'user' | 'assistant' | 'system';
+    content?: Array<{ type?: string; text?: string }>;
+    timestamp?: number;
+    provider?: string;
+    model?: string;
+  }>): Message[] => {
+    return items.reduce<Message[]>((acc, item, index) => {
+        const parts = Array.isArray(item.content)
+          ? item.content
+              .filter((part) => part?.type === 'text' && typeof part.text === 'string')
+              .map((part) => part.text?.trim())
+              .filter(Boolean)
+          : [];
+        const content = parts.join('\n').trim();
+        if (!content) return acc;
+        acc.push({
+          id: `history-${item.timestamp ?? Date.now()}-${index}`,
+          role: item.role,
+          content,
+          timestamp: new Date(item.timestamp ?? Date.now()),
+          raw: item,
+        });
+        return acc;
+      }, []);
+  };
 
   const checkStatus = async () => {
     try {
@@ -70,6 +98,23 @@ export default function OpenClaw() {
       setConnectError('状态检查失败，请确认后端服务已启动');
     }
   };
+
+  const loadHistory = useCallback(async () => {
+    setHistoryLoading(true);
+    try {
+      const res = await api.openclawHistory(100);
+      setMessages(mapHistoryToMessages(res.messages));
+    } catch (err: any) {
+      addMessage('system', `历史记录加载失败：${err.message}`);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, []);
+
+  const refreshOpenClaw = useCallback(async () => {
+    await checkStatus();
+    await loadHistory();
+  }, [loadHistory]);
 
   const addMessage = (role: Message['role'], content: string, raw?: any) => {
     setMessages(prev => [...prev, {
@@ -138,9 +183,9 @@ export default function OpenClaw() {
 
         <div className="flex items-center gap-1">
           <button
-            onClick={checkStatus}
+            onClick={() => void refreshOpenClaw()}
             className="p-2 text-gray-400 hover:text-orange-400 hover:bg-dark-800 rounded-lg transition-colors"
-            title="检查状态"
+            title="刷新状态和历史"
           >
             <RefreshCw className="w-4 h-4" />
           </button>
@@ -148,7 +193,7 @@ export default function OpenClaw() {
             onClick={clearChat}
             disabled={messages.length === 0}
             className="p-2 text-gray-400 hover:text-red-400 hover:bg-dark-800 rounded-lg transition-colors disabled:opacity-30"
-            title="清空会话"
+            title="清空当前显示（不删除后端历史）"
           >
             <Trash2 className="w-4 h-4" />
           </button>
@@ -175,7 +220,16 @@ export default function OpenClaw() {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
-        {messages.length === 0 && (
+        {historyLoading && messages.length === 0 && (
+          <div className="flex items-center justify-center h-full text-gray-500">
+            <div className="flex items-center gap-2 text-sm">
+              <Loader2 className="w-4 h-4 animate-spin text-orange-400" />
+              <span>正在加载历史会话...</span>
+            </div>
+          </div>
+        )}
+
+        {!historyLoading && messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-gray-500 select-none">
             <div className="w-20 h-20 mb-6 rounded-2xl bg-dark-800 border border-gray-800 flex items-center justify-center">
               <Terminal className="w-10 h-10 text-orange-400 opacity-60" />
@@ -278,7 +332,7 @@ export default function OpenClaw() {
           </button>
         </div>
         <p className="text-center text-[11px] text-gray-600 mt-2">
-          直连 OpenClaw · 回车发送 · Shift+回车换行
+          直连 OpenClaw · 自动恢复同一作用域历史 · 回车发送 · Shift+回车换行
         </p>
       </div>
     </div>

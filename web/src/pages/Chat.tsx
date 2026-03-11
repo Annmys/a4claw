@@ -20,6 +20,27 @@ const RESPONSE_MODES = [
   { id: 'deep' as const, label: 'מעמיק', labelEn: '深度', icon: Brain, color: 'text-purple-400', desc: 'ניתוח מלא' },
 ];
 
+type InteractionMode = 'chat' | 'task';
+
+function buildOutboundText(text: string, mode: InteractionMode, hasFile: boolean) {
+  if (mode !== 'task') return text;
+
+  const cleanText = text.trim();
+  const taskInstruction = [
+    '请按任务模式处理这次请求。',
+    '先明确目标，再拆分执行步骤，再给出结果与下一步建议。',
+    '如果信息不足，请主动指出缺口并给出最小可执行方案。',
+  ].join(' ');
+
+  if (!cleanText) {
+    return hasFile
+      ? `${taskInstruction}\n\n请围绕当前上传的文件直接开始处理。`
+      : `${taskInstruction}\n\n请根据当前上下文自动开始执行。`;
+  }
+
+  return `${taskInstruction}\n\n用户请求：\n${cleanText}`;
+}
+
 /** Render message content — detects inline images and browser session markers */
 function renderMessageContent(content: string) {
   // Strip [session:UUID] markers and track if browser session is active
@@ -297,7 +318,7 @@ export default function Chat() {
   const [wsConnected, setWsConnected] = useState(false);
   const [, setWsError] = useState<string | null>(null);
   const [expandedThinking, setExpandedThinking] = useState<Set<string>>(new Set());
-  const [showConversations, setShowConversations] = useState(true);
+  const [showConversations, setShowConversations] = useState(false);
   const [contextMenu, setContextMenu] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState<string | null>(null);
   const [editTitleValue, setEditTitleValue] = useState('');
@@ -311,6 +332,9 @@ export default function Chat() {
   );
   const [responseMode, setResponseMode] = useState<'auto' | 'quick' | 'deep'>(() =>
     (localStorage.getItem('a4claw-response-mode') as 'auto' | 'quick' | 'deep') || 'auto'
+  );
+  const [interactionMode, setInteractionMode] = useState<InteractionMode>(() =>
+    (localStorage.getItem('a4claw-interaction-mode') as InteractionMode) || 'task'
   );
   const [showModeMenu, setShowModeMenu] = useState(false);
   const [selectedModel, setSelectedModel] = useState<string>(() =>
@@ -343,6 +367,8 @@ export default function Chat() {
   const pendingConvRef = useRef<string | null>(null);
   const pendingWsRequestRef = useRef<PendingWsRequest | null>(null);
   const wsFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wsReconnectAtRef = useRef<number[]>([]);
+  const wsDegradedUntilRef = useRef<number>(0);
   const suppressedRecoveredRef = useRef<{ conversationId: string; text: string; expiresAt: number } | null>(null);
   // Ref to capture progress log for saving into final message
   const progressLogRef = useRef<Array<{ type: string; message: string; agent?: string; tool?: string; time: number }>>([]);
@@ -396,6 +422,12 @@ export default function Chat() {
     ws.onStatus((connected) => {
       setWsConnected(connected);
       if (connected) {
+        const now = Date.now();
+        wsReconnectAtRef.current = [...wsReconnectAtRef.current.filter(ts => now - ts < 10000), now];
+        if (wsReconnectAtRef.current.length >= 4) {
+          // Too many reconnects in a short window: route future sends through REST temporarily.
+          wsDegradedUntilRef.current = now + 60000;
+        }
         // Keep fallback timer alive while a request is still pending.
         // In flaky LAN conditions, a quick reconnect can otherwise cancel the only recovery path.
         if (!pendingWsRequestRef.current) clearWsFallbackTimer();
@@ -455,6 +487,8 @@ export default function Chat() {
 
       // Use response conversationId first, then pending ref, then current active conversation as final fallback.
       const targetConv = data.conversationId || pendingConvRef.current || activeConversationRef.current;
+      wsDegradedUntilRef.current = 0;
+      wsReconnectAtRef.current = [];
       pendingConvRef.current = null;
       pendingWsRequestRef.current = null;
       clearWsFallbackTimer();
@@ -499,6 +533,11 @@ export default function Chat() {
     });
 
     ws.on('progress', (data: { type: string; message: string; agent?: string; tool?: string }) => {
+      // Any WS progress means send path is alive; stop REST fallback to avoid duplicate requests.
+      if (pendingWsRequestRef.current && wsFallbackTimerRef.current) {
+        clearTimeout(wsFallbackTimerRef.current);
+        wsFallbackTimerRef.current = null;
+      }
       const entry = { ...data, time: Date.now() };
       progressLogRef.current = [...progressLogRef.current, entry];
       setProgressLog(prev => [...prev, entry]);
@@ -516,10 +555,18 @@ export default function Chat() {
 
     // ── Streaming text events ──
     ws.on('stream_start', () => {
+      if (pendingWsRequestRef.current && wsFallbackTimerRef.current) {
+        clearTimeout(wsFallbackTimerRef.current);
+        wsFallbackTimerRef.current = null;
+      }
       setStreamingText('');
     });
 
     ws.on('text_chunk', (data: { text: string }) => {
+      if (pendingWsRequestRef.current && wsFallbackTimerRef.current) {
+        clearTimeout(wsFallbackTimerRef.current);
+        wsFallbackTimerRef.current = null;
+      }
       setStreamingText(prev => prev + data.text);
     });
 
@@ -602,6 +649,11 @@ export default function Chat() {
     const text = input.trim();
     const file = attachedFile;
     if (!text && !file) return;
+    const outboundText = buildOutboundText(text, interactionMode, Boolean(file));
+    const effectiveResponseMode =
+      interactionMode === 'task' && responseMode === 'auto'
+        ? 'deep'
+        : responseMode;
 
     // Backend processes one request at a time.
     // If loading flag is stale (no pending request refs), auto-clear it instead of silently blocking send.
@@ -636,8 +688,8 @@ export default function Chat() {
     if (inputRef.current) inputRef.current.style.height = 'auto';
 
     const displayText = file
-      ? `${text}${text ? '\n' : ''}[${file.name}]`
-      : text;
+      ? `${interactionMode === 'task' ? '【任务模式】\n' : ''}${text}${text ? '\n' : ''}[${file.name}]`
+      : `${interactionMode === 'task' ? '【任务模式】\n' : ''}${text}`;
     addMessageTo(convId, { role: 'user', content: displayText });
     pendingConvRef.current = convId;
     setConversationLoading(convId);
@@ -645,7 +697,13 @@ export default function Chat() {
     // If file attached, must use REST API (WebSocket doesn't support binary)
     if (file) {
       try {
-        const res = await api.chatWithFile(text, file, convId, responseMode === 'auto' ? undefined : responseMode, selectedModel === 'auto' ? undefined : selectedModel);
+        const res = await api.chatWithFile(
+          outboundText,
+          file,
+          convId,
+          effectiveResponseMode === 'auto' ? undefined : effectiveResponseMode,
+          selectedModel === 'auto' ? undefined : selectedModel,
+        );
         addMessageTo(convId, { role: 'assistant', content: res.message, thinking: res.thinking, artifacts: res.artifacts, agent: res.agent, provider: res.provider, model: res.model, tokens: res.tokens ? { ...res.tokens, total: res.tokens.input + res.tokens.output } : undefined, elapsed: res.elapsed });
       } catch (err: any) {
         addMessageTo(convId, { role: 'assistant', content: `Error: ${err.message}` });
@@ -661,12 +719,13 @@ export default function Chat() {
     }
 
     // Try WebSocket first
-    if (wsRef.current && wsConnected) {
-      const modeArg = responseMode === 'auto' ? undefined : responseMode;
+    const wsDegraded = Date.now() < wsDegradedUntilRef.current;
+    if (wsRef.current && wsConnected && !wsDegraded) {
+      const modeArg = effectiveResponseMode === 'auto' ? undefined : effectiveResponseMode;
       const modelArg = selectedModel === 'auto' ? undefined : selectedModel;
       try {
-        pendingWsRequestRef.current = { text, conversationId: convId, responseMode: modeArg, model: modelArg };
-        wsRef.current.send(text, convId, modeArg, modelArg);
+        pendingWsRequestRef.current = { text: outboundText, conversationId: convId, responseMode: modeArg, model: modelArg };
+        wsRef.current.send(outboundText, convId, modeArg, modelArg);
         if (wsFallbackTimerRef.current) {
           clearTimeout(wsFallbackTimerRef.current);
           wsFallbackTimerRef.current = null;
@@ -709,7 +768,7 @@ export default function Chat() {
             setStreamingText('');
             setConversationLoading(null);
           }
-        }, 12000);
+        }, 4000);
         return; // Response will arrive via WS event handler
       } catch {
         pendingWsRequestRef.current = null;
@@ -723,7 +782,12 @@ export default function Chat() {
 
     // REST API fallback
     try {
-      const res = await api.chat(text, convId, responseMode === 'auto' ? undefined : responseMode, selectedModel === 'auto' ? undefined : selectedModel);
+      const res = await api.chat(
+        outboundText,
+        convId,
+        effectiveResponseMode === 'auto' ? undefined : effectiveResponseMode,
+        selectedModel === 'auto' ? undefined : selectedModel,
+      );
       addMessageTo(convId, { role: 'assistant', content: res.message, thinking: res.thinking, artifacts: res.artifacts, agent: res.agent, provider: res.provider, model: res.model, tokens: res.tokens ? { ...res.tokens, total: res.tokens.input + res.tokens.output } : undefined, elapsed: res.elapsed });
     } catch (err: any) {
       addMessageTo(convId, { role: 'assistant', content: `Error: ${err.message}` });
@@ -735,7 +799,7 @@ export default function Chat() {
       wsFallbackTimerRef.current = null;
     }
     setConversationLoading(null);
-  }, [input, attachedFile, loadingConversationId, wsConnected, activeConversationId, conversations, addMessageTo, setConversationLoading, newConversation, responseMode, selectedModel]);
+  }, [input, attachedFile, interactionMode, loadingConversationId, wsConnected, activeConversationId, conversations, addMessageTo, setConversationLoading, newConversation, responseMode, selectedModel]);
 
   // Global fail-safe: if UI stays locked for too long, auto-unlock and show a clear error.
   useEffect(() => {
@@ -1889,6 +1953,39 @@ export default function Chat() {
                   })}
                 </div>
               )}
+            </div>
+
+            <div className="flex items-center rounded-xl border border-gray-700 bg-dark-800/80 p-1 shrink-0">
+              <button
+                onClick={() => {
+                  setInteractionMode('chat');
+                  localStorage.setItem('a4claw-interaction-mode', 'chat');
+                }}
+                className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs transition-colors ${
+                  interactionMode === 'chat'
+                    ? 'bg-dark-700 text-white'
+                    : 'text-gray-400 hover:text-gray-200'
+                }`}
+                title="聊天模式"
+              >
+                <MessageSquare className="w-4 h-4" />
+                <span>聊天</span>
+              </button>
+              <button
+                onClick={() => {
+                  setInteractionMode('task');
+                  localStorage.setItem('a4claw-interaction-mode', 'task');
+                }}
+                className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs transition-colors ${
+                  interactionMode === 'task'
+                    ? 'bg-primary-600 text-white'
+                    : 'text-gray-400 hover:text-gray-200'
+                }`}
+                title="任务模式"
+              >
+                <Wrench className="w-4 h-4" />
+                <span>任务</span>
+              </button>
             </div>
 
             <textarea

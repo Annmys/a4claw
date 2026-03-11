@@ -5,6 +5,7 @@ import Login from './pages/Login';
 import Chat from './pages/Chat';
 import Dashboard from './pages/Dashboard';
 import Tasks from './pages/Tasks';
+import CommandCenter from './pages/CommandCenter';
 import Skills from './pages/Skills';
 import Servers from './pages/Servers';
 import Agents from './pages/Agents';
@@ -21,7 +22,6 @@ import Graph from './pages/Graph';
 import OpenClaw from './pages/OpenClaw';
 import Evolution from './pages/Evolution';
 import BrowserView from './pages/BrowserView';
-import VoiceAgent from './pages/VoiceAgent';
 import TerminalPage from './pages/Terminal';
 import ToastContainer, { pushToast } from './components/shared/ToastContainer';
 import { useAuthStore } from './stores/auth';
@@ -139,9 +139,9 @@ export default function App() {
           <Route path="openclaw" element={<AdminRoute><OpenClaw /></AdminRoute>} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="tasks" element={<Tasks />} />
+          <Route path="command-center" element={<CommandCenter />} />
           <Route path="skills" element={<Skills />} />
           <Route path="browser" element={<AdminRoute><BrowserView /></AdminRoute>} />
-          <Route path="voice-agent" element={<AdminRoute><VoiceAgent /></AdminRoute>} />
           <Route path="terminal" element={<AdminRoute><TerminalPage /></AdminRoute>} />
           <Route path="servers" element={<Servers />} />
           <Route path="agents" element={<Agents />} />

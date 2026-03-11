@@ -200,6 +200,11 @@ function setupMessageHandler(ws: WebSocket, engine: Engine, user: { userId: stri
 
       const { text, conversationId, responseMode, model } = msg;
       if (!text) return;
+      logger.info('WebSocket chat message received', {
+        userId: user.userId,
+        textLength: typeof text === 'string' ? text.length : 0,
+        conversationId: conversationId ?? null,
+      });
 
       // ── Direct command execution: !command ──────────────────────
       // Bypass AI entirely — run bash directly for instant results

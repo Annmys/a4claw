@@ -29,7 +29,9 @@ function buildScope(user: AuthUser): OpenClawScope {
   const safeUserId = toSafeScopeId(user.userId);
   return {
     sessionKey: `web:${safeUserId}`,
-    agentId: `web_${safeUserId}`,
+    // Reuse the default agent and isolate users by sessionKey.
+    // OpenClaw agent ids must exist ahead of time; web-specific ids do not.
+    agentId: 'main',
   };
 }
 
@@ -84,6 +86,13 @@ function extractResponseText(rawOutput: string | undefined): string {
 function extractSessions(payload: any): any[] {
   if (Array.isArray(payload)) return payload;
   if (Array.isArray(payload?.sessions)) return payload.sessions;
+  if (Array.isArray(payload?.items)) return payload.items;
+  return [];
+}
+
+function extractHistoryMessages(payload: any): any[] {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.messages)) return payload.messages;
   if (Array.isArray(payload?.items)) return payload.items;
   return [];
 }
@@ -284,6 +293,40 @@ export function setupOpenClawRoutes(): Router {
         },
       });
     } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  /**
+   * GET /api/openclaw/history
+   * Load the current user's OpenClaw chat history for the scoped session.
+   */
+  router.get('/history', async (req: Request, res: Response) => {
+    const user = getAuthUser(req, res);
+    if (!user) return;
+    const scope = buildScope(user);
+    const limitRaw = Number(req.query.limit ?? 100);
+    const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(Math.trunc(limitRaw), 1), 200) : 100;
+
+    try {
+      const result = await executeTool('openclaw', withActor({
+        action: 'chat_history',
+        sessionKey: scope.sessionKey,
+        limit,
+      }, user));
+
+      const payload = parseJsonMaybe(result.output);
+      const messages = extractHistoryMessages(payload);
+
+      res.json({
+        success: result.success,
+        scope,
+        sessionKey: payload?.sessionKey ?? scope.sessionKey,
+        sessionId: typeof payload?.sessionId === 'string' ? payload.sessionId : null,
+        messages,
+      });
+    } catch (err: any) {
+      logger.error('OpenClaw history error', { error: err.message, sessionKey: scope.sessionKey });
       res.status(500).json({ error: err.message });
     }
   });

@@ -124,6 +124,45 @@ export async function softDeleteConversationForUser(conversationId: string, user
     .where(and(eq(conversations.id, conversationId), eq(conversations.userId, userId)));
 }
 
+/** Get conversation metadata only if it belongs to the user. */
+export async function getConversationMetadataForUser(conversationId: string, userId: string): Promise<Record<string, unknown> | null> {
+  const db = getDb();
+  const [conv] = await db.select({
+    metadata: conversations.metadata,
+  }).from(conversations)
+    .where(and(eq(conversations.id, conversationId), eq(conversations.userId, userId)))
+    .limit(1);
+  return (conv?.metadata as Record<string, unknown> | undefined) ?? null;
+}
+
+/** Merge metadata into a conversation only if it belongs to the user. */
+export async function mergeConversationMetadataForUser(
+  conversationId: string,
+  userId: string,
+  patch: Record<string, unknown>,
+) {
+  const db = getDb();
+  const [conv] = await db.select({
+    metadata: conversations.metadata,
+  }).from(conversations)
+    .where(and(eq(conversations.id, conversationId), eq(conversations.userId, userId)))
+    .limit(1);
+
+  if (!conv) return null;
+
+  const nextMetadata = {
+    ...((conv.metadata as Record<string, unknown> | undefined) ?? {}),
+    ...patch,
+  };
+
+  const [updated] = await db.update(conversations)
+    .set({ metadata: nextMetadata, updatedAt: new Date() })
+    .where(and(eq(conversations.id, conversationId), eq(conversations.userId, userId)))
+    .returning();
+
+  return updated ?? null;
+}
+
 /** Get recent activity from platforms OTHER than the current one. */
 export async function getCrossPlatformSummary(
   userId: string,

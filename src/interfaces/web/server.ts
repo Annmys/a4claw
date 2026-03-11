@@ -38,12 +38,12 @@ import { setupLinkedInRoutes } from './routes/linkedin-api.js';
 import { setupLinkedInAgentRoutes } from './routes/linkedin-agent-api.js';
 import { setupTikTokRoutes } from './routes/tiktok-api.js';
 import { setupTikTokAgentRoutes } from './routes/tiktok-agent-api.js';
-import { setupVoiceAgentRoutes } from './routes/voice-agent-api.js';
 import { setupMobileAgentRoutes } from './routes/mobile-agent-api.js';
 import { setupTerminalRoutes } from './routes/terminal-api.js';
 import { setupDeployRoutes } from './routes/deploy-api.js';
 import { setupUsersRoutes } from './routes/users-api.js';
 import { setupFilesRoutes } from './routes/files-api.js';
+import { setupCommandCenterRoutes } from './routes/command-center-api.js';
 import { BrowserSessionManager } from '../../actions/browser/session-manager.js';
 import { getAllModels } from '../../core/model-router.js';
 import { resolve as resolvePath } from 'path';
@@ -82,15 +82,6 @@ export class WebServer extends BaseInterface {
       const vncMatch = url.match(/^\/browser-vnc\/([a-f0-9-]+)/);
       if (vncMatch) {
         this.handleVncUpgrade(vncMatch[1], req, socket, head);
-        return;
-      }
-
-      // Voice stream: /voice-stream — Twilio media stream ↔ OpenAI Realtime bridge
-      if (url.startsWith('/voice-stream')) {
-        this.wss.handleUpgrade(req, socket, head, async (ws) => {
-          const { TwilioVoiceAgent } = await import('../../actions/voice/twilio-voice-agent.js');
-          TwilioVoiceAgent.getInstance().handleMediaStream(ws as any);
-        });
         return;
       }
 
@@ -244,6 +235,7 @@ export class WebServer extends BaseInterface {
     this.app.use('/api/cron', authMiddleware, setupCronRoutes(this.engine));
     this.app.use('/api/history', authMiddleware, setupHistoryRoutes());
     this.app.use('/api/files', authMiddleware, setupFilesRoutes());
+    this.app.use('/api/command-center', authMiddleware, setupCommandCenterRoutes());
     this.app.use('/api/whatsapp', authMiddleware, setupWhatsAppQRRoutes());
     this.app.use('/api/trading', authMiddleware, setupTradingRoutes());
     this.app.use('/api/cli', authMiddleware, setupCLIRoutes(this.engine));
@@ -273,8 +265,6 @@ export class WebServer extends BaseInterface {
     this.app.use('/api/linkedin-agent', authMiddleware, setupLinkedInAgentRoutes());
     this.app.use('/api/tiktok', authMiddleware, setupTikTokRoutes());
     this.app.use('/api/tiktok-agent', authMiddleware, setupTikTokAgentRoutes());
-    // ── Voice Agent routes (webhook endpoints are NOT behind auth — Twilio needs access) ──
-    this.app.use('/api/voice-agent', setupVoiceAgentRoutes());
     this.app.use('/api/mobile-agent', authMiddleware, setupMobileAgentRoutes());
     // ── SSH Terminal routes ──────────────────────────────────────────────
     this.app.use('/api/terminal', authMiddleware, setupTerminalRoutes());
@@ -320,9 +310,25 @@ export class WebServer extends BaseInterface {
     // Serve React dashboard from web/dist (built with Vite)
     const distPath = pathResolve(process.cwd(), 'web', 'dist');
     if (existsSync(distPath)) {
-      this.app.use(express.static(distPath));
+      this.app.use(express.static(distPath, {
+        etag: false,
+        lastModified: false,
+        maxAge: 0,
+        setHeaders: (res, filePath) => {
+          if (filePath.endsWith('.html')) {
+            res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+          } else {
+            res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+          }
+          res.setHeader('Pragma', 'no-cache');
+          res.setHeader('Expires', '0');
+        },
+      }));
       // SPA catch-all: serve index.html for any non-API route (Express 5 syntax)
       this.app.get('{*path}', (_req, res) => {
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
         res.sendFile(pathResolve(distPath, 'index.html'));
       });
       logger.info('Serving React dashboard from web/dist');

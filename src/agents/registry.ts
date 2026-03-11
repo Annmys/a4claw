@@ -17,7 +17,6 @@ import { marketMakerPrompt } from './prompts/market-maker.js';
 import { strategyLabPrompt } from './prompts/strategy-lab.js';
 import { aiAppBuilderPrompt } from './prompts/ai-app-builder.js';
 import { mrrStrategistPrompt } from './prompts/mrr-strategist.js';
-import { voiceAgentPrompt } from './prompts/voice-agent.js';
 
 const agents: Map<string, AgentDefinition> = new Map();
 
@@ -41,8 +40,6 @@ register({ id: 'market-maker', name: 'Market Maker', description: 'Two-sided quo
 register({ id: 'strategy-lab', name: 'Strategy Lab', description: 'R&D agent — designs, backtests, and validates new trading strategies with walk-forward optimization.', systemPrompt: strategyLabPrompt, model: 'dynamic', preferredOllamaModel: 'glm5', tools: ['trading', 'search', 'memory'], maxTokens: 8192, temperature: 0.5, maxToolIterations: 20 });
 register({ id: 'ai-app-builder', name: 'AI App Builder', description: 'Builds complete revenue-generating AI applications from scratch — market validation via TrustMRR, full-stack development, Stripe payments, deployment, and launch automation.', systemPrompt: aiAppBuilderPrompt, model: 'dynamic', preferredOllamaModel: 'qwen3-coder-next', tools: ['bash', 'file', 'search', 'browser', 'github', 'docker', 'deploy', 'kie', 'social', 'memory', 'firecrawl'], maxTokens: 8192, temperature: 0.4, maxToolIterations: 25 });
 register({ id: 'mrr-strategist', name: 'MRR Strategist', description: 'Revenue strategy agent — deep market research via TrustMRR, financial modeling, pricing optimization, competitive intelligence, growth planning, and churn prevention for AI/SaaS products.', systemPrompt: mrrStrategistPrompt, model: 'dynamic', preferredOllamaModel: 'deepseek-v3.1', tools: ['search', 'browser', 'firecrawl', 'file', 'memory', 'analytics', 'social', 'email'], maxTokens: 8192, temperature: 0.5, maxToolIterations: 20 });
-register({ id: 'voice-agent', name: 'Voice Agent', description: 'Makes and receives phone calls with AI voice via Twilio + OpenAI Realtime. Call tracking, voice configuration, real-time conversation.', systemPrompt: voiceAgentPrompt, model: 'dynamic', preferredOllamaModel: 'minimax-m2.5', tools: ['voice', 'memory'], maxTokens: 4096, temperature: 0.3, maxToolIterations: 10 });
-
 export function getAgent(id: string): AgentDefinition | undefined { return agents.get(id); }
 export function getAllAgents(): AgentDefinition[] { return Array.from(agents.values()); }
 export function getAgentIds(): string[] { return Array.from(agents.keys()); }
