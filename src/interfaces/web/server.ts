@@ -191,14 +191,15 @@ export class WebServer extends BaseInterface {
       res.json(getAllCircuitBreakerStats());
     });
 
-    // Request timeout middleware — 120s for all API routes
+    // Request timeout middleware — allow longer processing on chat routes.
     this.app.use('/api', (req, res, next) => {
+      const timeoutMs = req.path === '/chat' ? 300_000 : 120_000;
       const timeout = setTimeout(() => {
         if (!res.headersSent) {
-          logger.warn('Request timeout', { method: req.method, path: req.path });
+          logger.warn('Request timeout', { method: req.method, path: req.path, timeoutMs });
           res.status(504).json({ error: 'Request timeout — processing took too long' });
         }
-      }, 120_000);
+      }, timeoutMs);
       res.on('finish', () => clearTimeout(timeout));
       res.on('close', () => clearTimeout(timeout));
       next();

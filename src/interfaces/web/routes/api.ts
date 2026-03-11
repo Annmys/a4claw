@@ -11,9 +11,11 @@ import { getAllModels } from '../../../core/model-router.js';
 import { publishFileToUserShare } from '../../../core/shared-artifacts.js';
 import { findOrCreateUser } from '../../../memory/repositories/users.js';
 import {
+  getOrCreateConversation,
   getConversationMetadataForUser,
   mergeConversationMetadataForUser,
 } from '../../../memory/repositories/conversations.js';
+import { saveMessage as saveConversationMessage } from '../../../memory/repositories/messages.js';
 import logger from '../../../utils/logger.js';
 
 const UPLOAD_DIR = pathResolve(process.cwd(), 'uploads');
@@ -61,6 +63,12 @@ function isDocumentSummaryRequest(text: string): boolean {
   return /总结|摘要|概括|总结一下|summar|summary|extract|提炼|主要内容|内容|看一下|看看|readme|说明书/.test(text.toLowerCase());
 }
 
+function isDocumentDirectRequest(text: string): boolean {
+  const normalized = text.trim().toLowerCase();
+  if (!normalized) return true;
+  return /总结|摘要|概括|总结一下|summar|summary|extract|提炼|主要内容|内容|看一下|看看|readme|说明书|翻译|translate|translation|译成|译为|全文|完整翻译|中文|分析|analysis|解释|问答|qa|q&a|校对|润色|整理|表格|excel/.test(normalized);
+}
+
 function looksLikeModelFailure(text: string | undefined): boolean {
   if (!text) return false;
   return [
@@ -80,6 +88,10 @@ function shouldReuseConversationDocumentContext(text: string): boolean {
 async function resolveDbUserId(jwtUserId: string): Promise<string> {
   const user = await findOrCreateUser(jwtUserId, 'web', jwtUserId);
   return user.masterUserId ?? user.id;
+}
+
+async function ensureConversationExists(conversationId: string, dbUserId: string) {
+  return getOrCreateConversation(dbUserId, 'web', conversationId);
 }
 
 async function getConversationDocumentContext(conversationId: string, dbUserId: string): Promise<null | {
@@ -105,11 +117,71 @@ async function resolveConversationDocumentText(context: {
   artifactPath?: string;
   cachedText?: string;
 }): Promise<string> {
-  if (context.cachedText?.trim()) return context.cachedText;
   if (context.artifactPath && existsSync(context.artifactPath)) {
     return extractText(context.artifactPath);
   }
+  if (context.cachedText?.trim()) return context.cachedText;
   return '';
+}
+
+async function processDocumentDirect(
+  engine: Engine,
+  params: {
+    userText: string;
+    fileName: string;
+    documentText: string;
+    model?: string;
+  }
+): Promise<{
+  message: string;
+  thinking?: string;
+  provider: string;
+  model?: string;
+  tokens?: { input: number; output: number };
+}> {
+  const trimmedDocument = params.documentText.trim();
+  if (!trimmedDocument) {
+    return {
+      message: `已收到文件《${params.fileName}》，但当前未提取到可用正文。`,
+      provider: 'local',
+      model: 'local-document-fallback',
+    };
+  }
+
+  const userRequest = params.userText.trim() || `请总结这份文档《${params.fileName}》的主要内容。`;
+  const promptText = [
+    `文档文件名：${params.fileName}`,
+    `用户请求：${userRequest}`,
+    '',
+    '--- 文档正文开始 ---',
+    trimmedDocument.slice(0, 50000),
+    '--- 文档正文结束 ---',
+  ].join('\n');
+
+  const response = await engine.getAIClient().chat({
+    systemPrompt: [
+      '你是 a4claw 的文档处理助手。',
+      '严格基于用户提供的文档正文完成任务，不要脱离文档臆测。',
+      '如果用户要求翻译成中文，则完整翻译当前提供的正文，并尽量保留原有标题、编号、列表和段落结构。',
+      '如果用户要求总结、分析、提取要点或整理内容，则默认用中文回答，结构清晰，直接给结果。',
+      '如果当前提供的正文可能被截断，请明确说明回答是基于已提取内容。',
+    ].join('\n'),
+    messages: [{ role: 'user', content: promptText }],
+    maxTokens: 8000,
+    temperature: 0.2,
+    model: params.model,
+  });
+
+  return {
+    message: response.content,
+    thinking: response.thinking,
+    provider: response.provider,
+    model: response.modelUsed,
+    tokens: {
+      input: response.usage.inputTokens,
+      output: response.usage.outputTokens,
+    },
+  };
 }
 
 export function setupApiRoutes(engine: Engine): Router {
@@ -157,6 +229,7 @@ export function setupApiRoutes(engine: Engine): Router {
     let renamedFilePath: string | undefined;
     let uploadedArtifact: any | undefined;
     let extractedDocumentText = '';
+    let activeDocumentFileName: string | undefined;
 
     try {
       logger.info('Chat API request', {
@@ -221,6 +294,7 @@ export function setupApiRoutes(engine: Engine): Router {
           const newPath = `${file.path}.${ext}`;
           renameSync(file.path, newPath);
           renamedFilePath = newPath;
+          activeDocumentFileName = file.originalname;
 
           try {
             uploadedArtifact = await publishFileToUserShare(newPath, user.userId, file.originalname);
@@ -234,7 +308,7 @@ export function setupApiRoutes(engine: Engine): Router {
 
           if (ragEngine) {
             const result = await ragEngine.ingestDocument(newPath, user.userId);
-            extractedDocumentText = typeof result.preview === 'string' ? result.preview : '';
+            extractedDocumentText = typeof result.text === 'string' ? result.text : '';
             try { unlinkSync(newPath); } catch {}
             renamedFilePath = undefined;
             const previewBlock = result.preview
@@ -266,6 +340,7 @@ export function setupApiRoutes(engine: Engine): Router {
         if (conversationId && extractedDocumentText.trim()) {
           try {
             const dbUserId = await resolveDbUserId(user.userId);
+            await ensureConversationExists(conversationId, dbUserId);
             await mergeConversationMetadataForUser(conversationId, dbUserId, {
               lastDocumentContext: {
                 fileName: file.originalname,
@@ -290,6 +365,8 @@ export function setupApiRoutes(engine: Engine): Router {
           if (documentContext) {
             const documentText = await resolveConversationDocumentText(documentContext);
             if (documentText.trim()) {
+              activeDocumentFileName = documentContext.fileName;
+              extractedDocumentText = documentText;
               enrichedText = [
                 `[Conversation document context: ${documentContext.fileName}]`,
                 'Use the following document as the primary source for this reply.',
@@ -313,6 +390,59 @@ export function setupApiRoutes(engine: Engine): Router {
       if (!enrichedText.trim()) {
         res.status(400).json({ error: 'No message or file provided' });
         return;
+      }
+
+      if (activeDocumentFileName && extractedDocumentText.trim() && isDocumentDirectRequest(text || '')) {
+        try {
+          let dbUserId: string | undefined;
+          if (conversationId) {
+            dbUserId = await resolveDbUserId(user.userId);
+            await ensureConversationExists(conversationId, dbUserId);
+          }
+
+          const direct = await processDocumentDirect(engine, {
+            userText: text,
+            fileName: activeDocumentFileName,
+            documentText: extractedDocumentText,
+            model,
+          });
+
+          if (conversationId && dbUserId) {
+            const userMessageText = text.trim()
+              ? `${text.trim()}\n[${activeDocumentFileName}]`
+              : `[${activeDocumentFileName}]`;
+            await saveConversationMessage(conversationId, dbUserId, 'user', userMessageText, {
+              _conversationId: conversationId,
+              source: 'document-direct',
+            });
+            await saveConversationMessage(conversationId, dbUserId, 'assistant', direct.message, {
+              _conversationId: conversationId,
+              agent: 'document-direct',
+              provider: direct.provider,
+              model: direct.model,
+              tokens: direct.tokens,
+            });
+          }
+
+          const responseArtifacts = uploadedArtifact ? [uploadedArtifact] : undefined;
+          res.json({
+            message: direct.message,
+            thinking: direct.thinking,
+            artifacts: responseArtifacts,
+            agent: 'document-direct',
+            provider: direct.provider,
+            model: direct.model,
+            tokens: direct.tokens,
+          });
+          return;
+        } catch (directErr: any) {
+          logger.warn('Direct document processing failed, falling back to engine', {
+            requestId,
+            userId: user?.userId,
+            conversationId: conversationId ?? null,
+            error: directErr.message,
+          });
+        }
       }
 
       if (file && extractedDocumentText.trim() && isDocumentSummaryRequest(text || '')) {

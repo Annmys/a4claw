@@ -14,7 +14,7 @@ export class RAGEngine {
     await this.vectorStore.loadFromDb();
   }
 
-  async ingestDocument(filePath: string, userId: string): Promise<{ chunks: number; source: string; preview: string }> {
+  async ingestDocument(filePath: string, userId: string): Promise<{ chunks: number; source: string; preview: string; text: string }> {
     const fileName = filePath.split(/[/\\]/).pop() ?? filePath;
     logger.info('RAG ingest start', { filePath, userId });
 
@@ -28,7 +28,7 @@ export class RAGEngine {
     await this.vectorStore.addChunks(chunks, userId);
     logger.info('RAG chunks stored', { chunks: chunks.length, fileName });
 
-    return { chunks: chunks.length, source: fileName, preview };
+    return { chunks: chunks.length, source: fileName, preview, text };
   }
 
   async query(question: string, userId: string, topK = 5): Promise<string> {

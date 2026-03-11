@@ -20,6 +20,9 @@ const RESPONSE_MODES = [
   { id: 'deep' as const, label: 'מעמיק', labelEn: '深度', icon: Brain, color: 'text-purple-400', desc: 'ניתוח מלא' },
 ];
 
+const DEFAULT_UI_TIMEOUT_MS = 90_000;
+const TASK_UI_TIMEOUT_MS = 300_000;
+
 type InteractionMode = 'chat' | 'task';
 
 function buildOutboundText(text: string, mode: InteractionMode, hasFile: boolean) {
@@ -365,6 +368,7 @@ export default function Chat() {
   const pendingConvRef = useRef<string | null>(null);
   const pendingWsRequestRef = useRef<PendingWsRequest | null>(null);
   const wsFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const requestTimeoutMsRef = useRef(DEFAULT_UI_TIMEOUT_MS);
   const wsReconnectAtRef = useRef<number[]>([]);
   const wsDegradedUntilRef = useRef<number>(0);
   const suppressedRecoveredRef = useRef<{ conversationId: string; text: string; expiresAt: number } | null>(null);
@@ -468,6 +472,7 @@ export default function Chat() {
             setProgressLog([]);
             setStreamingText('');
             setConversationLoading(null);
+            requestTimeoutMsRef.current = DEFAULT_UI_TIMEOUT_MS;
           }
         }, 1500);
       }
@@ -512,6 +517,7 @@ export default function Chat() {
         });
       }
       setConversationLoading(null);
+      requestTimeoutMsRef.current = DEFAULT_UI_TIMEOUT_MS;
     });
 
     ws.on('error', (data: { message: string }) => {
@@ -528,6 +534,7 @@ export default function Chat() {
         });
       }
       setConversationLoading(null);
+      requestTimeoutMsRef.current = DEFAULT_UI_TIMEOUT_MS;
     });
 
     ws.on('progress', (data: { type: string; message: string; agent?: string; tool?: string }) => {
@@ -549,6 +556,7 @@ export default function Chat() {
       setProgressLog([]);
       setStreamingText('');
       setConversationLoading(null);
+      requestTimeoutMsRef.current = DEFAULT_UI_TIMEOUT_MS;
     });
 
     // ── Streaming text events ──
@@ -652,6 +660,10 @@ export default function Chat() {
       interactionMode === 'task' && responseMode === 'auto'
         ? 'deep'
         : responseMode;
+    requestTimeoutMsRef.current =
+      file || interactionMode === 'task'
+        ? TASK_UI_TIMEOUT_MS
+        : DEFAULT_UI_TIMEOUT_MS;
 
     // Backend processes one request at a time.
     // If loading flag is stale (no pending request refs), auto-clear it instead of silently blocking send.
@@ -713,6 +725,7 @@ export default function Chat() {
         wsFallbackTimerRef.current = null;
       }
       setConversationLoading(null);
+      requestTimeoutMsRef.current = DEFAULT_UI_TIMEOUT_MS;
       return;
     }
 
@@ -765,6 +778,7 @@ export default function Chat() {
             setProgressLog([]);
             setStreamingText('');
             setConversationLoading(null);
+            requestTimeoutMsRef.current = DEFAULT_UI_TIMEOUT_MS;
           }
         }, 4000);
         return; // Response will arrive via WS event handler
@@ -797,6 +811,7 @@ export default function Chat() {
       wsFallbackTimerRef.current = null;
     }
     setConversationLoading(null);
+    requestTimeoutMsRef.current = DEFAULT_UI_TIMEOUT_MS;
   }, [input, attachedFile, interactionMode, loadingConversationId, wsConnected, activeConversationId, conversations, addMessageTo, setConversationLoading, newConversation, responseMode, selectedModel]);
 
   // Global fail-safe: if UI stays locked for too long, auto-unlock and show a clear error.
@@ -817,7 +832,8 @@ export default function Chat() {
       setProgressLog([]);
       setStreamingText('');
       setConversationLoading(null);
-    }, 90000);
+      requestTimeoutMsRef.current = DEFAULT_UI_TIMEOUT_MS;
+    }, requestTimeoutMsRef.current);
     return () => clearTimeout(timer);
   }, [loadingConversationId, addMessageTo, setConversationLoading]);
 
@@ -834,6 +850,7 @@ export default function Chat() {
     }
     setProgressLog([]);
     setConversationLoading(null);
+    requestTimeoutMsRef.current = DEFAULT_UI_TIMEOUT_MS;
   }, [wsConnected, setConversationLoading]);
 
   // ── Clear chat with confirmation ─────────────────────────────────
