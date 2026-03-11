@@ -17,6 +17,7 @@ import { marketMakerPrompt } from './prompts/market-maker.js';
 import { strategyLabPrompt } from './prompts/strategy-lab.js';
 import { aiAppBuilderPrompt } from './prompts/ai-app-builder.js';
 import { mrrStrategistPrompt } from './prompts/mrr-strategist.js';
+import { taskExecutorPrompt } from './prompts/task-executor.js';
 
 const agents: Map<string, AgentDefinition> = new Map();
 
@@ -26,6 +27,7 @@ register({ id: 'server-manager', name: 'Server Manager', description: 'Manages s
 register({ id: 'code-assistant', name: 'Code Assistant', description: 'Writes, fixes, and reviews code. Creates GitHub PRs and issues.', systemPrompt: codeAssistantPrompt, model: 'dynamic', preferredOllamaModel: 'qwen3-coder-next', tools: ['github', 'file', 'bash', 'memory'], maxTokens: 8192, temperature: 0.5, maxToolIterations: 15 });
 register({ id: 'researcher', name: 'Researcher', description: 'Searches the web, answers questions, summarizes information. Can scrape any site, find APIs, and run scrapers.', systemPrompt: researcherPrompt, model: 'dynamic', preferredOllamaModel: 'deepseek-v3.1', tools: ['search', 'scrape', 'browser', 'memory', 'firecrawl', 'rapidapi', 'apify', 'rag'], maxTokens: 4096, temperature: 0.7, maxToolIterations: 15 });
 register({ id: 'task-planner', name: 'Task Planner', description: 'Creates, manages, and schedules tasks and reminders.', systemPrompt: taskPlannerPrompt, model: 'dynamic', preferredOllamaModel: 'minimax-m2.5', tools: ['task', 'reminder', 'cron', 'memory', 'workflow'], maxTokens: 2048, temperature: 0.5, maxToolIterations: 12 });
+register({ id: 'task-executor', name: 'Task Executor', description: 'Analyzes a user goal into an execution path, selects the right tools/capabilities, and drives the task to a concrete result.', systemPrompt: taskExecutorPrompt, model: 'dynamic', preferredOllamaModel: 'glm5', tools: ['bash', 'file', 'search', 'browser', 'memory', 'workflow', 'rag', 'analytics', 'email', 'deploy', 'openclaw'], maxTokens: 8192, temperature: 0.3, maxToolIterations: 24 });
 register({ id: 'general', name: 'General Assistant', description: 'Casual conversation, help, and general knowledge.', systemPrompt: generalPrompt, model: 'dynamic', preferredOllamaModel: 'minimax-m2.5', tools: ['bash', 'search', 'file', 'cron', 'memory', 'email', 'analytics', 'claude-code', 'social', 'kie', 'workflow', 'rag', 'whatsapp', 'deploy'], maxTokens: 8192, temperature: 0.5, maxToolIterations: 12 });
 register({ id: 'security-guard', name: 'Security Guard', description: 'Reviews commands and actions for security risks before execution.', systemPrompt: securityGuardPrompt, model: 'dynamic', preferredOllamaModel: 'kimi-k2.5', tools: [], maxTokens: 1024, temperature: 0.1 });
 register({ id: 'desktop-controller', name: 'Desktop Controller', description: 'Controls the computer — mouse, keyboard, screenshots, app control via AI vision.', systemPrompt: desktopAgentPrompt, model: 'dynamic', preferredOllamaModel: 'minimax-m2.5', tools: ['desktop', 'memory'], maxTokens: 4096, temperature: 0.3, maxToolIterations: 10 });

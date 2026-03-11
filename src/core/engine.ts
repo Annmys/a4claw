@@ -306,15 +306,18 @@ export class Engine {
     // Need at least 2 distinct domains for crew
     if (activeDomains.length < 2) {
       // Special case: explicit orchestrate intent with complex multi-step task
-      if (intent === 'orchestrate' && text.length > 400) {
+      if ((intent === 'orchestrate' || intent === 'autonomous_task') && text.length > 120) {
         const hasMultipleSteps = /\d+\.\s|then\s|ואז\s|אחר כך|step\s?\d|first.*then|קודם.*אחר/i.test(text);
-        if (hasMultipleSteps) {
-          const reason = 'Multi-step orchestration task detected';
+        const looksLikeExecutionRequest = /继续处理|继续执行|直接执行|直接处理|自动处理|自动执行|帮我完成|帮我处理|请直接执行任务|task mode|run.*autonomously|execute.*task|do this yourself/i.test(lowerText);
+        if (hasMultipleSteps || looksLikeExecutionRequest) {
+          const reason = intent === 'autonomous_task'
+            ? 'Autonomous execution task detected'
+            : 'Multi-step orchestration task detected';
           logger.info('Crew activated', { reason, textLength: text.length });
           return {
-            id: `crew_${Date.now()}`, name: 'Orchestration Crew', mode: 'hierarchical',
+            id: `crew_${Date.now()}`, name: intent === 'autonomous_task' ? 'Task Execution Crew' : 'Orchestration Crew', mode: 'hierarchical',
             members: [
-              { agentId: 'orchestrator', role: 'leader' },
+              { agentId: intent === 'autonomous_task' ? 'task-executor' : 'orchestrator', role: 'leader' },
               { agentId: 'researcher', role: 'research' },
               { agentId: 'code-assistant', role: 'implementation' },
             ],

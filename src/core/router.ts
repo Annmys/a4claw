@@ -99,7 +99,7 @@ Available intents:
 - social_publish: Publish to social media — פרסם, תפרסם, publish to, post on, share to, cross-post, schedule post, תזמן פוסט, רשתות חברתיות, tiktok, instagram, youtube
 - orchestrate: Coordinate between ClawdAgent and OpenClaw, manage OpenClaw, Facebook via OpenClaw, WhatsApp via OpenClaw, check OpenClaw status, sync data between systems, content pipeline (create + publish everywhere), affiliate management — openclaw, תשלח ל-openclaw, מה קורה ב-openclaw, תפעיל את openclaw, פייסבוק, whatsapp, ווטסאפ, affiliate, תנהל, תתאם, סינרגיה, תפרסם בכל מקום, צור ופרסם
 - remember: Save or recall facts/preferences — remember that, תזכור ש, מה אתה זוכר, תשכח את, what do you know about me, save this
-- autonomous_task: Run a complex multi-step goal autonomously — תעשה באופן אוטונומי, run autonomously, execute goal, auto-run, תריץ לבד, do this yourself
+- autonomous_task: Run a complex multi-step goal autonomously — תעשה באופן אוטונומי, run autonomously, execute goal, auto-run, תריץ לבד, do this yourself, 直接执行, 继续处理, 自动处理, 帮我完成, 帮我执行
 - self_diagnose: Check system health, self-repair, diagnose issues — תבדוק את עצמך, מה המצב שלך, self check, diagnose, תתקן את עצמך
 - workflow: Create or manage automated workflows/chains — תהליך, workflow, automation, שרשרת, כל בוקר תעשה X, automate this
 - analytics: Usage stats, cost reports, API key status — סטטיסטיקות, analytics, כמה עולה, cost, דו"ח, כמה עלה, budget, תבדוק API keys
@@ -139,6 +139,8 @@ Hebrew examples:
 - "תזכור שאני אוהב פייתון" → remember
 - "מה אתה יודע עליי" → remember
 - "תעשה את זה לבד" → autonomous_task
+- "直接执行这个任务" → autonomous_task
+- "继续处理，不要解释" → autonomous_task
 - "תבדוק את עצמך" → self_diagnose
 - "כמה עלה לי היום" → analytics
 - "תבדוק API keys" → analytics
@@ -183,8 +185,9 @@ Hebrew examples:
 Respond ONLY with valid JSON (no markdown, no text before/after):
 {"intent":"<intent_name>","confidence":<0.0-1.0>,"agent":"<best_agent>","params":{"key":"value"}}
 
-Agent options: server-manager, code-assistant, researcher, task-planner, general, desktop-controller, project-builder, web-agent, content-creator, orchestrator, device-controller, crypto-trader, crypto-analyst, ai-app-builder, mrr-strategist
+Agent options: server-manager, code-assistant, researcher, task-planner, task-executor, general, desktop-controller, project-builder, web-agent, content-creator, orchestrator, device-controller, crypto-trader, crypto-analyst, ai-app-builder, mrr-strategist
 
+For autonomous_task → use task-executor agent.
 For ugc_create and podcast_create → use content-creator agent.
 For site_analyze → use orchestrator agent.
 For server_manage, server_health, server_scan → use server-manager agent.
@@ -322,6 +325,11 @@ export class IntentRouter {
     // Web search
     if (/חפש|תחפש|search|חיפוש|google|find.*info/i.test(message)) {
       return { intent: Intent.WEB_SEARCH, confidence: 0.8, agentId: 'researcher', extractedParams: {} };
+    }
+
+    // Autonomous task execution / task mode / direct execution requests
+    if (/任务模式|直接执行|直接处理|继续处理|继续执行|自动处理|自动执行|帮我完成|帮我处理|帮我执行|先做|你直接做|do it yourself|execute.*task|continue.*processing|run.*autonomously|autonomous.*task|execute.*autonomously|直接给结果/i.test(message)) {
+      return { intent: Intent.AUTONOMOUS_TASK, confidence: 0.88, agentId: 'task-executor', extractedParams: {} };
     }
 
     // Tasks

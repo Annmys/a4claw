@@ -30,9 +30,9 @@ function buildOutboundText(text: string, mode: InteractionMode, hasFile: boolean
 
   const cleanText = text.trim();
   const taskInstruction = [
-    '请按任务模式处理这次请求。',
-    '先明确目标，再拆分执行步骤，再给出结果与下一步建议。',
-    '如果信息不足，请主动指出缺口并给出最小可执行方案。',
+    '请直接执行任务并优先返回结果。',
+    '不要默认输出“目标、步骤、信息缺口、下一步建议”这类模板化内容。',
+    '只有在缺少关键信息、存在明显风险，或用户明确要求说明过程时，才简短说明。',
   ].join(' ');
 
   if (!cleanText) {
