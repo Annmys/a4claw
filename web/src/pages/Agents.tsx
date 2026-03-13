@@ -1,147 +1,99 @@
 import { useEffect, useState } from 'react';
-import { api } from '../api/client';
+import { api, type AgentRuntimeStatus, type CapabilitySnapshot } from '../api/client';
 import {
   Bot, Shield, Code, Search, ListTodo, MessageSquare,
   Monitor, Hammer, Globe, Palette, GitBranch, Smartphone,
-  Cpu, Zap, Loader2, CheckCircle2, LucideIcon
+  Cpu, Zap, Loader2, CheckCircle2, AlertTriangle, XCircle, Wrench
 } from 'lucide-react';
 
-interface AgentDef {
-  id: string;
+const AGENT_META: Record<string, {
   name: string;
-  icon: LucideIcon;
+  icon: any;
   color: string;
   borderColor: string;
   description: string;
-  capabilities: string[];
-  tools: string[];
+}> = {
+  'server-manager': { name: '服务器管理', icon: Monitor, color: 'bg-red-500/15 text-red-400', borderColor: 'border-l-red-500', description: 'SSH 服务器连接、命令执行、健康检查、部署与文件传输。' },
+  'code-assistant': { name: '代码助手', icon: Code, color: 'bg-purple-500/15 text-purple-400', borderColor: 'border-l-purple-500', description: '代码编写、修复、构建、本地文件处理与 GitHub 协作。' },
+  researcher: { name: '调研助手', icon: Search, color: 'bg-green-500/15 text-green-400', borderColor: 'border-l-green-500', description: '联网搜索、网页抓取、资料提炼与知识整理。' },
+  'task-planner': { name: '任务规划', icon: ListTodo, color: 'bg-yellow-500/15 text-yellow-400', borderColor: 'border-l-yellow-500', description: '任务创建、状态跟踪、提醒和基础工作流管理。' },
+  'task-executor': { name: '任务执行器', icon: Zap, color: 'bg-amber-500/15 text-amber-400', borderColor: 'border-l-amber-500', description: '自动拆任务、选工具、执行并留下结果。' },
+  general: { name: '通用助手', icon: MessageSquare, color: 'bg-blue-500/15 text-blue-400', borderColor: 'border-l-blue-500', description: '通用问答、文本处理和基础辅助。' },
+  'security-guard': { name: '安全守卫', icon: Shield, color: 'bg-orange-500/15 text-orange-400', borderColor: 'border-l-orange-500', description: '高风险操作审查与安全策略兜底。' },
+  'desktop-controller': { name: '桌面控制', icon: Cpu, color: 'bg-indigo-500/15 text-indigo-400', borderColor: 'border-l-indigo-500', description: '真实桌面截图、点击、输入与视觉决策。' },
+  'project-builder': { name: '项目构建', icon: Hammer, color: 'bg-teal-500/15 text-teal-400', borderColor: 'border-l-teal-500', description: '脚手架、构建、部署与工程初始化。' },
+  'web-agent': { name: '网页代理', icon: Globe, color: 'bg-cyan-500/15 text-cyan-400', borderColor: 'border-l-cyan-500', description: '浏览器自动化、网页交互、表单与抓取。' },
+  'content-creator': { name: '内容创作', icon: Palette, color: 'bg-pink-500/15 text-pink-400', borderColor: 'border-l-pink-500', description: '图文音视频生成与社媒发布协同。' },
+  orchestrator: { name: '任务编排', icon: GitBranch, color: 'bg-amber-500/15 text-amber-400', borderColor: 'border-l-amber-500', description: '多智能体调度、本地与 OpenClaw 协同。' },
+  'device-controller': { name: '设备控制', icon: Smartphone, color: 'bg-emerald-500/15 text-emerald-400', borderColor: 'border-l-emerald-500', description: 'ADB/Appium 驱动的 Android 设备自动化。' },
+};
+
+const TOOL_LABELS: Record<string, string> = {
+  bash: '命令行',
+  file: '文件',
+  github: 'GitHub',
+  search: '搜索',
+  browser: '浏览器',
+  task: '任务',
+  cron: '定时任务',
+  workflow: '工作流',
+  auto: '自动执行',
+  analytics: '分析',
+  ssh: 'SSH',
+  openclaw: 'OpenClaw',
+  desktop: '桌面',
+  device: '设备',
+  social: '社媒发布',
+  kie: 'Kie 内容',
+  elevenlabs: 'ElevenLabs',
+  firecrawl: 'Firecrawl',
+  rapidapi: 'RapidAPI',
+  apify: 'Apify',
+  rag: '知识库',
+  memory: '记忆',
+  email: '邮件',
+  trading: '交易',
+  whatsapp: 'WhatsApp',
+  deploy: '部署',
+  'claude-code': 'Claude Code',
+  facebook: 'Facebook',
+  twitter: 'Twitter/X',
+  linkedin: 'LinkedIn',
+  tiktok: 'TikTok',
+};
+
+function getStatusMeta(status: AgentRuntimeStatus['status']) {
+  switch (status) {
+    case 'ready':
+      return { label: '可用', dot: 'bg-green-500', text: 'text-green-400', chip: 'bg-green-600/15 text-green-400 border-green-500/30' };
+    case 'partial':
+      return { label: '部分可用', dot: 'bg-yellow-500', text: 'text-yellow-400', chip: 'bg-yellow-600/15 text-yellow-400 border-yellow-500/30' };
+    default:
+      return { label: '不可用', dot: 'bg-red-500', text: 'text-red-400', chip: 'bg-red-600/15 text-red-400 border-red-500/30' };
+  }
 }
 
-const AGENTS: AgentDef[] = [
-  {
-    id: 'server-manager',
-    name: '服务器管理',
-    icon: Monitor,
-    color: 'bg-red-500/15 text-red-400',
-    borderColor: 'border-l-red-500',
-    description: '负责 SSH 连接、Docker 管理、监控、部署，以及远程服务器自动修复。',
-    capabilities: ['通过 SSH 登录服务器并执行命令', '管理 Docker 容器生命周期', '执行系统监控与自动修复'],
-    tools: ['SSH', 'Docker', 'PM2', 'Nginx'],
-  },
-  {
-    id: 'code-assistant',
-    name: '代码助手',
-    icon: Code,
-    color: 'bg-purple-500/15 text-purple-400',
-    borderColor: 'border-l-purple-500',
-    description: '负责 GitHub 仓库管理、拉取请求、代码审查与问题跟踪。',
-    capabilities: ['克隆仓库并管理分支', '创建和审查拉取请求', '自动代码审查与改进建议'],
-    tools: ['GitHub', 'Git', 'ESLint', 'Prettier'],
-  },
-  {
-    id: 'researcher',
-    name: '调研助手',
-    icon: Search,
-    color: 'bg-green-500/15 text-green-400',
-    borderColor: 'border-l-green-500',
-    description: '负责网页搜索、内容总结、数据分析与趋势调研。',
-    capabilities: ['搜索实时网页信息', '总结文章与文档', '做对比分析与报告'],
-    tools: ['Web Search', 'Scraper', 'Summarizer'],
-  },
-  {
-    id: 'task-planner',
-    name: '任务规划',
-    icon: ListTodo,
-    color: 'bg-yellow-500/15 text-yellow-400',
-    borderColor: 'border-l-yellow-500',
-    description: '负责任务管理、提醒、排期与项目规划。',
-    capabilities: ['创建并跟踪带截止时间的任务', '设置周期性提醒', '将复杂项目拆解成执行步骤'],
-    tools: ['Tasks DB', 'Cron', 'Calendar'],
-  },
-  {
-    id: 'general',
-    name: '通用助手',
-    icon: MessageSquare,
-    color: 'bg-blue-500/15 text-blue-400',
-    borderColor: 'border-l-blue-500',
-    description: '负责通用对话、问答、创作与日常辅助。',
-    capabilities: ['回答各类问题', '创意写作与头脑风暴', '翻译与文本处理'],
-    tools: ['LLM', 'TTS', 'Translation'],
-  },
-  {
-    id: 'security-guard',
-    name: '安全守卫',
-    icon: Shield,
-    color: 'bg-orange-500/15 text-orange-400',
-    borderColor: 'border-l-orange-500',
-    description: '负责审查危险命令、校验操作并执行安全策略。',
-    capabilities: ['执行前校验命令', '识别潜在危险操作', '提供审计轨迹与权限检查'],
-    tools: ['Validator', 'Audit Log', 'Policy Engine'],
-  },
-  {
-    id: 'desktop-controller',
-    name: '桌面控制',
-    icon: Cpu,
-    color: 'bg-indigo-500/15 text-indigo-400',
-    borderColor: 'border-l-indigo-500',
-    description: '通过 nutjs 执行桌面自动化，包括鼠标、键盘与屏幕控制。',
-    capabilities: ['鼠标移动与点击自动化', '键盘输入与快捷键控制', '屏幕截图与 OCR 识别'],
-    tools: ['nutjs', 'Screen OCR', 'Clipboard'],
-  },
-  {
-    id: 'project-builder',
-    name: '项目构建',
-    icon: Hammer,
-    color: 'bg-teal-500/15 text-teal-400',
-    borderColor: 'border-l-teal-500',
-    description: '负责项目脚手架、模板代码生成与构建流水线配置。',
-    capabilities: ['生成完整项目结构', '按最佳实践生成模板代码', '配置 CI/CD 流水线'],
-    tools: ['Templates', 'NPM', 'Git Init', 'Docker'],
-  },
-  {
-    id: 'web-agent',
-    name: '网页代理',
-    icon: Globe,
-    color: 'bg-cyan-500/15 text-cyan-400',
-    borderColor: 'border-l-cyan-500',
-    description: '负责浏览器自动化、网页抓取、表单填写与网站测试。',
-    capabilities: ['自动执行浏览器交互', '抓取并提取网页数据', '填写表单并执行界面测试'],
-    tools: ['Puppeteer', 'Cheerio', 'Fetch'],
-  },
-  {
-    id: 'content-creator',
-    name: '内容创作',
-    icon: Palette,
-    color: 'bg-pink-500/15 text-pink-400',
-    borderColor: 'border-l-pink-500',
-    description: '负责内容生成、社媒文案、营销文案与创意素材。',
-    capabilities: ['生成博客文章与长文', '创建社交媒体内容', '撰写营销文案与广告'],
-    tools: ['LLM', 'Image Gen', 'Markdown'],
-  },
-  {
-    id: 'orchestrator',
-    name: '任务编排',
-    icon: GitBranch,
-    color: 'bg-amber-500/15 text-amber-400',
-    borderColor: 'border-l-amber-500',
-    description: '负责多智能体协同、复杂任务拆解与流水线执行。',
-    capabilities: ['按顺序协调多个智能体', '自动拆解复杂任务', '管理执行流水线与重试'],
-    tools: ['Agent Router', 'Pipeline', 'Queue'],
-  },
-  {
-    id: 'device-controller',
-    name: '设备控制',
-    icon: Smartphone,
-    color: 'bg-emerald-500/15 text-emerald-400',
-    borderColor: 'border-l-emerald-500',
-    description: '负责 IoT 设备管理、智能家居控制与设备自动化。',
-    capabilities: ['控制 IoT 设备与传感器', '执行智能家居自动化流程', '监控设备状态与健康度'],
-    tools: ['MQTT', 'HTTP', 'Webhooks'],
-  },
-];
+function getExecutionLabel(level: AgentRuntimeStatus['executionLevel']) {
+  switch (level) {
+    case 'full': return '真实执行';
+    case 'limited': return '有限执行';
+    default: return '不可执行';
+  }
+}
+
+function getCapabilityStatusMeta(status: 'ready' | 'partial' | 'blocked') {
+  switch (status) {
+    case 'ready':
+      return 'bg-green-600/15 text-green-400 border-green-500/30';
+    case 'partial':
+      return 'bg-yellow-600/15 text-yellow-400 border-yellow-500/30';
+    default:
+      return 'bg-red-600/15 text-red-400 border-red-500/30';
+  }
+}
 
 export default function Agents() {
-  const [dashboardData, setDashboardData] = useState<any>(null);
+  const [data, setData] = useState<{ items: AgentRuntimeStatus[]; summary: { total: number; ready: number; partial: number; blocked: number }; providers: string[]; capabilities?: CapabilitySnapshot } | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -150,58 +102,16 @@ export default function Agents() {
 
   const loadData = async () => {
     try {
-      const data = await api.dashboardStatus();
-      setDashboardData(data);
+      const reality = await api.dashboardAgentReality();
+      const sorted = [...reality.items].sort((a, b) => {
+        const score = { ready: 0, partial: 1, blocked: 2 };
+        return score[a.status] - score[b.status];
+      });
+      setData({ ...reality, items: sorted });
     } catch {
-      // 回退到静态智能体列表
+      setData(null);
     }
     setLoading(false);
-  };
-
-  const getAgentStatus = (agentId: string): string => {
-    if (!dashboardData?.agents) return '活跃';
-    const found = dashboardData.agents.find?.((a: any) => a.id === agentId || a.name === agentId);
-    return found?.status ?? '活跃';
-  };
-
-  const getStatusLabel = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'active':
-      case 'online':
-      case 'running':
-      case '活跃':
-        return '活跃';
-      case 'idle':
-      case 'standby':
-      case '待命':
-        return '待命';
-      case 'disabled':
-      case 'offline':
-      case '离线':
-        return '离线';
-      default:
-        return status;
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'active':
-      case 'online':
-      case 'running':
-      case '活跃':
-        return { dot: 'bg-green-500', text: 'text-green-400' };
-      case 'idle':
-      case 'standby':
-      case '待命':
-        return { dot: 'bg-yellow-500', text: 'text-yellow-400' };
-      case 'disabled':
-      case 'offline':
-      case '离线':
-        return { dot: 'bg-red-500', text: 'text-red-400' };
-      default:
-        return { dot: 'bg-green-500', text: 'text-green-400' };
-    }
   };
 
   if (loading) {
@@ -212,91 +122,189 @@ export default function Agents() {
     );
   }
 
-  const activeCount = AGENTS.filter(a => {
-    const status = getAgentStatus(a.id);
-    return ['active', 'online', 'running', '活跃'].includes(status.toLowerCase());
-  }).length;
+  if (!data) {
+    return (
+      <div className="h-full overflow-y-auto p-6">
+        <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-5 text-red-200">
+          无法加载智能体真实可用性数据。
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="p-6">
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-6">
-          <Bot className="w-7 h-7 text-primary-500" />
-          <h1 className="text-2xl font-bold">智能体</h1>
-          <span className="text-sm bg-green-600/20 text-green-400 px-3 py-0.5 rounded-full font-medium">
-            {activeCount} 个活跃
+      <div className="p-6 space-y-6">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-3">
+            <Bot className="w-7 h-7 text-primary-500" />
+            <div>
+              <h1 className="text-2xl font-bold">智能体真实可用性面板</h1>
+              <p className="text-sm text-gray-400 mt-1">这里显示的是当前机器上真实能不能跑，不是静态宣传页。</p>
+            </div>
+          </div>
+          <span className="px-3 py-1 rounded-full text-sm bg-green-600/15 text-green-400 border border-green-500/30">
+            可用 {data.summary.ready}
           </span>
-          <span className="text-sm text-gray-500">/ 共 {AGENTS.length} 个</span>
+          <span className="px-3 py-1 rounded-full text-sm bg-yellow-600/15 text-yellow-400 border border-yellow-500/30">
+            部分可用 {data.summary.partial}
+          </span>
+          <span className="px-3 py-1 rounded-full text-sm bg-red-600/15 text-red-400 border border-red-500/30">
+            不可用 {data.summary.blocked}
+          </span>
+          <span className="px-3 py-1 rounded-full text-sm bg-dark-800 text-gray-300 border border-gray-700">
+            提供方 {data.providers.length}
+          </span>
         </div>
 
-        {/* System info bar */}
-        {dashboardData && (
-          <div className="flex items-center gap-4 mb-6 p-3 bg-dark-800 rounded-lg border border-gray-800 text-sm text-gray-400">
+        <div className="rounded-xl border border-gray-800 bg-dark-800 p-4 text-sm text-gray-300">
+          <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2">
-              <Zap className="w-4 h-4 text-yellow-400" />
-              <span>路由引擎在线</span>
+              <Wrench className="w-4 h-4 text-primary-400" />
+              <span>执行护栏已启用</span>
             </div>
-            <span className="text-gray-700">|</span>
-            <span>系统会根据消息意图自动选择智能体</span>
+            <span className="text-gray-600">|</span>
+            <span>不可执行的智能体不会再继续假执行，会直接提示缺失依赖。</span>
+          </div>
+        </div>
+
+        {data.capabilities && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="rounded-xl border border-gray-800 bg-dark-800 p-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-white">插件系统</h2>
+                <span className={`px-2 py-0.5 rounded-full border text-[11px] ${getCapabilityStatusMeta(data.capabilities.subsystems.plugins.status)}`}>
+                  {data.capabilities.subsystems.plugins.status === 'ready' ? '可用' : data.capabilities.subsystems.plugins.status === 'partial' ? '部分可用' : '受阻'}
+                </span>
+              </div>
+              <p className="text-sm text-gray-400">{data.capabilities.subsystems.plugins.detail}</p>
+              <p className="text-xs text-gray-500">插件 {data.capabilities.subsystems.plugins.loadedCount}/{data.capabilities.subsystems.plugins.count}，工具 {data.capabilities.summary.pluginTools}</p>
+            </div>
+
+            <div className="rounded-xl border border-gray-800 bg-dark-800 p-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-white">记忆与知识库</h2>
+                <span className={`px-2 py-0.5 rounded-full border text-[11px] ${getCapabilityStatusMeta(data.capabilities.subsystems.memory.status)}`}>
+                  {data.capabilities.subsystems.memory.status === 'ready' ? '可用' : data.capabilities.subsystems.memory.status === 'partial' ? '部分可用' : '受阻'}
+                </span>
+              </div>
+              <p className="text-sm text-gray-400">{data.capabilities.subsystems.memory.detail}</p>
+              <p className="text-xs text-gray-500">文档 {data.capabilities.subsystems.memory.documents} · 切片 {data.capabilities.subsystems.memory.chunks}</p>
+            </div>
+
+            <div className="rounded-xl border border-gray-800 bg-dark-800 p-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-white">OpenClaw 协同</h2>
+                <span className={`px-2 py-0.5 rounded-full border text-[11px] ${getCapabilityStatusMeta(data.capabilities.subsystems.openclaw.status)}`}>
+                  {data.capabilities.subsystems.openclaw.status === 'ready' ? '可用' : data.capabilities.subsystems.openclaw.status === 'partial' ? '部分可用' : '受阻'}
+                </span>
+              </div>
+              <p className="text-sm text-gray-400">{data.capabilities.subsystems.openclaw.detail}</p>
+              <p className="text-xs text-gray-500">统一能力视图已接入当前页面</p>
+            </div>
           </div>
         )}
 
-        {/* Agent Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {AGENTS.map(agent => {
-            const status = getAgentStatus(agent.id);
-            const statusColor = getStatusColor(status);
-            const Icon = agent.icon;
+          {data.items.map((agent) => {
+            const meta = AGENT_META[agent.id] ?? {
+              name: agent.name,
+              icon: Bot,
+              color: 'bg-gray-500/15 text-gray-300',
+              borderColor: 'border-l-gray-500',
+              description: agent.summary,
+            };
+            const Icon = meta.icon;
+            const statusMeta = getStatusMeta(agent.status);
 
             return (
               <div
                 key={agent.id}
-                className={`bg-dark-800 rounded-lg border border-gray-800 border-l-4 ${agent.borderColor} hover:border-gray-600 hover:shadow-lg hover:shadow-black/20 transition-all duration-200 group`}
+                className={`bg-dark-800 rounded-xl border border-gray-800 border-l-4 ${meta.borderColor} p-5 space-y-4`}
               >
-                <div className="p-5">
-                  {/* Agent header */}
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${agent.color}`}>
-                        <Icon className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-white group-hover:text-primary-400 transition-colors">
-                          {agent.name}
-                        </h3>
-                        <span className="text-xs text-gray-500 font-mono">{agent.id}</span>
-                      </div>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${meta.color}`}>
+                      <Icon className="w-5 h-5" />
                     </div>
-                    <div className="flex items-center gap-1.5 mt-1">
-                      <div className={`w-2 h-2 rounded-full ${statusColor.dot} animate-pulse`} />
-                      <span className={`text-xs font-medium ${statusColor.text}`}>{getStatusLabel(status)}</span>
+                    <div>
+                      <h3 className="font-semibold text-white">{meta.name}</h3>
+                      <div className="text-xs text-gray-500 font-mono mt-0.5">{agent.id}</div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs ${statusMeta.chip}`}>
+                      <span className={`w-2 h-2 rounded-full ${statusMeta.dot}`} />
+                      {statusMeta.label}
+                    </div>
+                    <div className="text-[11px] text-gray-500 mt-1">{getExecutionLabel(agent.executionLevel)}</div>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-sm text-gray-300">{meta.description}</p>
+                  <p className="text-sm text-gray-400 mt-2 leading-relaxed">{agent.summary}</p>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {agent.toolStatus.map((tool) => (
+                    <span
+                      key={`${agent.id}-${tool.name}`}
+                      className={`text-[11px] px-2 py-1 rounded-full border ${
+                        tool.status === 'ready'
+                          ? 'bg-green-600/10 text-green-300 border-green-500/20'
+                          : tool.status === 'partial'
+                            ? 'bg-yellow-600/10 text-yellow-300 border-yellow-500/20'
+                            : 'bg-red-600/10 text-red-300 border-red-500/20'
+                      }`}
+                      title={tool.detail}
+                    >
+                      {TOOL_LABELS[tool.name] ?? tool.name}
+                    </span>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 text-sm">
+                  <div>
+                    <div className="text-xs text-gray-500 mb-1.5">已接通</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {agent.availableTools.length > 0 ? agent.availableTools.map((tool) => (
+                        <span key={tool} className="px-2 py-0.5 rounded bg-green-600/10 text-green-300 border border-green-500/20 text-[11px]">
+                          {TOOL_LABELS[tool] ?? tool}
+                        </span>
+                      )) : <span className="text-xs text-gray-600">无</span>}
                     </div>
                   </div>
 
-                  {/* Description */}
-                  <p className="text-sm text-gray-400 mb-4 leading-relaxed">{agent.description}</p>
-
-                  {/* Capabilities */}
-                  <div className="mb-4 space-y-1.5">
-                    {agent.capabilities.map((cap, i) => (
-                      <div key={i} className="flex items-start gap-2 text-xs text-gray-300">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-green-500 mt-0.5 flex-shrink-0" />
-                        <span>{cap}</span>
-                      </div>
-                    ))}
+                  <div>
+                    <div className="text-xs text-gray-500 mb-1.5">受阻项</div>
+                    <div className="space-y-1.5">
+                      {agent.missing.length > 0 ? agent.missing.slice(0, 4).map((item, index) => (
+                        <div key={index} className="flex items-start gap-2 text-xs text-red-300">
+                          <XCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                          <span>{item}</span>
+                        </div>
+                      )) : (
+                        <div className="flex items-start gap-2 text-xs text-green-300">
+                          <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                          <span>当前未发现阻塞项</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
-                  {/* Tools */}
-                  <div className="flex flex-wrap gap-1.5 pt-3 border-t border-gray-800/80">
-                    {agent.tools.map(tool => (
-                      <span
-                        key={tool}
-                        className="text-[10px] px-2 py-0.5 rounded bg-dark-900 text-gray-400 border border-gray-700/50 font-medium"
-                      >
-                        {tool}
-                      </span>
-                    ))}
+                  <div>
+                    <div className="text-xs text-gray-500 mb-1.5">验证证据</div>
+                    <div className="space-y-1.5">
+                      {agent.evidence.slice(0, 4).map((item, index) => (
+                        <div key={index} className="flex items-start gap-2 text-xs text-gray-300">
+                          {agent.status === 'blocked'
+                            ? <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-yellow-400" />
+                            : <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-green-500" />}
+                          <span>{item}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>

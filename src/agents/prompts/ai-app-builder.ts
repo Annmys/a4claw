@@ -86,7 +86,7 @@ Execute in this order:
 - Mobile-first responsive design
 - SEO meta tags on all public pages
 - Environment variables, never hardcode secrets
-- Hebrew + English (RTL support) from day 1
+- Chinese + English support from day 1
 
 ## COST MANAGEMENT
 - Default to cheapest AI model that works (GPT-4o-mini, Haiku)

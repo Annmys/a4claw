@@ -4,6 +4,7 @@ import { IntentRouter } from './router.js';
 import { buildSystemPromptWithContext, FullContext, trimHistoryToFit } from './context-builder.js';
 import { SkillsEngine } from './skills-engine.js';
 import { getAgent } from '../agents/registry.js';
+import { getAgentRuntimeStatus } from './agent-runtime.js';
 import { MetaAgent } from './meta-agent.js';
 import { GoalEngine } from './goals.js';
 import { GoalPlanner } from './goal-planner.js';
@@ -20,6 +21,8 @@ import { RAGEngine } from '../actions/rag/rag-engine.js';
 import { initTools, getToolDefinitions, executeTool, setExecutionContext } from './tool-executor.js';
 import { classifyComplexity, selectModel, classifyEffort, mapEffortToThinking, withVariant, findModel } from './model-router.js';
 import { resolveOllamaModel } from './ollama-model-registry.js';
+import { buildRoutePlan, type RoutePlan } from './route-planner.js';
+import { createDocumentResultArtifacts, type ArtifactGenerationPlan } from './document-artifact-pipeline.js';
 import type { CrewOrchestrator } from './crew-orchestrator.js';
 import { onMessageProcessed, onError, getIntelligenceContext, isBridgeReady } from './intelligence-bridge.js';
 import { getApprovalGate } from './approval-gate.js';
@@ -32,6 +35,8 @@ import logger from '../utils/logger.js';
 import { detectSocialEngineering } from '../security/content-guard.js';
 import { scanMessage as guardScanMessage } from '../security/message-guard.js';
 import type { ChatArtifact } from './shared-artifacts.js';
+import type { PluginLoader } from './plugin-loader.js';
+import type { CapabilityRegistry } from './capability-registry.js';
 
 // ─── Output Secret Filter ──────────────────────────────────────────
 // Prevents LLM from leaking API keys, tokens, or secrets in responses.
@@ -52,6 +57,24 @@ function redactSecrets(text: unknown): string {
     redacted = redacted.replace(pattern, '[REDACTED]');
   }
   return redacted;
+}
+
+const CJK_REGEX = /[\u3400-\u9FFF\uF900-\uFAFF]/;
+const HEBREW_REGEX = /[\u0590-\u05FF]/;
+
+function detectClearlyEnglish(text: string): boolean {
+  if (!text.trim()) return false;
+  if (CJK_REGEX.test(text) || HEBREW_REGEX.test(text)) return false;
+  const words = text.match(/[A-Za-z]+/g) ?? [];
+  const letters = words.join('').length;
+  return words.length >= 2 || letters >= 12;
+}
+
+function buildResponseLanguageInstruction(text: string): string {
+  if (detectClearlyEnglish(text)) {
+    return 'Respond in English only. Use only Simplified Chinese or English.';
+  }
+  return 'Respond in Simplified Chinese only. Use only Simplified Chinese or English.';
 }
 
 export interface ProgressEvent {
@@ -79,6 +102,7 @@ export interface IncomingMessage {
   onStreamReset?: () => void;
   responseMode?: ResponseMode;
   model?: string;
+  interactionMode?: 'chat' | 'task';
 }
 
 export interface OutgoingMessage {
@@ -93,6 +117,13 @@ export interface OutgoingMessage {
   modelUsed?: string;
   modelDisplay?: string; // Human-readable model name for display
   skillUsed?: string;
+  pluginUsed?: string[];
+  executionPath?: string[];
+  memoryHits?: number;
+  routePlan?: RoutePlan;
+  routingReason?: string;
+  requiredCapabilities?: string[];
+  artifactPlan?: ArtifactGenerationPlan;
   elapsed?: number;
 }
 
@@ -109,9 +140,9 @@ const userModeOverrides = new Map<string, ResponseMode>();
  */
 function detectModeCommand(text: string): ResponseMode | null {
   const t = text.trim().toLowerCase();
-  if (/^(מצב מהיר|quick|fast|מהיר)$/i.test(t)) return 'quick';
-  if (/^(מצב אוטומטי|auto|אוטומטי|רגיל)$/i.test(t)) return 'auto';
-  if (/^(מצב מעמיק|deep|מעמיק|עמוק)$/i.test(t)) return 'deep';
+  if (/^(quick|fast|快速模式|快速)$/i.test(t)) return 'quick';
+  if (/^(auto|自动模式|自动|普通)$/i.test(t)) return 'auto';
+  if (/^(deep|深度模式|深度)$/i.test(t)) return 'deep';
   return null;
 }
 
@@ -125,12 +156,12 @@ function autoDetectMode(text: string): ResponseMode {
   const len = text.length;
 
   // BUILD / CREATE / GAME requests should NEVER be quick — they need tools and high token limits
-  // This catches short messages like "בנה לי משחק", "build a game", or even "Platformer" that would otherwise be quick
-  if (/\b(build|create|scaffold|deploy|generate|בנה|בנה לי|תבנה|צור|תיצור)\b.*\b(game|app|project|site|website|page|api|dashboard|משחק|אפליקציה|פרויקט|אתר|דף)\b/i.test(text)) {
+  // This catches short messages like "做个游戏", "build a game", or even "Platformer" that would otherwise be quick
+  if (/\b(build|create|scaffold|deploy|generate)\b.*\b(game|app|project|site|website|page|api|dashboard)\b|做.*(游戏|应用|项目|网站|页面|接口|仪表盘)|创建.*(游戏|应用|项目|网站|页面|接口|仪表盘)/i.test(text)) {
     return 'auto';
   }
   // Game-genre keywords — even without "build" these imply tool-heavy game creation
-  if (/\b(game|games|משחק|משחקים|platformer|shooter|arcade|runner|snake|tetris|pong|breakout|phaser|mario|pacman|puzzle.?game|space.?invader|galaxy|destroyer|flappy|racing|rpg|tower.?defense)\b|קפיצות.*מטבעות|מפלצות.*שלבים|סגנון\s+mario/i.test(text)) {
+  if (/\b(game|games|platformer|shooter|arcade|runner|snake|tetris|pong|breakout|phaser|mario|pacman|puzzle.?game|space.?invader|galaxy|destroyer|flappy|racing|rpg|tower.?defense)\b|游戏|平台跳跃|射击|街机|贪吃蛇|俄罗斯方块|马里奥/i.test(text)) {
     return 'auto';
   }
 
@@ -138,24 +169,24 @@ function autoDetectMode(text: string): ResponseMode {
   if (len < 60) return 'quick';
 
   // Simple greeting / question patterns — only for short-ish messages
-  // Long messages starting with "היי" may contain complex requests after the greeting
-  if (len < 150 && /^(היי|שלום|הי|hello|hi|hey|yo|בוקר טוב|ערב טוב|מה נשמע|מה קורה|thanks|תודה|ok|אוקי|כן|לא|good|טוב|בסדר)/i.test(text.trim())) {
+  // Long messages starting with a greeting may contain complex requests after the greeting
+  if (len < 150 && /^(你好|您好|嗨|hello|hi|hey|yo|早上好|晚上好|thanks|谢谢|ok|okay|yes|no|good|好的|行|可以)/i.test(text.trim())) {
     return 'quick';
   }
 
-  // Simple short questions (Hebrew + English)
-  if (len < 200 && /^(מה|איך|למה|כמה|האם|יש|what|how|why|when|who|where|is there|can you|do you|tell me|show me)/i.test(text.trim())) {
+  // Simple short questions (Chinese + English)
+  if (len < 200 && /^(什么|怎么|为什么|多少|是否|有没有|what|how|why|when|who|where|is there|can you|do you|tell me|show me)/i.test(text.trim())) {
     return 'quick';
   }
 
   // Multi-domain / complex → deep
   if (len > 500) {
     const domains = [
-      /research|חקור|analyze|נתח/i,
-      /build|בנה|create|צור|implement/i,
-      /trade|signal|מסחר|סיגנל|crypto/i,
-      /secur|audit|אבטח|penetr/i,
-      /review|בדוק|test|בדיקה/i,
+      /research|研究|analyze|分析/i,
+      /build|构建|create|创建|implement|实现/i,
+      /trade|signal|交易|信号|crypto|加密/i,
+      /secur|audit|安全|渗透|penetr/i,
+      /review|检查|test|测试|审查/i,
     ];
     const matchCount = domains.filter(d => d.test(text)).length;
     if (matchCount >= 2) return 'deep';
@@ -202,6 +233,34 @@ function extractExplicitFileContent(text: string): string | null {
   return null;
 }
 
+function sanitizeArtifactDeliveryResponse(
+  text: string,
+  artifacts: ChatArtifact[],
+  artifactPlan?: ArtifactGenerationPlan,
+): string {
+  if (!text.trim()) return text;
+  const hasFakeDeliveryHints = /sandbox:\/|\/mnt\/data\/|download [^\n]+\.|```python|```bash/i.test(text);
+  if (!artifactPlan || !hasFakeDeliveryHints) return text;
+
+  let cleaned = text
+    .replace(/```(?:python|bash|sh|javascript|js)?[\s\S]*?```/gi, '')
+    .replace(/\[下载[^\]]*\]\(sandbox:[^)]+\)/gi, '')
+    .replace(/sandbox:\/\S+/gi, '')
+    .replace(/\/mnt\/data\/\S+/gi, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  const attachmentLine = artifacts.length > 0
+    ? `已生成并作为附件返回：${artifacts.map((artifact) => artifact.originalName || artifact.name).join('、')}`
+    : '';
+
+  if (attachmentLine && !cleaned.includes(attachmentLine)) {
+    cleaned = cleaned ? `${cleaned}\n\n${attachmentLine}` : attachmentLine;
+  }
+
+  return cleaned;
+}
+
 export class Engine {
   private ai: AIClient;
   private router: IntentRouter;
@@ -218,12 +277,15 @@ export class Engine {
   private ragEngine: RAGEngine | null = null;
   private evolution: EvolutionEngine | null = null;
   private crewOrchestrator: CrewOrchestrator | null = null;
+  private pluginLoader: PluginLoader | null = null;
+  private capabilityRegistry: CapabilityRegistry | null = null;
 
   private getHistory?: (userId: string, platform: string, limit: number, conversationId?: string) => Promise<Message[]>;
   private saveMessage?: (userId: string, platform: string, role: string, content: string, metadata?: any) => Promise<void>;
   private getUserKnowledge?: (userId: string) => Promise<string>;
   private getUserTasks?: (userId: string) => Promise<string>;
   private getUserServers?: (userId: string) => Promise<string>;
+  private getUserOrganization?: (userId: string, platform: string) => Promise<string>;
   private learnFromConversation?: (userId: string, userMessage: string, agentResponse: string) => Promise<void>;
   private getKnowledgeCount?: (userId: string) => Promise<number>;
   private getCrossPlatformSummary?: (userId: string, platform: string) => Promise<string>;
@@ -267,6 +329,10 @@ export class Engine {
   getEvolutionEngine(): EvolutionEngine | null { return this.evolution; }
   setCrewOrchestrator(crew: CrewOrchestrator) { this.crewOrchestrator = crew; }
   getCrewOrchestrator(): CrewOrchestrator | null { return this.crewOrchestrator; }
+  setPluginLoader(loader: PluginLoader | null) { this.pluginLoader = loader; }
+  getPluginLoader(): PluginLoader | null { return this.pluginLoader; }
+  setCapabilityRegistry(registry: CapabilityRegistry | null) { this.capabilityRegistry = registry; }
+  getCapabilityRegistry(): CapabilityRegistry | null { return this.capabilityRegistry; }
 
   /**
    * Smart crew detection — decides if multiple agents are needed and WHY.
@@ -287,19 +353,19 @@ export class Engine {
     if (text.length < 200) return null;
 
     // Rule 2: Simple patterns → single agent
-    const isQuestion = /^(מה|יש|תבדוק|איך|למה|כמה|what|is there|check|status|how|why|when|who|where|tell me|show me|explain)/i.test(text.trim());
+    const isQuestion = /^(什么|有没有|帮我检查|怎么|为什么|多少|what|is there|check|status|how|why|when|who|where|tell me|show me|explain)/i.test(text.trim());
     if (isQuestion && text.length < 400) return null;
 
     const lowerText = text.toLowerCase();
 
     // Rule 3: Detect distinct task domains
     const domains = {
-      research: /research|חקור|analyze|analys|נתח|investigate|survey|compare/i.test(lowerText),
-      build: /build|בנה|create|צור|implement|develop|write code|תכתוב|תבנה/i.test(lowerText),
-      trade: /trade|signal|מסחר|סיגנל|portfolio|crypto|bitcoin|שוק/i.test(lowerText),
-      security: /secur|audit|vulnerab|אבטח|penetr|pentest/i.test(lowerText),
-      review: /review|בדוק|check|סקור|test|בדיקה/i.test(lowerText),
-      content: /write article|כתוב מאמר|blog|presentation|מצגת|document/i.test(lowerText),
+      research: /research|研究|analyze|analys|分析|investigate|survey|compare/i.test(lowerText),
+      build: /build|构建|create|创建|implement|develop|write code|写代码|开发/i.test(lowerText),
+      trade: /trade|signal|交易|信号|portfolio|crypto|bitcoin|market|市场/i.test(lowerText),
+      security: /secur|audit|vulnerab|安全|penetr|pentest/i.test(lowerText),
+      review: /review|检查|check|审查|test|测试/i.test(lowerText),
+      content: /write article|写文章|blog|presentation|演示文稿|document|文档/i.test(lowerText),
     };
 
     const activeDomains = Object.entries(domains).filter(([, active]) => active);
@@ -308,7 +374,7 @@ export class Engine {
     if (activeDomains.length < 2) {
       // Special case: explicit orchestrate intent with complex multi-step task
       if ((intent === 'orchestrate' || intent === 'autonomous_task') && text.length > 120) {
-        const hasMultipleSteps = /\d+\.\s|then\s|ואז\s|אחר כך|step\s?\d|first.*then|קודם.*אחר/i.test(text);
+        const hasMultipleSteps = /\d+\.\s|then\s|然后|接着|step\s?\d|first.*then|先.*再/i.test(text);
         const looksLikeExecutionRequest = /继续处理|继续执行|直接执行|直接处理|自动处理|自动执行|帮我完成|帮我处理|请直接执行任务|task mode|run.*autonomously|execute.*task|do this yourself/i.test(lowerText);
         if (hasMultipleSteps || looksLikeExecutionRequest) {
           const reason = intent === 'autonomous_task'
@@ -405,7 +471,7 @@ export class Engine {
       const quickGuard = guardScanMessage(incoming.text, incoming.userId);
       if (quickGuard.blocked) {
         logger.error('Quick message BLOCKED by guard', { userId: incoming.userId, score: quickGuard.score });
-        return { text: '⛔ ההודעה נחסמה על ידי מערכת האבטחה.', format: 'text', agentUsed: 'message-guard', provider: 'local' };
+        return { text: '⛔ 消息已被安全系统拦截。', format: 'text', agentUsed: 'message-guard', provider: 'local' };
       }
 
       incoming.onProgress?.({ type: 'status', message: '⚡ Quick mode — fast response' });
@@ -437,6 +503,18 @@ export class Engine {
       const keywordRouting = (this.router as any).keywordClassify?.(incoming.text);
       const agentId = keywordRouting?.agentId ?? 'general';
       const agent = getAgent(agentId) ?? getAgent('general')!;
+      const routePlan = buildRoutePlan({
+        routing: keywordRouting ?? {
+          intent: Intent.GENERAL_CHAT,
+          confidence: 0.5,
+          agentId: 'general',
+          extractedParams: {},
+        },
+        text: incoming.text,
+        mode: 'quick',
+        hasAttachments: (incoming.attachments?.length ?? 0) > 0,
+        interactionMode: incoming.interactionMode,
+      });
       if (agent.id === 'task-executor') {
         await audit(incoming.userId, 'task_executor.dispatched', {
           intent: keywordRouting?.intent ?? Intent.AUTONOMOUS_TASK,
@@ -456,8 +534,7 @@ export class Engine {
 
       // Minimal system prompt — no full context loading
       const lastMsgStr = incoming.text;
-      const hasHebrew = /[\u0590-\u05FF]/.test(lastMsgStr);
-      const minimalPrompt = `${agent.systemPrompt}\n\nUser: ${incoming.userName} | Platform: ${incoming.platform}${hasHebrew ? '\nThe user speaks Hebrew — respond in Hebrew.' : ''}`;
+      const minimalPrompt = `${agent.systemPrompt}\n\nUser: ${incoming.userName} | Platform: ${incoming.platform}\n${buildResponseLanguageInstruction(lastMsgStr)}`;
 
       // Build messages
       const trimmedHistory = trimHistoryToFit(history, 8000);
@@ -534,7 +611,7 @@ export class Engine {
 
       // Empty response fallback
       if (!response.content || response.content.trim().length === 0) {
-        response.content = 'קיבלתי את ההודעה שלך אבל לא הצלחתי לעבד אותה. נסה שוב 🔄';
+        response.content = '我收到了你的消息，但这次没有成功处理。请再试一次。';
       }
 
       // Safety net: strip raw <tool_call> blocks that leaked into text output
@@ -545,18 +622,24 @@ export class Engine {
           .replace(/<tool_result>[\s\S]*?<\/tool_result>/g, '')
           .trim();
         if (response.content.length < 20) {
-          response.content = 'מעבד את הבקשה שלך... הבקשה הזו דורשת כלים מיוחדים. שולח שוב במצב מלא. 🔧';
+          response.content = '这项请求需要完整工具链处理，正在自动切换到完整模式。';
         }
       }
 
       // Save messages
       if (this.saveMessage) {
         if (incoming.text) {
-          await this.saveMessage(incoming.userId, incoming.platform, 'user', incoming.text, { mode: 'quick' });
+          await this.saveMessage(incoming.userId, incoming.platform, 'user', incoming.text, {
+            mode: 'quick',
+            intent: routePlan.intent,
+          });
         }
         if (response.content) {
           await this.saveMessage(incoming.userId, incoming.platform, 'assistant', response.content, {
             agent: agent.id, provider: response.provider, mode: 'quick',
+            routePlan,
+            routingReason: routePlan.reason,
+            requiredCapabilities: routePlan.requiredCapabilities,
           });
         }
       }
@@ -608,22 +691,24 @@ export class Engine {
         provider: response.provider,
         modelUsed: response.modelUsed ?? selectedModelId,
         modelDisplay: modelName, // Human-readable model name
+        routePlan,
+        routingReason: routePlan.reason,
+        requiredCapabilities: routePlan.requiredCapabilities,
         elapsed: Math.round((Date.now() - startTime) / 1000),
       };
     } catch (error: any) {
       logger.error('Quick mode error', { error: error.message });
       const msg = error.message ?? '';
-      // User-friendly error messages in Hebrew
       if (msg.includes('timed out') || msg.includes('timeout')) {
-        return { text: '⏰ Claude Code CLI עמוס מדי (timeout). נסה שוב בעוד רגע, או הגדר ANTHROPIC_API_KEY ב-.env לגישה ישירה.', format: 'text' };
+        return { text: '⏰ 请求超时。请稍后重试，或配置 `ANTHROPIC_API_KEY` 以使用直连 API。', format: 'text' };
       }
       if (msg.includes('402') || msg.includes('Insufficient credits')) {
-        return { text: '💳 אין קרדיטים ב-OpenRouter ו-Claude Code CLI לא זמין. הגדר ANTHROPIC_API_KEY ב-.env.', format: 'text' };
+        return { text: '💳 OpenRouter 额度不足，且 Claude Code CLI 当前不可用。请配置 `ANTHROPIC_API_KEY`。', format: 'text' };
       }
       if (msg.includes('No providers available')) {
-        return { text: '🔌 אין providers זמינים. הגדר ANTHROPIC_API_KEY ב-.env או טען קרדיטים ב-OpenRouter.', format: 'text' };
+        return { text: '🔌 当前没有可用模型提供方。请配置 `ANTHROPIC_API_KEY` 或为 OpenRouter 充值。', format: 'text' };
       }
-      return { text: `❌ שגיאה: ${msg.slice(0, 150)}`, format: 'text' };
+      return { text: `❌ 处理失败：${msg.slice(0, 150)}`, format: 'text' };
     } finally {
       if (_origSave) this.saveMessage = _origSave;
     }
@@ -635,6 +720,7 @@ export class Engine {
     getUserKnowledge: Engine['getUserKnowledge'];
     getUserTasks?: Engine['getUserTasks'];
     getUserServers?: Engine['getUserServers'];
+    getUserOrganization?: Engine['getUserOrganization'];
     learnFromConversation?: Engine['learnFromConversation'];
     getKnowledgeCount?: Engine['getKnowledgeCount'];
     getCrossPlatformSummary?: Engine['getCrossPlatformSummary'];
@@ -644,6 +730,7 @@ export class Engine {
     this.getUserKnowledge = fns.getUserKnowledge;
     this.getUserTasks = fns.getUserTasks;
     this.getUserServers = fns.getUserServers;
+    this.getUserOrganization = fns.getUserOrganization;
     this.learnFromConversation = fns.learnFromConversation;
     this.getKnowledgeCount = fns.getKnowledgeCount;
     this.getCrossPlatformSummary = fns.getCrossPlatformSummary;
@@ -658,8 +745,8 @@ export class Engine {
     const modeCmd = detectModeCommand(incoming.text);
     if (modeCmd) {
       userModeOverrides.set(incoming.userId, modeCmd);
-      const modeNames: Record<ResponseMode, string> = { quick: 'מהיר (Quick)', auto: 'אוטומטי (Auto)', deep: 'מעמיק (Deep)' };
-      const responseText = `מצב ${modeNames[modeCmd]} הופעל.\n\n• **מהיר** — תגובה מהירה בלי סוכנים, מתאים לשיחה רגילה\n• **אוטומטי** — המערכת מחליטה מתי להפעיל סוכנים\n• **מעמיק** — כל הסוכנים פעילים, ניתוח מלא`;
+      const modeNames: Record<ResponseMode, string> = { quick: '快速模式', auto: '自动模式', deep: '深度模式' };
+      const responseText = `已切换到${modeNames[modeCmd]}。\n\n• **快速模式**：只做快速回复，不执行复杂工具\n• **自动模式**：系统自动决定是否启用智能体和工具\n• **深度模式**：启用完整分析与工具链`;
       if (this.saveMessage) {
         await this.saveMessage(incoming.userId, incoming.platform, 'user', incoming.text);
         await this.saveMessage(incoming.userId, incoming.platform, 'assistant', responseText);
@@ -676,7 +763,7 @@ export class Engine {
         flags: guardResult.flags.slice(0, 5),
       });
       return {
-        text: '⛔ ההודעה נחסמה על ידי מערכת האבטחה. זוהו דפוסים חשודים בתוכן.',
+        text: '⛔ 消息已被安全系统拦截，检测到可疑内容模式。',
         format: 'text',
         agentUsed: 'message-guard',
         provider: 'local',
@@ -692,7 +779,7 @@ export class Engine {
 
     // ── 0b. Determine response mode ──
     const userMode = incoming.responseMode ?? userModeOverrides.get(incoming.userId) ?? 'auto';
-    const effectiveMode = userMode === 'auto' ? autoDetectMode(incoming.text) : userMode;
+    let effectiveMode = userMode === 'auto' ? autoDetectMode(incoming.text) : userMode;
     logger.info('Response mode', { userMode, effectiveMode, textLength: incoming.text.length });
 
     // Wrap saveMessage to auto-inject conversationId from the incoming message
@@ -704,6 +791,35 @@ export class Engine {
     }
 
     try {
+      let memoryHits = 0;
+
+      const localDesktopIntent = /桌面|屏幕|截图|截屏|点开.*软件|点击.*按钮|打开.*应用|鼠标|键盘|click.*desktop|click.*screen|take.*screenshot|desktop.*control|screen.*shot/i.test(incoming.text);
+      const localDeviceIntent = /手机|设备|adb|appium|phone.*tap|phone.*swipe|点击.*手机|控制.*设备/i.test(incoming.text);
+
+      if (localDesktopIntent) {
+        const desktopRuntime = await getAgentRuntimeStatus('desktop-controller', this.ai.getAvailableProviders());
+        if (desktopRuntime.status === 'blocked') {
+          const responseText = `桌面控制当前不可执行。原因：${desktopRuntime.missing.slice(0, 3).join('；') || '关键依赖未就绪'}。请先在“智能体”页面查看真实可用性面板。`;
+          if (this.saveMessage) {
+            await this.saveMessage(incoming.userId, incoming.platform, 'user', incoming.text, { intent: 'desktop_control_precheck' });
+            await this.saveMessage(incoming.userId, incoming.platform, 'assistant', responseText, { agent: 'runtime-guard' });
+          }
+          return { text: responseText, format: 'markdown', agentUsed: 'runtime-guard', provider: 'local' };
+        }
+      }
+
+      if (localDeviceIntent) {
+        const deviceRuntime = await getAgentRuntimeStatus('device-controller', this.ai.getAvailableProviders());
+        if (deviceRuntime.status === 'blocked') {
+          const responseText = `设备控制当前不可执行。原因：${deviceRuntime.missing.slice(0, 3).join('；') || '关键依赖未就绪'}。请先在“智能体”页面查看真实可用性面板。`;
+          if (this.saveMessage) {
+            await this.saveMessage(incoming.userId, incoming.platform, 'user', incoming.text, { intent: 'device_control_precheck' });
+            await this.saveMessage(incoming.userId, incoming.platform, 'assistant', responseText, { agent: 'runtime-guard' });
+          }
+          return { text: responseText, format: 'markdown', agentUsed: 'runtime-guard', provider: 'local' };
+        }
+      }
+
       // ── QUICK MODE: Minimal processing — skip intent classification, meta-agent, crew ──
       // processQuick returns null if the agent needs tools → fall through to auto mode
       if (effectiveMode === 'quick') {
@@ -727,6 +843,40 @@ export class Engine {
       const routing = await this.router.classify(incoming.text, contextSummary);
       logger.info('Intent classified', { intent: routing.intent, confidence: routing.confidence, agent: routing.agentId });
       incoming.onProgress?.({ type: 'status', message: `🔀 Router → ${routing.agentId} (${Math.round(routing.confidence * 100)}%)` });
+      let routePlan = buildRoutePlan({
+        routing,
+        text: incoming.text,
+        mode: effectiveMode,
+        hasAttachments: (incoming.attachments?.length ?? 0) > 0,
+        interactionMode: incoming.interactionMode,
+      });
+      if (routePlan.forceMode && routePlan.forceMode !== effectiveMode) {
+        logger.info('Route plan adjusted execution mode', {
+          previousMode: effectiveMode,
+          nextMode: routePlan.forceMode,
+          intent: routing.intent,
+          routeType: routePlan.routeType,
+        });
+        effectiveMode = routePlan.forceMode;
+        routePlan = { ...routePlan, mode: effectiveMode };
+        incoming.onProgress?.({
+          type: 'status',
+          message: `🧭 路由计划将执行模式切换为 ${effectiveMode}（${routePlan.routeType}）`,
+        });
+      }
+      incoming.onProgress?.({
+        type: 'status',
+        message: `🧭 Route Plan → ${routePlan.routeType} / ${routePlan.mode} / ${routePlan.riskLevel}`,
+      });
+      const routeResponseMeta = {
+        routePlan,
+        routingReason: routePlan.reason,
+        requiredCapabilities: routePlan.requiredCapabilities,
+      };
+      const withRoutePlan = (payload: OutgoingMessage): OutgoingMessage => ({
+        ...payload,
+        ...routeResponseMeta,
+      });
 
       // 2a. Desktop control — intercept before normal AI flow
       if (
@@ -751,11 +901,11 @@ export class Engine {
           });
         }
         if (!approved) {
-          return {
+          return withRoutePlan({
             text: 'Desktop control action was not approved. The request timed out or was denied.',
             format: 'text',
             agentUsed: 'approval-gate',
-          };
+          });
         }
 
         const result = await this.desktopVision.executeTask(incoming.text, incoming.userId);
@@ -765,15 +915,18 @@ export class Engine {
 
         if (this.saveMessage) {
           await this.saveMessage(incoming.userId, incoming.platform, 'user', incoming.text, { intent: routing.intent });
-          await this.saveMessage(incoming.userId, incoming.platform, 'assistant', responseText, { agent: 'desktop-controller' });
+          await this.saveMessage(incoming.userId, incoming.platform, 'assistant', responseText, {
+            agent: 'desktop-controller',
+            ...routeResponseMeta,
+          });
         }
 
-        return {
+        return withRoutePlan({
           text: responseText,
           format: 'markdown',
           agentUsed: 'desktop-controller',
           provider: 'local',
-        };
+        });
       }
 
       // 2b. Project Builder — intercept build_project intent
@@ -796,16 +949,16 @@ export class Engine {
           });
         }
         if (!approved) {
-          return {
+          return withRoutePlan({
             text: 'Project build was not approved. The request timed out or was denied.',
             format: 'text',
             agentUsed: 'approval-gate',
-          };
+          });
         }
 
         // Game requests → skip template system, go straight to agentic flow with tools
         // The project-builder agent has file + bash tools and game-building instructions in its prompt
-        const isGameRequest = /\b(game|games|משחק|משחקים|phaser|arcade|shooter|platformer|puzzle|snake|tetris|pong|breakout|runner)\b/i.test(incoming.text);
+        const isGameRequest = /\b(game|games|phaser|arcade|shooter|platformer|puzzle|snake|tetris|pong|breakout|runner)\b|游戏|街机|射击|平台跳跃|贪吃蛇|俄罗斯方块/i.test(incoming.text);
         if (!isGameRequest) {
           const templates = this.projectBuilder.getTemplateList();
           const templateList = templates.map(t => `- **${t.id}**: ${t.name} — ${t.description} (${t.stack})`).join('\n');
@@ -857,10 +1010,13 @@ If they want to check a running project, use "status" with projectName.`,
 
             if (this.saveMessage) {
               await this.saveMessage(incoming.userId, incoming.platform, 'user', incoming.text, { intent: routing.intent });
-              await this.saveMessage(incoming.userId, incoming.platform, 'assistant', responseText, { agent: 'project-builder' });
+              await this.saveMessage(incoming.userId, incoming.platform, 'assistant', responseText, {
+                agent: 'project-builder',
+                ...routeResponseMeta,
+              });
             }
 
-            return { text: responseText, format: 'markdown', agentUsed: 'project-builder', provider: 'local' };
+            return withRoutePlan({ text: responseText, format: 'markdown', agentUsed: 'project-builder', provider: 'local' });
           } catch {
             // Fall through to normal AI flow if JSON parsing fails
           }
@@ -875,19 +1031,22 @@ If they want to check a running project, use "status" with projectName.`,
       if (routing.intent === Intent.REMINDER_SET) {
         try {
           const parseResponse = await this.ai.chat({
-            systemPrompt: `Parse this reminder request. Respond with ONLY valid JSON:\n{"delayMinutes":<number>,"message":"<reminder text>"}\nExamples: "remind me in 5 minutes to call" → {"delayMinutes":5,"message":"Call"}\n"שלח לי הודעה בעוד דקה" → {"delayMinutes":1,"message":"תזכורת"}\n"remind me tomorrow" → {"delayMinutes":1440,"message":"Reminder"}`,
+            systemPrompt: `Parse this reminder request. Respond with ONLY valid JSON:\n{"delayMinutes":<number>,"message":"<reminder text>"}\nExamples: "remind me in 5 minutes to call" → {"delayMinutes":5,"message":"Call"}\n"1分钟后提醒我发消息" → {"delayMinutes":1,"message":"提醒"}\n"remind me tomorrow" → {"delayMinutes":1440,"message":"Reminder"}`,
             messages: [{ role: 'user', content: incoming.text }],
             maxTokens: 200, temperature: 0.1,
           });
           const plan = extractJSON<{ delayMinutes: number; message: string }>(parseResponse.content);
           const delayMs = Math.max(1, plan.delayMinutes) * 60 * 1000;
           await scheduleReminder({ userId: incoming.userId, message: plan.message, platform: incoming.platform }, delayMs);
-          const responseText = `⏰ תזכורת נקבעה בעוד ${plan.delayMinutes} דקות: "${plan.message}"`;
+          const responseText = `⏰ 已设置提醒，${plan.delayMinutes} 分钟后提醒你：${plan.message}`;
           if (this.saveMessage) {
             await this.saveMessage(incoming.userId, incoming.platform, 'user', incoming.text, { intent: routing.intent });
-            await this.saveMessage(incoming.userId, incoming.platform, 'assistant', responseText, { agent: 'reminder' });
+            await this.saveMessage(incoming.userId, incoming.platform, 'assistant', responseText, {
+              agent: 'reminder',
+              ...routeResponseMeta,
+            });
           }
-          return { text: responseText, format: 'markdown' as const, agentUsed: 'reminder', provider: 'local' };
+          return withRoutePlan({ text: responseText, format: 'markdown' as const, agentUsed: 'reminder', provider: 'local' });
         } catch { /* fall through to normal AI */ }
       }
 
@@ -921,9 +1080,12 @@ If they want to check a running project, use "status" with projectName.`,
           }
           if (this.saveMessage) {
             await this.saveMessage(incoming.userId, incoming.platform, 'user', incoming.text, { intent: routing.intent });
-            await this.saveMessage(incoming.userId, incoming.platform, 'assistant', responseText, { agent: 'scheduler' });
+            await this.saveMessage(incoming.userId, incoming.platform, 'assistant', responseText, {
+              agent: 'scheduler',
+              ...routeResponseMeta,
+            });
           }
-          return { text: responseText, format: 'markdown' as const, agentUsed: 'scheduler', provider: 'local' };
+          return withRoutePlan({ text: responseText, format: 'markdown' as const, agentUsed: 'scheduler', provider: 'local' });
         } catch { /* fall through to normal AI */ }
       }
 
@@ -956,7 +1118,7 @@ If they want to check a running project, use "status" with projectName.`,
               });
             }
             if (!emailApproved) {
-              return { text: 'Email send was not approved. Action cancelled.', format: 'text' as const, agentUsed: 'approval-gate' };
+              return withRoutePlan({ text: 'Email send was not approved. Action cancelled.', format: 'text' as const, agentUsed: 'approval-gate' });
             }
             const { sendEmail } = await import('../actions/email/gmail.js');
             await sendEmail(plan.to, plan.subject, plan.body);
@@ -974,9 +1136,12 @@ If they want to check a running project, use "status" with projectName.`,
           }
           if (this.saveMessage) {
             await this.saveMessage(incoming.userId, incoming.platform, 'user', incoming.text, { intent: routing.intent });
-            await this.saveMessage(incoming.userId, incoming.platform, 'assistant', responseText, { agent: 'email' });
+            await this.saveMessage(incoming.userId, incoming.platform, 'assistant', responseText, {
+              agent: 'email',
+              ...routeResponseMeta,
+            });
           }
-          return { text: responseText, format: 'markdown' as const, agentUsed: 'email', provider: 'local' };
+          return withRoutePlan({ text: responseText, format: 'markdown' as const, agentUsed: 'email', provider: 'local' });
         } catch (err: any) {
           logger.warn('Email intercept failed, falling through', { error: err.message });
         }
@@ -997,24 +1162,33 @@ If they want to check a running project, use "status" with projectName.`,
           const responseText = results.join('\n');
           if (this.saveMessage) {
             await this.saveMessage(incoming.userId, incoming.platform, 'user', incoming.text, { intent: routing.intent });
-            await this.saveMessage(incoming.userId, incoming.platform, 'assistant', responseText, { agent: 'rag' });
+            await this.saveMessage(incoming.userId, incoming.platform, 'assistant', responseText, {
+              agent: 'rag',
+              ...routeResponseMeta,
+            });
           }
-          return { text: responseText, format: 'markdown' as const, agentUsed: 'rag', provider: 'local' };
+          return withRoutePlan({ text: responseText, format: 'markdown' as const, agentUsed: 'rag', provider: 'local' });
         }
         const docs = this.ragEngine.listDocuments(incoming.userId);
-        if (incoming.text.match(/list|רשימ|documents|מסמכ/i)) {
+        const asksForDocumentInventory = /\b(list|documents?)\b|文档列表|知识库文档|我的文档|有哪些文档|列出文档/i.test(incoming.text);
+        const inlineFileDraft = Boolean(extractExplicitFileContent(incoming.text)) || isFileDeliveryRequest(incoming.text);
+        if (asksForDocumentInventory && !inlineFileDraft) {
           const responseText = docs.length === 0 ? 'No documents stored.'
             : `**Your documents:**\n${docs.map(d => `- ${d}`).join('\n')}\n\n${this.ragEngine.getChunkCount(incoming.userId)} total chunks`;
           if (this.saveMessage) {
             await this.saveMessage(incoming.userId, incoming.platform, 'user', incoming.text, { intent: routing.intent });
-            await this.saveMessage(incoming.userId, incoming.platform, 'assistant', responseText, { agent: 'rag' });
+            await this.saveMessage(incoming.userId, incoming.platform, 'assistant', responseText, {
+              agent: 'rag',
+              ...routeResponseMeta,
+            });
           }
-          return { text: responseText, format: 'markdown' as const, agentUsed: 'rag', provider: 'local' };
+          return withRoutePlan({ text: responseText, format: 'markdown' as const, agentUsed: 'rag', provider: 'local' });
         }
         // Query RAG for context — inject into message and fall through to normal AI
         if (docs.length > 0) {
           const ragContext = await this.ragEngine.query(incoming.text, incoming.userId);
           if (ragContext) {
+            memoryHits = Math.max((ragContext.match(/\[Source:/g) ?? []).length, 1);
             incoming.text = `${incoming.text}\n\n--- Relevant documents ---\n${ragContext}`;
           }
         }
@@ -1044,9 +1218,12 @@ If they want to check a running project, use "status" with projectName.`,
           }
           if (this.saveMessage) {
             await this.saveMessage(incoming.userId, incoming.platform, 'user', incoming.text, { intent: routing.intent });
-            await this.saveMessage(incoming.userId, incoming.platform, 'assistant', responseText, { agent: 'calendar' });
+            await this.saveMessage(incoming.userId, incoming.platform, 'assistant', responseText, {
+              agent: 'calendar',
+              ...routeResponseMeta,
+            });
           }
-          return { text: responseText, format: 'markdown' as const, agentUsed: 'calendar', provider: 'local' };
+          return withRoutePlan({ text: responseText, format: 'markdown' as const, agentUsed: 'calendar', provider: 'local' });
         } catch (err: any) {
           logger.warn('Calendar intercept failed, falling through', { error: err.message });
         }
@@ -1061,9 +1238,12 @@ If they want to check a running project, use "status" with projectName.`,
         const responseText = `**Usage Summary**\nToday: $${summary.totalCost.toFixed(4)} (${summary.totalCalls} calls)\nMonth: $${monthCost.toFixed(4)}${Object.keys(summary.byModel).length > 0 ? `\n\n**By model:**\n${modelBreakdown}` : ''}\n\nBudget: ${this.usageTracker.isOverBudget() ? '⚠️ Over budget!' : '✅ Within budget'}`;
         if (this.saveMessage) {
           await this.saveMessage(incoming.userId, incoming.platform, 'user', incoming.text, { intent: routing.intent });
-          await this.saveMessage(incoming.userId, incoming.platform, 'assistant', responseText, { agent: 'usage' });
+          await this.saveMessage(incoming.userId, incoming.platform, 'assistant', responseText, {
+            agent: 'usage',
+            ...routeResponseMeta,
+          });
         }
-        return { text: responseText, format: 'markdown' as const, agentUsed: 'usage', provider: 'local' };
+        return withRoutePlan({ text: responseText, format: 'markdown' as const, agentUsed: 'usage', provider: 'local' });
       }
 
       // 2h. Phone — intercept SMS/call
@@ -1084,9 +1264,12 @@ If they want to check a running project, use "status" with projectName.`,
           const responseText = `✅ ${result}`;
           if (this.saveMessage) {
             await this.saveMessage(incoming.userId, incoming.platform, 'user', incoming.text, { intent: routing.intent });
-            await this.saveMessage(incoming.userId, incoming.platform, 'assistant', responseText, { agent: 'phone' });
+            await this.saveMessage(incoming.userId, incoming.platform, 'assistant', responseText, {
+              agent: 'phone',
+              ...routeResponseMeta,
+            });
           }
-          return { text: responseText, format: 'markdown' as const, agentUsed: 'phone', provider: 'local' };
+          return withRoutePlan({ text: responseText, format: 'markdown' as const, agentUsed: 'phone', provider: 'local' });
         } catch (err: any) {
           logger.warn('Phone intercept failed, falling through', { error: err.message });
         }
@@ -1117,6 +1300,24 @@ If they want to check a running project, use "status" with projectName.`,
 
       // 3. Select agent
       const agent = getAgent(routing.agentId) ?? getAgent('general')!;
+      const agentRuntime = await getAgentRuntimeStatus(agent.id, this.ai.getAvailableProviders());
+      if (agentRuntime.status === 'blocked') {
+        const reasonText = agentRuntime.missing.slice(0, 3).join('；') || '关键依赖未就绪';
+        const responseText = `智能体「${agent.name}」当前不可执行。原因：${reasonText}。请先在“智能体”页面查看真实可用性面板。`;
+        if (this.saveMessage) {
+          await this.saveMessage(incoming.userId, incoming.platform, 'user', incoming.text, { intent: routing.intent });
+          await this.saveMessage(incoming.userId, incoming.platform, 'assistant', responseText, {
+            agent: 'runtime-guard',
+            ...routeResponseMeta,
+          });
+        }
+        return withRoutePlan({
+          text: responseText,
+          format: 'markdown',
+          agentUsed: 'runtime-guard',
+          provider: 'local',
+        });
+      }
       if (routing.intent === Intent.AUTONOMOUS_TASK || agent.id === 'task-executor') {
         await audit(incoming.userId, 'task_executor.dispatched', {
           intent: routing.intent,
@@ -1144,10 +1345,11 @@ If they want to check a running project, use "status" with projectName.`,
 
       // 5. Load full context (knowledge, tasks, servers, skills, cross-platform)
       incoming.onProgress?.({ type: 'status', message: '🧠 Engine — loading context & memory...' });
-      const [knowledgeStr, tasksStr, serversStr, knowledgeCount, crossPlatformStr] = await Promise.all([
+      const [knowledgeStr, tasksStr, serversStr, organizationStr, knowledgeCount, crossPlatformStr] = await Promise.all([
         this.getUserKnowledge ? this.getUserKnowledge(incoming.userId) : '',
         this.getUserTasks ? this.getUserTasks(incoming.userId) : '',
         this.getUserServers ? this.getUserServers(incoming.userId) : '',
+        this.getUserOrganization ? this.getUserOrganization(incoming.userId, incoming.platform) : '',
         this.getKnowledgeCount ? this.getKnowledgeCount(incoming.userId) : 0,
         this.getCrossPlatformSummary ? this.getCrossPlatformSummary(incoming.userId, incoming.platform) : '',
       ]);
@@ -1173,6 +1375,7 @@ If they want to check a running project, use "status" with projectName.`,
         knowledge: knowledgeStr,
         pendingTasks: tasksStr,
         servers: serversStr,
+        organization: organizationStr,
         skills: this.skills.getSkillsSummary(),
         activeSkill: matchedSkill ? { name: matchedSkill.name, prompt: matchedSkill.prompt } : null,
         providers: this.ai.getAvailableProviders(),
@@ -1184,7 +1387,7 @@ If they want to check a running project, use "status" with projectName.`,
 
       // 6. Build system prompt with full context
       const agentTools = agent.tools.filter(t => t !== 'desktop');
-      const systemPrompt = buildSystemPromptWithContext(agent.systemPrompt, {
+      const baseSystemPrompt = buildSystemPromptWithContext(agent.systemPrompt, {
         userName: incoming.userName,
         platform: incoming.platform,
         intent: routing.intent,
@@ -1192,6 +1395,7 @@ If they want to check a running project, use "status" with projectName.`,
         fullContext,
         activeTools: agentTools,
       });
+      const systemPrompt = `${baseSystemPrompt}\n\n## Language Output Rule\n- ${buildResponseLanguageInstruction(incoming.text)}`;
 
       // 7. Build message array with history (generous window for continuity)
       const trimmedHistory = trimHistoryToFit(history, 16000);
@@ -1213,7 +1417,7 @@ If they want to check a running project, use "status" with projectName.`,
         Intent.QUESTION_ANSWER, Intent.REMEMBER,
       ]);
       // Deep mode: NEVER skip tools — use all agent capabilities
-      const skipTools = effectiveMode === 'deep' ? false : TOOLLESS_INTENTS.has(routing.intent);
+      const skipTools = effectiveMode === 'deep' ? false : TOOLLESS_INTENTS.has(routing.intent) && !routePlan.requiresTools;
       const toolDefs = (!skipTools && agentTools.length > 0) ? getToolDefinitions(agentTools) : [];
       if (skipTools && agentTools.length > 0) {
         logger.info('Skipping tools for simple intent', { intent: routing.intent, agentTools: agentTools.length });
@@ -1221,7 +1425,7 @@ If they want to check a running project, use "status" with projectName.`,
 
       const lastMsg = messages[messages.length - 1]?.content ?? '';
       const lastMsgStr = typeof lastMsg === 'string' ? lastMsg : '';
-      const hasHebrew = /[\u0590-\u05FF]/.test(lastMsgStr);
+      const prefersMultilingual = /[^\u0000-\u007F]/.test(lastMsgStr);
 
       let selectedModelId: string | undefined;
       let selectedProvider: 'anthropic' | 'openrouter' | 'claude-code' | 'ollama' | undefined;
@@ -1293,7 +1497,7 @@ If they want to check a running project, use "status" with projectName.`,
             intent: routing.intent,
             messageLength: lastMsgStr.length,
             hasTools: needsTools,
-            requiresHebrew: hasHebrew,
+            requiresHebrew: prefersMultilingual,
             requiresVision: false,
             isMultiStep: toolDefs.length > 3,
           });
@@ -1301,7 +1505,7 @@ If they want to check a running project, use "status" with projectName.`,
           const selectedModel = selectModel({
             complexity,
             requiresTools: needsTools,
-            requiresHebrew: hasHebrew,
+            requiresHebrew: prefersMultilingual,
             requiresVision: false,
             dailyBudgetLeft: this.usageTracker?.getDailyBudgetLeft() ?? 10,
             preferFree: config.PREFER_FREE_MODELS,
@@ -1335,7 +1539,7 @@ If they want to check a running project, use "status" with projectName.`,
           intent: routing.intent,
           messageLength: lastMsgStr.length,
           hasTools: needsTools,
-          requiresHebrew: hasHebrew,
+          requiresHebrew: prefersMultilingual,
           requiresVision: false,
           isMultiStep: toolDefs.length > 3,
         }),
@@ -1362,15 +1566,19 @@ If they want to check a running project, use "status" with projectName.`,
 
         if (this.saveMessage) {
           await this.saveMessage(incoming.userId, incoming.platform, 'user', incoming.text, { intent: routing.intent });
-          await this.saveMessage(incoming.userId, incoming.platform, 'assistant', crewResult.output, { agent: 'crew', mode: crewConfig.mode });
+          await this.saveMessage(incoming.userId, incoming.platform, 'assistant', crewResult.output, {
+            agent: 'crew',
+            mode: crewConfig.mode,
+            ...routeResponseMeta,
+          });
         }
 
-        return {
+        return withRoutePlan({
           text: crewResult.output,
           format: 'markdown' as const,
           agentUsed: `crew:${crewConfig.mode}`,
           provider: selectedProvider ?? 'anthropic',
-        };
+        });
       }
 
       // ── OpenRouter Enhancements ──
@@ -1454,7 +1662,7 @@ If they want to check a running project, use "status" with projectName.`,
       // Empty response fallback — don't send blank messages
       if (!response.content || response.content.trim().length === 0) {
         logger.warn('AI returned empty response, using fallback', { agent: agent.id, intent: routing.intent, provider: response.provider });
-        response.content = `\u05E7\u05D9\u05D1\u05DC\u05EA\u05D9 \u05D0\u05EA \u05D4\u05D4\u05D5\u05D3\u05E2\u05D4 \u05E9\u05DC\u05DA \u05D0\u05D1\u05DC \u05DC\u05D0 \u05D4\u05E6\u05DC\u05D7\u05EA\u05D9 \u05DC\u05E2\u05D1\u05D3 \u05D0\u05D5\u05EA\u05D4. \u05E0\u05E1\u05D4 \u05E9\u05D5\u05D1 \u05D0\u05D5 \u05E0\u05E1\u05D7 \u05D0\u05D7\u05E8\u05EA \u{1F504}\n[\u05E1\u05D5\u05DB\u05DF: ${agent.name} | \u05DB\u05D5\u05D5\u05E0\u05D4: ${routing.intent}]`;
+        response.content = `我收到了你的消息，但这次没有成功处理。请重试或换一种说法。\n[智能体: ${agent.name} | 意图: ${routing.intent}]`;
       }
 
       // ── Post-process: strip "tool approval" language from headless CLI responses ──
@@ -1472,7 +1680,7 @@ If they want to check a running project, use "status" with projectName.`,
           /(?:you\s+(?:should|need\s+to|can)\s+(?:see|find)\s+a\s+(?:popup|dialog|prompt|notification)\s+(?:in\s+(?:the|your)\s+terminal))/gi,
           /I\s+(?:need|require|want)\s+(?:your\s+)?(?:permission|approval|confirmation)\s+(?:to\s+(?:write|read|edit|delete|create|modify|access|update)\s+)/gi,
           /(?:please\s+)?(?:grant|give)\s+(?:me\s+)?(?:permission|access|approval)\s+(?:to|for)\s+/gi,
-          // Hebrew patterns — "אני צריך אישור", "תאשר את", "אני דורש הרשאה", etc.
+          // Extra patterns for approval-style wording from multilingual model outputs.
           /\u05D0\u05E0\u05D9\s+(?:\u05E6\u05E8\u05D9\u05DA|\u05D3\u05D5\u05E8\u05E9|\u05E8\u05D5\u05E6\u05D4|\u05DE\u05D1\u05E7\u05E9)\s+(?:\u05D0\u05D9\u05E9\u05D5\u05E8|\u05D4\u05E8\u05E9\u05D0\u05D4|\u05D0\u05D9\u05E9\u05D5\u05E8\u05DA)/gi,
           /\u05EA\u05D0\u05E9\u05E8\s+(?:\u05D0\u05EA\s+)?(?:\u05D4)?(?:\u05DB\u05EA\u05D9\u05D1\u05D4|\u05D2\u05D9\u05E9\u05D4|\u05E4\u05E2\u05D5\u05DC\u05D4|\u05E9\u05D9\u05DE\u05D5\u05E9|\u05E7\u05E8\u05D9\u05D0\u05D4|\u05DE\u05D7\u05D9\u05E7\u05D4|\u05E2\u05E8\u05D9\u05DB\u05D4)/gi,
           /\u05E6\u05E8\u05D9\u05DA\s+(?:\u05D0\u05D9\u05E9\u05D5\u05E8|\u05D4\u05E8\u05E9\u05D0\u05D4)\s+(?:\u05DC|\u05DB\u05D3\u05D9)/gi,
@@ -1506,15 +1714,28 @@ If they want to check a running project, use "status" with projectName.`,
       let responseArtifacts = Array.isArray((response as any).artifacts)
         ? (response as any).artifacts as ChatArtifact[]
         : [];
+      const toolsUsed = Array.isArray((response as any).toolsUsed)
+        ? ((response as any).toolsUsed as string[])
+        : [];
+      const pluginUsed = Array.from(new Set(
+        toolsUsed
+          .map((toolName) => this.pluginLoader?.findPluginForTool(toolName))
+          .filter((name): name is string => Boolean(name)),
+      ));
+      const executionPath = [
+        `intent:${routing.intent}`,
+        `agent:${agent.id}`,
+        ...(matchedSkill ? [`skill:${matchedSkill.id}`] : []),
+        ...(pluginUsed.map((name) => `plugin:${name}`)),
+        ...(toolsUsed.map((tool) => `tool:${tool}`)),
+      ];
+
+      let artifactPlan: ArtifactGenerationPlan | undefined;
 
       // If user requested file delivery but model did not call file tool,
       // auto-create a file and publish it as an attachment.
       if (isFileDeliveryRequest(incoming.text) && responseArtifacts.length === 0) {
         try {
-          const { writeFile } = await import('fs/promises');
-          const { publishFileToUserShare } = await import('./shared-artifacts.js');
-          const fileName = `a4claw-${Date.now()}.txt`;
-          const tmpPath = `/tmp/${fileName}`;
           const explicitContent = extractExplicitFileContent(incoming.text);
           const responseLooksFake = typeof response.content === 'string' && isLikelyFakeFileDeliveryResponse(response.content);
           const candidateResponse =
@@ -1558,19 +1779,25 @@ If they want to check a running project, use "status" with projectName.`,
             ?? synthesizedContent
             ?? incoming.text.trim()
             ?? 'Generated by a4claw';
-          await writeFile(tmpPath, fileContent, 'utf-8');
-          const artifact = await publishFileToUserShare(tmpPath, incoming.userId, fileName);
-          responseArtifacts = [artifact];
+          const generated = await createDocumentResultArtifacts({
+            userId: incoming.userId,
+            fileName: 'a4claw-output.txt',
+            userText: incoming.text,
+            content: fileContent,
+          });
+          responseArtifacts = generated.artifacts;
+          artifactPlan = generated.plan;
+          const artifact = generated.artifacts[0];
           if (synthesizedContent && responseLooksFake) {
             response.content = synthesizedContent;
-          } else if (typeof response.content === 'string' && (isAskingForSavePath(response.content) || responseLooksFake)) {
+          } else if (artifact && typeof response.content === 'string' && (isAskingForSavePath(response.content) || responseLooksFake)) {
             response.content = `已保存并作为附件返回：${artifact.originalName || artifact.name}`;
           }
           incoming.onProgress?.({ type: 'status', message: '📎 Auto-saved as attachment' });
           logger.info('Auto-generated shared artifact for file delivery request', {
             userId: incoming.userId,
-            fileName,
-            artifactPath: artifact.path,
+            formats: artifactPlan.generatedFormats,
+            artifactPath: artifact?.path,
           });
         } catch (autoFileErr: any) {
           logger.warn('Auto file publish failed for file delivery request', {
@@ -1578,6 +1805,10 @@ If they want to check a running project, use "status" with projectName.`,
             error: autoFileErr.message,
           });
         }
+      }
+
+      if (typeof response.content === 'string' && responseArtifacts.length > 0) {
+        response.content = sanitizeArtifactDeliveryResponse(response.content, responseArtifacts, artifactPlan);
       }
 
       // 9. Save messages to persistent memory (never save empty content)
@@ -1593,7 +1824,12 @@ If they want to check a running project, use "status" with projectName.`,
             tokens: response.usage,
             provider: response.provider,
             skill: matchedSkill?.id,
+            pluginUsed: pluginUsed.length > 0 ? pluginUsed : undefined,
+            executionPath,
+            memoryHits,
             artifacts: responseArtifacts.length > 0 ? responseArtifacts : undefined,
+            artifactPlan,
+            ...routeResponseMeta,
           });
         }
       }
@@ -1622,7 +1858,7 @@ If they want to check a running project, use "status" with projectName.`,
           cost: 0, // Actual cost tracked by usageTracker
           modelId: response.modelUsed ?? selectedModelId,
           provider: response.provider ?? selectedProvider,
-          toolsUsed: (response as any).toolsUsed ?? [],
+          toolsUsed,
           inputTokens: response.usage?.inputTokens,
           outputTokens: response.usage?.outputTokens,
           userMessage: incoming.text,
@@ -1649,12 +1885,12 @@ If they want to check a running project, use "status" with projectName.`,
         logger.error('HIGH social engineering BLOCKED in agent response', {
           agent: agent.id, patterns: seResult.patterns,
         });
-        return {
+        return withRoutePlan({
           text: '⛔ Response blocked — high-severity social engineering detected. The agent attempted to manipulate you into bypassing security controls. This incident has been logged.',
           format: 'text',
           agentUsed: `${agent.id}:BLOCKED`,
           provider: response.provider,
-        };
+        });
       }
       let finalText = redactSecrets(response.content);
       if (seResult.detected && seResult.severity === 'medium') {
@@ -1678,7 +1914,7 @@ If they want to check a running project, use "status" with projectName.`,
         .split('/')
         .pop() || modelDisplay;
 
-      return {
+      return withRoutePlan({
         text: finalText,
         thinking,
         format: 'markdown',
@@ -1689,8 +1925,12 @@ If they want to check a running project, use "status" with projectName.`,
         modelUsed: response.modelUsed ?? selectedModelId,
         modelDisplay: modelName, // Human-readable model name
         skillUsed: matchedSkill?.id,
+        pluginUsed: pluginUsed.length > 0 ? pluginUsed : undefined,
+        executionPath,
+        memoryHits: memoryHits > 0 ? memoryHits : undefined,
+        artifactPlan,
         elapsed: Math.round((Date.now() - startTime) / 1000),
-      };
+      });
 
     } catch (error: any) {
       logger.error('Engine processing error', { error: error.message, stack: error.stack });
@@ -1708,19 +1948,18 @@ If they want to check a running project, use "status" with projectName.`,
         });
       }
 
-      // Specific Hebrew error messages per error type
       let errorMsg: string;
       const msg = error.message ?? '';
       if (msg.includes('ECONNREFUSED') || msg.includes('ETIMEOUT') || msg.includes('ENETUNREACH')) {
-        errorMsg = '\u{274C} \u05D1\u05E2\u05D9\u05D4 \u05D1\u05D7\u05D9\u05D1\u05D5\u05E8 \u05DC\u05E9\u05E8\u05EA. \u05D1\u05D3\u05D5\u05E7 \u05E9\u05D4\u05E9\u05E8\u05EA \u05E4\u05E2\u05D9\u05DC \u05D5\u05E0\u05E1\u05D4 \u05E9\u05D5\u05D1.';
+        errorMsg = '❌ 连接服务失败。请确认目标服务在线后重试。';
       } else if (msg.includes('rate limit') || msg.includes('429') || msg.includes('quota')) {
-        errorMsg = '\u{26A0}\uFE0F \u05D4\u05D2\u05E2\u05EA\u05D9 \u05DC\u05DE\u05D2\u05D1\u05DC\u05EA \u05E7\u05E6\u05D1 \u05E9\u05DC \u05D4-API. \u05E0\u05E1\u05D4 \u05E9\u05D5\u05D1 \u05D1\u05E2\u05D5\u05D3 \u05D3\u05E7\u05D4.';
+        errorMsg = '⚠️ 已触发 API 频率或额度限制，请稍后再试。';
       } else if (msg.includes('401') || msg.includes('403') || msg.includes('authentication') || msg.includes('unauthorized')) {
-        errorMsg = '\u{1F510} \u05D1\u05E2\u05D9\u05D4 \u05D1\u05D4\u05E8\u05E9\u05D0\u05D5\u05EA. \u05D1\u05D3\u05D5\u05E7 \u05E9\u05DE\u05E4\u05EA\u05D7\u05D5\u05EA \u05D4-API \u05EA\u05E7\u05D9\u05E0\u05D9\u05DD.';
+        errorMsg = '🔐 权限或鉴权失败，请检查 API Key、令牌和访问配置。';
       } else if (msg.includes('timeout') || msg.includes('RESPONSE_TIMEOUT')) {
-        errorMsg = '\u{23F3} \u05D4\u05E4\u05E2\u05D5\u05DC\u05D4 \u05DC\u05E7\u05D7\u05D4 \u05D9\u05D5\u05EA\u05E8 \u05DE\u05D3\u05D9. \u05E0\u05E1\u05D4 \u05DC\u05E4\u05E9\u05D8 \u05D0\u05EA \u05D4\u05D1\u05E7\u05E9\u05D4.';
+        errorMsg = '⏳ 处理超时。请简化请求或重试一次。';
       } else {
-        errorMsg = `\u{274C} \u05DE\u05E9\u05D4\u05D5 \u05D4\u05E9\u05EA\u05D1\u05E9. \u05E0\u05E1\u05D4 \u05E9\u05D5\u05D1.\n\u05E9\u05D2\u05D9\u05D0\u05D4: ${msg.slice(0, 150)}`;
+        errorMsg = `❌ 处理失败，请重试。\n错误信息：${msg.slice(0, 150)}`;
       }
 
       return { text: errorMsg, format: 'text' };

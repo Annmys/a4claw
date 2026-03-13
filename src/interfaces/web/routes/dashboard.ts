@@ -4,11 +4,13 @@ import { sql } from 'drizzle-orm';
 import { getDashboardData, isBridgeReady } from '../../../core/intelligence-bridge.js';
 import { getAllAgents } from '../../../agents/registry.js';
 import { checkOllamaModels, getAgentModelMapping, OLLAMA_MODELS } from '../../../core/ollama-model-registry.js';
+import { getAgentRuntimeStatuses } from '../../../core/agent-runtime.js';
 import { getDb } from '../../../memory/database.js';
 import { usageLogs, messages, tasks } from '../../../memory/schema.js';
 import { getApprovalGate } from '../../../core/approval-gate.js';
 import type { Skill } from '../../../core/skills-engine.js';
 import type { ModelOption } from '../../../core/model-router.js';
+import type { CapabilitySnapshot } from '../../../core/capability-registry.js';
 
 // In-memory activity log (capped at 50 entries)
 const activityLog: Array<{ time: string; type: string; message: string; agent?: string; platform?: string }> = [];
@@ -29,6 +31,7 @@ export function setupDashboardRoutes(deps: {
   getProviders?: () => string[];
   getMcpServers?: () => Array<{ id: string; tools?: string[] }>;
   getSSHServers?: () => Array<{ id: string; name?: string; host: string; status?: string }>;
+  getCapabilitySnapshot?: (userId?: string) => Promise<CapabilitySnapshot>;
 }): Router {
   const router = Router();
 
@@ -115,6 +118,41 @@ export function setupDashboardRoutes(deps: {
       return;
     }
     res.json({ ready: true, ...getDashboardData() });
+  });
+
+  router.get('/agent-reality', async (_req, res) => {
+    try {
+      const providers = deps.getProviders?.() ?? [];
+      const items = await getAgentRuntimeStatuses(providers);
+      const summary = items.reduce((acc, item) => {
+        acc.total += 1;
+        acc[item.status] += 1;
+        return acc;
+      }, { total: 0, ready: 0, partial: 0, blocked: 0 });
+
+      res.json({
+        items,
+        summary,
+        providers,
+        capabilities: deps.getCapabilitySnapshot
+          ? await deps.getCapabilitySnapshot(((_req as any).user)?.userId)
+          : undefined,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.get('/capabilities', async (req, res) => {
+    try {
+      if (!deps.getCapabilitySnapshot) {
+        res.status(404).json({ error: 'Capability registry not configured' });
+        return;
+      }
+      res.json(await deps.getCapabilitySnapshot((req as any).user?.userId));
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
   });
 
   // GET /api/dashboard/graph — network graph data (agents, tools, skills, subsystems)

@@ -381,6 +381,11 @@ export async function listCommandCenterUserBindings(ownerUserId: string) {
     .orderBy(asc(commandCenterCenters.createdAt), asc(commandCenterMembers.createdAt));
 }
 
+export async function getCommandCenterUserBindingByWebCredential(ownerUserId: string, webCredentialId: string) {
+  const bindings = await listCommandCenterUserBindings(ownerUserId);
+  return bindings.find((binding) => binding.webCredentialId === webCredentialId) ?? null;
+}
+
 async function validateScopeExists(
   ownerUserId: string,
   scopeType: CommandCenterSkillScopeType,
@@ -474,6 +479,41 @@ export async function listCommandCenterSkillAssignments(ownerUserId: string) {
       memberName,
     };
   });
+}
+
+export async function getCommandCenterActorContext(ownerUserId: string, webCredentialId: string) {
+  const binding = await getCommandCenterUserBindingByWebCredential(ownerUserId, webCredentialId);
+  if (!binding) {
+    return {
+      binding: null,
+      skillAssignments: [],
+    };
+  }
+
+  const allAssignments = await listCommandCenterSkillAssignments(ownerUserId);
+  const scopedAssignments = allAssignments
+    .filter((assignment) => {
+      if (assignment.scopeType === 'member') {
+        return assignment.memberId === binding.memberId;
+      }
+      if (assignment.scopeType === 'department') {
+        return Boolean(binding.departmentId) && assignment.departmentId === binding.departmentId;
+      }
+      return assignment.centerId === binding.centerId;
+    })
+    .sort((a, b) => {
+      const scopeWeight: Record<CommandCenterSkillScopeType, number> = { member: 3, department: 2, center: 1 };
+      const weightDiff = scopeWeight[b.scopeType as CommandCenterSkillScopeType] - scopeWeight[a.scopeType as CommandCenterSkillScopeType];
+      if (weightDiff !== 0) return weightDiff;
+      const primaryDiff = Number(Boolean(b.isPrimary)) - Number(Boolean(a.isPrimary));
+      if (primaryDiff !== 0) return primaryDiff;
+      return (b.priority ?? 0) - (a.priority ?? 0);
+    });
+
+  return {
+    binding,
+    skillAssignments: scopedAssignments,
+  };
 }
 
 export async function upsertCommandCenterSkillAssignment(
@@ -889,11 +929,53 @@ export async function createCommandCenterTask(
   const db = getDb();
 
   return db.transaction(async (tx) => {
+    const [center] = await tx.select().from(commandCenterCenters).where(and(
+      eq(commandCenterCenters.id, data.centerId),
+      eq(commandCenterCenters.ownerUserId, ownerUserId),
+    )).limit(1);
+    if (!center) {
+      throw new Error('Selected center not found');
+    }
+
+    let departmentId: string | null = data.departmentId ?? null;
+    if (departmentId) {
+      const [department] = await tx.select().from(commandCenterDepartments).where(and(
+        eq(commandCenterDepartments.id, departmentId),
+        eq(commandCenterDepartments.ownerUserId, ownerUserId),
+      )).limit(1);
+      if (!department) {
+        throw new Error('Selected department not found');
+      }
+      if (department.centerId !== center.id) {
+        throw new Error('Department does not belong to selected center');
+      }
+    }
+
+    let assigneeMemberId: string | null = data.assigneeMemberId ?? null;
+    if (assigneeMemberId) {
+      const [member] = await tx.select().from(commandCenterMembers).where(and(
+        eq(commandCenterMembers.id, assigneeMemberId),
+        eq(commandCenterMembers.ownerUserId, ownerUserId),
+      )).limit(1);
+      if (!member) {
+        throw new Error('Selected assignee member not found');
+      }
+      if (member.centerId !== center.id) {
+        throw new Error('Assignee member does not belong to selected center');
+      }
+      if (departmentId && member.departmentId !== departmentId) {
+        throw new Error('Assignee member does not belong to selected department');
+      }
+      if (!departmentId && member.departmentId) {
+        departmentId = member.departmentId;
+      }
+    }
+
     const [task] = await tx.insert(commandCenterTasks).values({
       ownerUserId,
       centerId: data.centerId,
-      departmentId: data.departmentId ?? null,
-      assigneeMemberId: data.assigneeMemberId ?? null,
+      departmentId,
+      assigneeMemberId,
       title: data.title,
       description: data.description,
       status: data.status ?? 'incoming',
@@ -967,7 +1049,7 @@ export async function updateCommandCenterTaskStatus(
   });
 }
 
-export async function listCommandCenterOverview(ownerUserId: string) {
+export async function listCommandCenterOverview(ownerUserId: string, webCredentialId?: string) {
   await ensureCommandCenterSchema();
   const db = getDb();
 
@@ -980,6 +1062,9 @@ export async function listCommandCenterOverview(ownerUserId: string) {
     listCommandCenterSkillAssignments(ownerUserId),
     listCommandCenterTaskRuns(ownerUserId),
   ]);
+  const actorContext = webCredentialId
+    ? await getCommandCenterActorContext(ownerUserId, webCredentialId)
+    : { binding: null, skillAssignments: [] };
 
   const latestEventByTaskId = new Map<string, typeof recentEvents[number]>();
   for (const event of recentEvents) {
@@ -1019,6 +1104,7 @@ export async function listCommandCenterOverview(ownerUserId: string) {
 
   return {
     skillCatalog: loadCommandCenterSkillCatalog(),
+    actorContext,
     centers,
     departments,
     members,
@@ -1066,4 +1152,97 @@ export async function getCommandCenterTaskById(ownerUserId: string, taskId: stri
     eq(commandCenterTasks.ownerUserId, ownerUserId),
   )).limit(1);
   return task ?? null;
+}
+
+export async function listCommandCenterTasksForMember(ownerUserId: string, memberId: string) {
+  await ensureCommandCenterSchema();
+  const db = getDb();
+  return db.select().from(commandCenterTasks).where(and(
+    eq(commandCenterTasks.ownerUserId, ownerUserId),
+    eq(commandCenterTasks.assigneeMemberId, memberId),
+  )).orderBy(desc(commandCenterTasks.updatedAt));
+}
+
+export async function planCommandCenterTaskDispatch(
+  ownerUserId: string,
+  taskId: string,
+  options?: {
+    preferredMemberId?: string | null;
+  },
+) {
+  await ensureCommandCenterSchema();
+  const db = getDb();
+
+  const [task, members, assignments] = await Promise.all([
+    getCommandCenterTaskById(ownerUserId, taskId),
+    db.select().from(commandCenterMembers).where(eq(commandCenterMembers.ownerUserId, ownerUserId)),
+    listCommandCenterSkillAssignments(ownerUserId),
+  ]);
+
+  if (!task) return null;
+
+  const activeMembers = members.filter((member) =>
+    member.employmentStatus === 'active'
+    && member.centerId === task.centerId
+    && (!task.departmentId || member.departmentId === task.departmentId),
+  );
+  const memberMap = new Map(members.map((member) => [member.id, member]));
+  const candidateMemberIds = new Set(activeMembers.map((member) => member.id));
+
+  const preferredMember = options?.preferredMemberId ? memberMap.get(options.preferredMemberId) ?? null : null;
+  const assignedMember = task.assigneeMemberId ? memberMap.get(task.assigneeMemberId) ?? null : null;
+
+  let executorMember = assignedMember && candidateMemberIds.has(assignedMember.id)
+    ? assignedMember
+    : preferredMember && candidateMemberIds.has(preferredMember.id)
+      ? preferredMember
+      : null;
+
+  const relevantAssignments = assignments.filter((assignment) => {
+    if (assignment.status !== 'active') return false;
+    if (assignment.scopeType === 'member') {
+      return assignment.memberId ? candidateMemberIds.has(assignment.memberId) : false;
+    }
+    if (assignment.scopeType === 'department') {
+      return Boolean(task.departmentId) && assignment.departmentId === task.departmentId;
+    }
+    return assignment.centerId === task.centerId;
+  });
+
+  if (!executorMember) {
+    const memberScoped = relevantAssignments.find((assignment) =>
+      assignment.scopeType === 'member'
+      && assignment.memberId
+      && candidateMemberIds.has(assignment.memberId),
+    );
+    executorMember = memberScoped?.memberId ? memberMap.get(memberScoped.memberId) ?? null : null;
+  }
+
+  if (!executorMember && activeMembers.length > 0) {
+    executorMember = activeMembers[0] ?? null;
+  }
+
+  const scopeWeight: Record<CommandCenterSkillScopeType, number> = { member: 3, department: 2, center: 1 };
+  const sortedAssignments = [...relevantAssignments].sort((a, b) => {
+    const executorBoostA = executorMember && a.scopeType === 'member' && a.memberId === executorMember.id ? 1000 : 0;
+    const executorBoostB = executorMember && b.scopeType === 'member' && b.memberId === executorMember.id ? 1000 : 0;
+    const scoreA = executorBoostA + (scopeWeight[a.scopeType as CommandCenterSkillScopeType] * 100) + (a.isPrimary ? 25 : 0) + (a.priority ?? 0);
+    const scoreB = executorBoostB + (scopeWeight[b.scopeType as CommandCenterSkillScopeType] * 100) + (b.isPrimary ? 25 : 0) + (b.priority ?? 0);
+    return scoreB - scoreA;
+  });
+
+  const skillAssignment = sortedAssignments[0] ?? null;
+  const reasons = [
+    assignedMember ? `任务当前执行人：${assignedMember.displayName}` : null,
+    preferredMember && (!assignedMember || preferredMember.id !== assignedMember.id) ? `当前操作者绑定员工：${preferredMember.displayName}` : null,
+    skillAssignment ? `匹配技能：${skillAssignment.skillName}（${skillAssignment.scopeType}）` : null,
+    executorMember ? `推荐执行人：${executorMember.displayName}` : '未找到可执行员工',
+  ].filter(Boolean) as string[];
+
+  return {
+    task,
+    executorMember,
+    skillAssignment,
+    reason: reasons.join('；'),
+  };
 }

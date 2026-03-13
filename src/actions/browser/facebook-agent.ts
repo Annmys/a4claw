@@ -101,7 +101,7 @@ const DEFAULT_CONFIG: AgentConfig = {
   },
   content: {
     tone: 'friendly and engaging',
-    language: 'Hebrew',
+    language: 'Chinese',
     topics: ['general'],
     promoFrequency: 0,
     maxLength: 500,

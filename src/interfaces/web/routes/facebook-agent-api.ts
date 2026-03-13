@@ -48,7 +48,7 @@ export function setupFacebookAgentRoutes(): Router {
         },
         content: {
           tone: config?.content?.tone ?? 'friendly and engaging',
-          language: config?.content?.language ?? 'Hebrew',
+          language: config?.content?.language ?? 'Chinese',
           topics: config?.content?.topics ?? ['general'],
           promoLink: config?.content?.promoLink,
           promoFrequency: config?.content?.promoFrequency ?? 0,

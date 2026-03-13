@@ -13,9 +13,11 @@ import {
   createCommandCenterTask,
   createCommandCenterTaskRun,
   ensureCommandCenterSchema,
+  getCommandCenterActorContext,
   getCommandCenterTaskById,
   getCommandCenterTaskDetail,
   listCommandCenterOverview,
+  planCommandCenterTaskDispatch,
   removeCommandCenterSkillAssignment,
   type CommandCenterSkillScopeType,
   updateCommandCenterTaskStatus,
@@ -25,6 +27,7 @@ import {
   type CommandCenterTaskRunStatus,
   type CommandCenterTaskStatus,
 } from '../../../memory/repositories/command-center.js';
+import { findWebCredentialByUsername } from '../../../memory/repositories/web-credentials.js';
 import logger from '../../../utils/logger.js';
 
 async function resolveOwnerUserId(jwtUserId: string): Promise<string> {
@@ -69,7 +72,8 @@ export function setupCommandCenterRoutes(): Router {
     try {
       const actor = (req as any).user as { userId: string };
       const ownerUserId = await resolveOwnerUserId(actor.userId);
-      const overview = await listCommandCenterOverview(ownerUserId);
+      const credential = await findWebCredentialByUsername(actor.userId);
+      const overview = await listCommandCenterOverview(ownerUserId, credential?.id);
       res.json(overview);
     } catch (err: any) {
       logger.error('Failed to load command center overview', { error: err.message });
@@ -230,7 +234,9 @@ export function setupCommandCenterRoutes(): Router {
     try {
       const actor = (req as any).user as { userId: string };
       const ownerUserId = await resolveOwnerUserId(actor.userId);
-      const centerId = optionalString(req.body?.centerId, 80);
+      const credential = await findWebCredentialByUsername(actor.userId);
+      const actorContext = credential ? await getCommandCenterActorContext(ownerUserId, credential.id) : { binding: null, skillAssignments: [] };
+      const centerId = optionalString(req.body?.centerId, 80) ?? actorContext.binding?.centerId ?? undefined;
       const title = optionalString(req.body?.title, 200);
       if (!centerId) return badRequest(res, 'centerId required');
       if (!title) return badRequest(res, 'Task title required');
@@ -254,16 +260,22 @@ export function setupCommandCenterRoutes(): Router {
 
       const task = await createCommandCenterTask(ownerUserId, actor.userId, {
         centerId,
-        departmentId: optionalString(req.body?.departmentId, 80) ?? null,
-        assigneeMemberId: optionalString(req.body?.assigneeMemberId, 80) ?? null,
+        departmentId: optionalString(req.body?.departmentId, 80) ?? actorContext.binding?.departmentId ?? null,
+        assigneeMemberId: optionalString(req.body?.assigneeMemberId, 80) ?? actorContext.binding?.memberId ?? null,
         title,
         description: optionalString(req.body?.description, 4000),
         status: statusInput,
         priority: priorityInput,
         source: optionalString(req.body?.source, 40) ?? 'manual',
-        requestedBy: optionalString(req.body?.requestedBy, 120) ?? actor.userId,
+        requestedBy: optionalString(req.body?.requestedBy, 120) ?? actorContext.binding?.memberName ?? actor.userId,
         dueAt,
         tags,
+        metadata: {
+          actorWebUser: actor.userId,
+          actorMemberId: actorContext.binding?.memberId ?? null,
+          actorCenterId: actorContext.binding?.centerId ?? null,
+          actorDepartmentId: actorContext.binding?.departmentId ?? null,
+        },
       });
 
       await audit(actor.userId, 'command_center.task_created', { taskId: task.id, title: task.title, centerId }, 'web');
@@ -339,17 +351,21 @@ export function setupCommandCenterRoutes(): Router {
     try {
       const actor = (req as any).user as { userId: string };
       const ownerUserId = await resolveOwnerUserId(actor.userId);
+      const credential = await findWebCredentialByUsername(actor.userId);
+      const actorContext = credential ? await getCommandCenterActorContext(ownerUserId, credential.id) : { binding: null, skillAssignments: [] };
       const taskId = optionalString(req.params.id, 80);
       if (!taskId) return badRequest(res, 'Invalid task id');
 
       const run = await createCommandCenterTaskRun(ownerUserId, actor.userId, {
         taskId,
-        skillId: optionalString(req.body?.skillId, 160) ?? null,
+        skillId: optionalString(req.body?.skillId, 160) ?? actorContext.skillAssignments[0]?.skillId ?? null,
         executorType: optionalString(req.body?.executorType, 30) ?? 'member',
-        executorMemberId: optionalString(req.body?.executorMemberId, 80) ?? null,
+        executorMemberId: optionalString(req.body?.executorMemberId, 80) ?? actorContext.binding?.memberId ?? null,
         inputSummary: optionalString(req.body?.inputSummary, 4000),
         metadata: {
           source: optionalString(req.body?.source, 60) ?? 'dashboard',
+          actorWebUser: actor.userId,
+          actorMemberId: actorContext.binding?.memberId ?? null,
         },
       });
 
@@ -367,6 +383,71 @@ export function setupCommandCenterRoutes(): Router {
     } catch (err: any) {
       logger.error('Failed to create task run', { error: err.message });
       res.status(500).json({ error: err.message ?? 'Failed to create task run' });
+    }
+  });
+
+  router.post('/tasks/:id/auto-dispatch', async (req: Request, res: Response) => {
+    try {
+      const actor = (req as any).user as { userId: string };
+      const ownerUserId = await resolveOwnerUserId(actor.userId);
+      const credential = await findWebCredentialByUsername(actor.userId);
+      const actorContext = credential ? await getCommandCenterActorContext(ownerUserId, credential.id) : { binding: null, skillAssignments: [] };
+      const taskId = optionalString(req.params.id, 80);
+      if (!taskId) return badRequest(res, 'Invalid task id');
+
+      const plan = await planCommandCenterTaskDispatch(ownerUserId, taskId, {
+        preferredMemberId: actorContext.binding?.memberId ?? null,
+      });
+      if (!plan) {
+        res.status(404).json({ error: 'Task not found' });
+        return;
+      }
+
+      const run = await createCommandCenterTaskRun(ownerUserId, actor.userId, {
+        taskId,
+        skillId: plan.skillAssignment?.skillId ?? null,
+        executorType: 'auto-dispatch',
+        executorMemberId: plan.executorMember?.id ?? null,
+        inputSummary: `自动分派执行：${plan.reason}`,
+        metadata: {
+          source: 'auto-dispatch',
+          actorWebUser: actor.userId,
+          actorMemberId: actorContext.binding?.memberId ?? null,
+          autoDispatchReason: plan.reason,
+        },
+      });
+
+      if (!run) {
+        res.status(404).json({ error: 'Task not found' });
+        return;
+      }
+
+      await audit(actor.userId, 'command_center.task_auto_dispatched', {
+        taskId,
+        runId: run.id,
+        executorMemberId: run.executorMemberId,
+        skillId: run.skillId,
+        reason: plan.reason,
+      }, 'web');
+
+      res.status(201).json({
+        run,
+        recommendation: {
+          reason: plan.reason,
+          executorMember: plan.executorMember ? {
+            id: plan.executorMember.id,
+            displayName: plan.executorMember.displayName,
+          } : null,
+          skillAssignment: plan.skillAssignment ? {
+            skillId: plan.skillAssignment.skillId,
+            skillName: plan.skillAssignment.skillName,
+            scopeType: plan.skillAssignment.scopeType,
+          } : null,
+        },
+      });
+    } catch (err: any) {
+      logger.error('Failed to auto-dispatch task', { error: err.message });
+      res.status(500).json({ error: err.message ?? 'Failed to auto-dispatch task' });
     }
   });
 

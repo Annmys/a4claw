@@ -12,6 +12,66 @@ export interface ChatArtifact {
   createdAt?: string;
 }
 
+export interface ConversationRuntime {
+  model?: string;
+  responseMode?: 'auto' | 'quick' | 'deep';
+  interactionMode?: 'chat' | 'task';
+  thinkingMode?: 'standard' | 'deep';
+  verbosity?: 'concise' | 'balanced' | 'detailed';
+  compactSummary?: string | null;
+  compactedAt?: string | null;
+  compactSourceMessages?: number | null;
+  compactTokensSaved?: number | null;
+}
+
+export interface RoutePlanStep {
+  id: string;
+  title: string;
+  detail: string;
+  capability?: string;
+  optional?: boolean;
+}
+
+export interface RoutePlan {
+  intent: string;
+  confidence: number;
+  agentId: string;
+  mode: 'quick' | 'auto' | 'deep';
+  routeType: 'chat' | 'tool' | 'workflow' | 'command-center' | 'openclaw' | 'document';
+  requiresTools: boolean;
+  requiresFiles: boolean;
+  requiresMemory: boolean;
+  requiresOrganization: boolean;
+  requiredCapabilities: string[];
+  steps: RoutePlanStep[];
+  reason: string;
+  riskLevel: 'low' | 'medium' | 'high';
+  fallback: string;
+  forceMode?: 'quick' | 'auto' | 'deep';
+}
+
+export interface ArtifactPlan {
+  requestedFormats: string[];
+  generatedFormats: string[];
+  unresolvedFormats: string[];
+  primaryFormat: string;
+  extensionMode: 'builtin-only' | 'external-fallback' | 'external-only';
+  rationale: string;
+}
+
+export interface FileCapabilities {
+  input: {
+    supportedExtensions: string[];
+    externalAdapterConfigured: boolean;
+    externalHandlers?: string[];
+  };
+  output: {
+    builtInFormats: string[];
+    externalAdapterConfigured: boolean;
+    externalHandlers?: string[];
+  };
+}
+
 export interface WebUser {
   id: string;
   username: string;
@@ -112,24 +172,78 @@ export interface CommandCenterTask {
   latestEvent?: CommandCenterTaskEvent | null;
 }
 
+export interface CommandCenterSkillAssignment {
+  id: string;
+  ownerUserId: string;
+  skillId: string;
+  skillName: string;
+  scopeType: 'center' | 'department' | 'member';
+  scopeId: string;
+  scopeName?: string;
+  centerId?: string | null;
+  centerName?: string | null;
+  departmentId?: string | null;
+  departmentName?: string | null;
+  memberId?: string | null;
+  memberName?: string | null;
+  proficiency: number;
+  priority: number;
+  isPrimary: boolean;
+  status: string;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CommandCenterTaskRun {
+  id: string;
+  ownerUserId: string;
+  taskId: string;
+  skillId: string | null;
+  skillName: string | null;
+  executorType: string;
+  executorMemberId: string | null;
+  executorMemberName?: string | null;
+  status: 'pending' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+  inputSummary: string | null;
+  outputSummary: string | null;
+  artifacts: Record<string, unknown>[];
+  metadata: Record<string, unknown>;
+  startedAt: string | null;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface CommandCenterOverview {
+  actorContext?: {
+    binding: CommandCenterUserBinding | null;
+    skillAssignments: CommandCenterSkillAssignment[];
+  };
+  skillCatalog?: Array<{ id: string; name: string; description: string; category?: string }>;
   centers: CommandCenterCenter[];
   departments: CommandCenterDepartment[];
   members: CommandCenterMember[];
+  skillAssignments?: CommandCenterSkillAssignment[];
   tasks: CommandCenterTask[];
+  taskRuns?: CommandCenterTaskRun[];
   recentEvents: CommandCenterTaskEvent[];
   summary: {
     centers: number;
     departments: number;
     members: number;
+    skillAssignments?: number;
     tasks: number;
+    taskRuns?: number;
     byStatus: Record<CommandCenterTask['status'], number>;
+    byRunStatus?: Record<CommandCenterTaskRun['status'], number>;
   };
 }
 
 export interface CommandCenterTaskDetail {
   task: CommandCenterTask;
   events: CommandCenterTaskEvent[];
+  runs?: CommandCenterTaskRun[];
 }
 
 export interface TaskExecutorAuditItem {
@@ -141,6 +255,84 @@ export interface TaskExecutorAuditItem {
   ip: string | null;
   platform: string | null;
   createdAt: string;
+}
+
+export interface AgentRuntimeToolStatus {
+  name: string;
+  status: 'ready' | 'partial' | 'blocked';
+  detail: string;
+}
+
+export interface AgentRuntimeStatus {
+  id: string;
+  name: string;
+  status: 'ready' | 'partial' | 'blocked';
+  executionLevel: 'full' | 'limited' | 'none';
+  summary: string;
+  evidence: string[];
+  missing: string[];
+  availableTools: string[];
+  unavailableTools: string[];
+  toolStatus: AgentRuntimeToolStatus[];
+}
+
+export interface CapabilitySkillItem {
+  id: string;
+  name: string;
+  description: string;
+  trigger: string;
+  prompt?: string;
+  examples: string[];
+  version: string;
+  source: string;
+  sourceLabel: string;
+  type: 'skill' | 'plugin-tool';
+  status: 'ready' | 'partial' | 'blocked';
+  editable: boolean;
+  pluginName?: string;
+  pluginVersion?: string;
+  pluginAuthor?: string;
+}
+
+export interface CapabilitySnapshot {
+  summary: {
+    skills: number;
+    pluginTools: number;
+    plugins: number;
+    loadedPlugins: number;
+    ready: number;
+    partial: number;
+    blocked: number;
+  };
+  skills: CapabilitySkillItem[];
+  subsystems: {
+    plugins: {
+      status: 'ready' | 'partial' | 'blocked';
+      detail: string;
+      count: number;
+      loadedCount: number;
+      failedCount: number;
+      items: Array<{
+        name: string;
+        version: string;
+        author: string;
+        description: string;
+        loaded: boolean;
+        error?: string;
+        toolCount: number;
+      }>;
+    };
+    memory: {
+      status: 'ready' | 'partial' | 'blocked';
+      detail: string;
+      documents: number;
+      chunks: number;
+    };
+    openclaw: {
+      status: 'ready' | 'partial' | 'blocked';
+      detail: string;
+    };
+  };
 }
 
 export async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -232,21 +424,23 @@ export const api = {
     tags?: string[];
   }) => apiRequest<{ task: CommandCenterTask }>('/command-center/tasks', { method: 'POST', body: JSON.stringify(data) }),
   commandCenterTaskDetail: (id: string) => apiRequest<CommandCenterTaskDetail>(`/command-center/tasks/${id}`),
+  commandCenterAutoDispatchTask: (id: string) => apiRequest<{ run: CommandCenterTaskRun; recommendation: { reason: string; executorMember: { id: string; displayName: string } | null; skillAssignment: { skillId: string; skillName: string; scopeType: 'center' | 'department' | 'member' } | null } }>(`/command-center/tasks/${id}/auto-dispatch`, { method: 'POST' }),
   commandCenterUpdateTaskStatus: (id: string, status: CommandCenterTask['status'], note?: string) =>
     apiRequest<{ task: CommandCenterTask }>(`/command-center/tasks/${id}/status`, { method: 'POST', body: JSON.stringify({ status, note }) }),
   commandCenterAddTaskEvent: (id: string, content: string, eventType = 'note') =>
     apiRequest<{ event: CommandCenterTaskEvent }>(`/command-center/tasks/${id}/events`, { method: 'POST', body: JSON.stringify({ content, eventType }) }),
 
   // Chat
-  chat: (text: string, conversationId?: string, responseMode?: string, model?: string) => apiRequest<{ message: string; thinking?: string; artifacts?: ChatArtifact[]; agent: string; provider?: string; model?: string; tokens?: { input: number; output: number }; elapsed?: number }>('/chat', { method: 'POST', body: JSON.stringify({ text, conversationId, responseMode, model }) }),
-  chatWithFile: (text: string, file: File, conversationId?: string, responseMode?: string, model?: string) => {
+  chat: (text: string, conversationId?: string, responseMode?: string, model?: string, interactionMode?: 'chat' | 'task') => apiRequest<{ message: string; thinking?: string; artifacts?: ChatArtifact[]; agent: string; provider?: string; model?: string; tokens?: { input: number; output: number }; skillUsed?: string; pluginUsed?: string[]; executionPath?: string[]; memoryHits?: number; routePlan?: RoutePlan; routingReason?: string; requiredCapabilities?: string[]; artifactPlan?: ArtifactPlan; elapsed?: number }>('/chat', { method: 'POST', body: JSON.stringify({ text, conversationId, responseMode, model, interactionMode }) }),
+  chatWithFile: (text: string, file: File, conversationId?: string, responseMode?: string, model?: string, interactionMode?: 'chat' | 'task') => {
     const formData = new FormData();
     formData.append('text', text);
     formData.append('file', file);
     if (conversationId) formData.append('conversationId', conversationId);
     if (responseMode) formData.append('responseMode', responseMode);
     if (model) formData.append('model', model);
-    return uploadRequest<{ message: string; thinking?: string; artifacts?: ChatArtifact[]; agent: string; provider?: string; model?: string; tokens?: { input: number; output: number }; elapsed?: number }>('/chat', formData);
+    if (interactionMode) formData.append('interactionMode', interactionMode);
+    return uploadRequest<{ message: string; thinking?: string; artifacts?: ChatArtifact[]; agent: string; provider?: string; model?: string; tokens?: { input: number; output: number }; skillUsed?: string; pluginUsed?: string[]; executionPath?: string[]; memoryHits?: number; routePlan?: RoutePlan; routingReason?: string; requiredCapabilities?: string[]; artifactPlan?: ArtifactPlan; elapsed?: number }>('/chat', formData);
   },
   status: () => apiRequest<{ status: string; uptime: number; memory: number }>('/status'),
 
@@ -256,7 +450,7 @@ export const api = {
   testKey: (provider: string, key: string) => apiRequest<{ valid: boolean; message: string; provider: string }>('/settings/test-key', { method: 'POST', body: JSON.stringify({ provider, key }) }),
 
   // Skills
-  getSkills: () => apiRequest<any[]>('/skills'),
+  getSkills: () => apiRequest<CapabilitySkillItem[]>('/skills'),
   createSkill: (data: any) => apiRequest<any>('/skills', { method: 'POST', body: JSON.stringify(data) }),
   updateSkill: (id: string, data: any) => apiRequest<any>(`/skills/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteSkill: (id: string) => apiRequest<any>(`/skills/${id}`, { method: 'DELETE' }),
@@ -296,9 +490,12 @@ export const api = {
     if (params?.platform) qs.set('platform', params.platform);
     if (params?.limit) qs.set('limit', String(params.limit));
     if (params?.offset) qs.set('offset', String(params.offset));
-    return apiRequest<{ conversations: Array<{ id: string; title: string | null; platform: string; messageCount: number; lastMessage: { content: string; role: string; createdAt: string } | null; createdAt: string; updatedAt: string }> }>(`/history?${qs.toString()}`);
+    return apiRequest<{ conversations: Array<{ id: string; title: string | null; platform: string; messageCount: number; lastMessage: { content: string; role: string; createdAt: string } | null; runtime?: ConversationRuntime | null; createdAt: string; updatedAt: string }> }>(`/history?${qs.toString()}`);
   },
-  getConversation: (id: string) => apiRequest<{ id: string; messages: Array<{ id: string; role: string; content: string; agent?: string; artifacts?: ChatArtifact[]; createdAt: string }> }>(`/history/${id}`),
+  getConversation: (id: string) => apiRequest<{ id: string; runtime?: ConversationRuntime | null; messages: Array<{ id: string; role: string; content: string; agent?: string; artifacts?: ChatArtifact[]; skillUsed?: string; pluginUsed?: string[]; executionPath?: string[]; memoryHits?: number; routePlan?: RoutePlan; routingReason?: string; requiredCapabilities?: string[]; artifactPlan?: ArtifactPlan; createdAt: string }> }>(`/history/${id}`),
+  getConversationRuntime: (id: string) => apiRequest<{ id: string; runtime?: ConversationRuntime | null }>(`/history/${id}/runtime`),
+  updateConversationRuntime: (id: string, runtime: Partial<ConversationRuntime>) => apiRequest<{ ok: boolean; runtime: ConversationRuntime }>(`/history/${id}/runtime`, { method: 'PUT', body: JSON.stringify(runtime) }),
+  compactConversation: (id: string) => apiRequest<{ ok: boolean; runtime: ConversationRuntime; summary: string; sourceMessages: number; tokensSaved: number }>(`/history/${id}/compact`, { method: 'POST' }),
   createConversationOnServer: (conversationId: string, title?: string) => apiRequest<{ id: string; ok: boolean }>('/history', { method: 'POST', body: JSON.stringify({ conversationId, title }) }),
   renameConversationOnServer: (id: string, title: string) => apiRequest<{ ok: boolean }>(`/history/${id}`, { method: 'PUT', body: JSON.stringify({ title }) }),
   deleteConversationOnServer: (id: string) => apiRequest<{ ok: boolean }>(`/history/${id}`, { method: 'DELETE' }),
@@ -332,6 +529,7 @@ export const api = {
   dashboardHeatmap: () => apiRequest<{ grid: number[][]; period: string }>('/dashboard/heatmap'),
   dashboardKanban: () => apiRequest<{ columns: Record<string, any[]>; total: number }>('/dashboard/kanban'),
   dashboardApprovals: () => apiRequest<{ pending: any[]; stats: { pending: number; approvedToday: number; deniedToday: number } }>('/dashboard/approvals'),
+  dashboardAgentReality: () => apiRequest<{ items: AgentRuntimeStatus[]; summary: { total: number; ready: number; partial: number; blocked: number }; providers: string[]; capabilities?: CapabilitySnapshot }>('/dashboard/agent-reality'),
   approveAction: (id: string) => apiRequest<{ ok: boolean }>(`/dashboard/approvals/${id}/approve`, { method: 'POST' }),
   denyAction: (id: string) => apiRequest<{ ok: boolean }>(`/dashboard/approvals/${id}/deny`, { method: 'POST' }),
 
@@ -421,6 +619,7 @@ export const api = {
   fbAgentLogs: (accountId: string, limit?: number) => apiRequest<{ logs: any[] }>(`/facebook-agent/agents/${accountId}/logs?limit=${limit || 50}`),
 
   // Generic helpers
+  fileCapabilities: () => apiRequest<FileCapabilities>('/files/capabilities'),
   get: <T = any>(path: string) => apiRequest<T>(path),
   post: <T = any>(path: string, body?: any) => apiRequest<T>(path, { method: 'POST', body: body != null ? JSON.stringify(body) : undefined }),
 };

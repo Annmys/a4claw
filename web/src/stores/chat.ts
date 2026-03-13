@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { api } from '../api/client';
-import type { ChatArtifact } from '../api/client';
+import type { ArtifactPlan, ChatArtifact, ConversationRuntime, RoutePlan } from '../api/client';
 
 export interface ProgressEntry {
   type: string;
@@ -19,6 +19,14 @@ export interface Message {
   agent?: string;
   provider?: string;
   model?: string;
+  skillUsed?: string;
+  pluginUsed?: string[];
+  executionPath?: string[];
+  memoryHits?: number;
+  routePlan?: RoutePlan;
+  routingReason?: string;
+  requiredCapabilities?: string[];
+  artifactPlan?: ArtifactPlan;
   tokens?: { input: number; output: number; total: number };
   elapsed?: number;
   progressLog?: ProgressEntry[];
@@ -29,6 +37,7 @@ export interface Conversation {
   id: string;
   title: string;
   messages: Message[];
+  runtime: ConversationRuntime | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -37,6 +46,7 @@ interface SerializedConversation {
   id: string;
   title: string;
   messages: Array<Omit<Message, 'timestamp'> & { timestamp: string }>;
+  runtime: ConversationRuntime | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -57,6 +67,7 @@ interface ChatState {
   switchConversation: (id: string) => void;
   deleteConversation: (id: string) => void;
   renameConversation: (id: string, title: string) => void;
+  updateConversationRuntime: (id: string, runtime: Partial<ConversationRuntime>) => Promise<ConversationRuntime | null>;
   addMessage: (msg: Omit<Message, 'id' | 'timestamp'>) => void;
   addMessageTo: (conversationId: string, msg: Omit<Message, 'id' | 'timestamp'>) => void;
   setLoading: (loading: boolean) => void;
@@ -116,6 +127,7 @@ function loadFromStorage(storageKey: string): Conversation[] {
     return data.map(c => ({
       ...c,
       messages: c.messages.map(m => ({ ...m, timestamp: new Date(m.timestamp) })),
+      runtime: c.runtime ?? null,
       createdAt: new Date(c.createdAt),
       updatedAt: new Date(c.updatedAt),
     }));
@@ -135,6 +147,7 @@ function createConversation(): Conversation {
     id: generateId(),
     title: 'New Chat',
     messages: [],
+    runtime: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -218,6 +231,29 @@ export const useChatStore = create<ChatState>((set, get) => ({
     api.renameConversationOnServer(id, title).catch(() => {});
   },
 
+  updateConversationRuntime: async (id, runtimePatch) => {
+    try {
+      const result = await api.updateConversationRuntime(id, runtimePatch);
+      set(state => {
+        const updated = state.conversations.map(c =>
+          c.id === id ? { ...c, runtime: result.runtime ?? null, updatedAt: new Date() } : c
+        );
+        saveToStorage(state.storageKey, updated);
+        return { conversations: updated };
+      });
+      return result.runtime ?? null;
+    } catch {
+      set(state => {
+        const updated = state.conversations.map(c =>
+          c.id === id ? { ...c, runtime: { ...(c.runtime ?? {}), ...runtimePatch }, updatedAt: new Date() } : c
+        );
+        saveToStorage(state.storageKey, updated);
+        return { conversations: updated };
+      });
+      return null;
+    }
+  },
+
   // Add message to active conversation
   addMessage: (msg) => set(state => {
     let { activeConversationId, conversations } = state;
@@ -253,6 +289,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         id: conversationId,
         title: 'New Chat',
         messages: [],
+        runtime: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -320,6 +357,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       // Build a map of local conversations by ID
       const localMap = new Map(localConvs.map(c => [c.id, c]));
+      const serverMap = new Map(serverConvs.map(c => [c.id, c]));
 
       // Merge: server conversations that don't exist locally get added (with empty messages — loaded on demand)
       const newFromServer: Conversation[] = [];
@@ -329,16 +367,27 @@ export const useChatStore = create<ChatState>((set, get) => ({
             id: sc.id,
             title: sc.title ?? (sc.lastMessage?.content.slice(0, 40) ?? 'Conversation'),
             messages: [], // Loaded on demand when user switches to this conversation
+            runtime: sc.runtime ?? null,
             createdAt: new Date(sc.createdAt),
             updatedAt: new Date(sc.updatedAt),
           });
         }
       }
 
-      if (newFromServer.length > 0) {
+      if (newFromServer.length > 0 || serverConvs.length > 0) {
         set(state => {
+          const updatedExisting = state.conversations.map((conversation) => {
+            const serverConversation = serverMap.get(conversation.id);
+            if (!serverConversation) return conversation;
+            return {
+              ...conversation,
+              title: serverConversation.title ?? conversation.title,
+              runtime: serverConversation.runtime ?? conversation.runtime ?? null,
+              updatedAt: new Date(serverConversation.updatedAt),
+            };
+          });
           // Sort all by updatedAt desc
-          const merged = [...state.conversations, ...newFromServer]
+          const merged = [...updatedExisting, ...newFromServer]
             .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
           saveToStorage(state.storageKey, merged);
           return { conversations: merged, synced: true };
@@ -365,23 +414,34 @@ export const useChatStore = create<ChatState>((set, get) => ({
     try {
       const state = get();
       const conv = state.conversations.find(c => c.id === id);
-      if (!conv || conv.messages.length > 0) return; // Already has messages
+      if (!conv) return;
+      if (conv.messages.length > 0 && conv.runtime) return;
 
       const data = await api.getConversation(id);
-      if (data.messages.length === 0) return;
-
       const messages: Message[] = data.messages.map(m => ({
         id: m.id,
         role: m.role as 'user' | 'assistant',
         content: m.content,
         agent: m.agent,
         artifacts: m.artifacts,
+        skillUsed: m.skillUsed,
+        pluginUsed: m.pluginUsed,
+        executionPath: m.executionPath,
+        memoryHits: m.memoryHits,
+        routePlan: m.routePlan,
+        routingReason: m.routingReason,
+        requiredCapabilities: m.requiredCapabilities,
+        artifactPlan: m.artifactPlan,
         timestamp: new Date(m.createdAt),
       }));
 
       set(state => {
         const updated = state.conversations.map(c =>
-          c.id === id ? { ...c, messages } : c
+          c.id === id ? {
+            ...c,
+            messages: messages.length > 0 ? messages : c.messages,
+            runtime: data.runtime ?? c.runtime ?? null,
+          } : c
         );
         saveToStorage(state.storageKey, updated);
         return { conversations: updated };

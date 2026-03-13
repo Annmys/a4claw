@@ -1,6 +1,9 @@
 import { Router, Request, Response } from 'express';
 import { existsSync } from 'fs';
 import { resolve } from 'path';
+import config from '../../../config.js';
+import { SUPPORTED_DOCUMENT_EXTENSIONS } from '../../../actions/rag/extractor.js';
+import { getArtifactGeneratorFormats } from '../../../core/document-artifact-pipeline.js';
 import {
   getSharedOutputRoot,
   resolveUserShareDir,
@@ -13,8 +16,46 @@ function isPathInside(parent: string, child: string): boolean {
   return child === parent || child.startsWith(normalizedParent);
 }
 
+async function fetchAdapterHandlers(url: string | undefined): Promise<string[]> {
+  if (!url) return [];
+  try {
+    const healthUrl = new URL(url);
+    healthUrl.pathname = '/health';
+    healthUrl.search = '';
+    const response = await fetch(healthUrl.toString(), {
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!response.ok) return [];
+    const payload = await response.json() as { handlers?: string[] };
+    return Array.isArray(payload.handlers)
+      ? payload.handlers.map((item) => String(item)).filter(Boolean)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
 export function setupFilesRoutes(): Router {
   const router = Router();
+
+  router.get('/capabilities', async (_req: Request, res: Response) => {
+    const [inputHandlers, outputHandlers] = await Promise.all([
+      fetchAdapterHandlers(config.DOCUMENT_EXTRACTOR_ADAPTER_URL),
+      fetchAdapterHandlers(config.ARTIFACT_ADAPTER_URL),
+    ]);
+    res.json({
+      input: {
+        supportedExtensions: SUPPORTED_DOCUMENT_EXTENSIONS,
+        externalAdapterConfigured: Boolean(config.DOCUMENT_EXTRACTOR_ADAPTER_URL),
+        externalHandlers: inputHandlers,
+      },
+      output: {
+        builtInFormats: getArtifactGeneratorFormats(),
+        externalAdapterConfigured: Boolean(config.ARTIFACT_ADAPTER_URL),
+        externalHandlers: outputHandlers,
+      },
+    });
+  });
 
   // GET /api/files/:userKey/:fileName
   // Download a generated file from /data/gongxiang/<user>/... (auth required).

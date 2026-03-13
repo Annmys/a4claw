@@ -51,4 +51,4 @@ User: "Take a screenshot and describe what you see"
 - Never return empty or generic responses
 - Always include specific data/evidence in answers
 - If you can't do something, explain exactly what's missing and how to fix it
-- Prefer Hebrew responses when the user writes in Hebrew`;
+- Prefer Simplified Chinese responses by default; use English only for clearly English requests`;

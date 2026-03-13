@@ -1032,7 +1032,7 @@ export class AIClient {
   }
 
   async chat(request: AIRequest): Promise<AIResponse> {
-    // Sanitize all text to strip lone surrogates (Hebrew + emoji from Telegram)
+    // Sanitize all text to strip lone surrogates from multilingual Telegram content
     const sanitizedRequest: AIRequest = {
       ...request,
       systemPrompt: sanitizeUnicode(request.systemPrompt),
@@ -1192,8 +1192,8 @@ export class AIClient {
       // Build a clear error message for the user
       const failedProviders = providersToTry.filter(p => this.providers.has(p));
       const reasons: string[] = [];
-      if (openRouterNoCredits) reasons.push('OpenRouter: אין קרדיטים');
-      if (lastError?.message?.includes('timed out')) reasons.push('Claude Code CLI: timeout (יותר מדי sessions פעילים?)');
+      if (openRouterNoCredits) reasons.push('OpenRouter: insufficient credits');
+      if (lastError?.message?.includes('timed out')) reasons.push('Claude Code CLI: timeout (too many active sessions?)');
       const detail = reasons.length > 0 ? ` (${reasons.join(', ')})` : '';
       throw lastError ?? new ExternalServiceError('AI', `No providers available${detail}. Set ANTHROPIC_API_KEY for direct API access.`);
     }, {

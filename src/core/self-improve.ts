@@ -27,10 +27,10 @@ export class SelfImprove {
    */
   isNegativeFeedback(message: string): boolean {
     const negativePhrases = [
-      'לא זה', 'לא נכון', 'טעות', 'שגוי', 'wrong', 'bad', 'not what',
-      'לא מה שביקשתי', 'לא ככה', 'שוב', 'תנסה שוב', 'try again',
-      'לא עובד', "doesn't work", 'broken', 'שבור', 'נכשל',
-      'מה אתה עושה', 'what are you doing', 'למה', 'why did you',
+      '不是这个', '不对', '错误', '不正确', 'wrong', 'bad', 'not what',
+      '不是我要的', '不是这样', '重来', '再试一次', 'try again',
+      '不能用', "doesn't work", 'broken', '坏了', '失败',
+      '你在干什么', 'what are you doing', '为什么', 'why did you',
     ];
     const lower = message.toLowerCase();
     return negativePhrases.some(p => lower.includes(p));
@@ -60,7 +60,7 @@ export class SelfImprove {
     if (recentNeg >= 3 && this.sendAlert) {
       const analysis = await this.analyzeAndSuggest();
       if (analysis) {
-        await this.sendAlert(`📈 ניתוח שיפור עצמי:\n\n${analysis}`).catch(() => {});
+        await this.sendAlert(`📈 自我改进分析：\n\n${analysis}`).catch(() => {});
       }
     }
   }

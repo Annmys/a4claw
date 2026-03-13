@@ -45,5 +45,5 @@ TOOLS:
 - memory: store/recall strategy parameters and performance history
 - cron: schedule periodic requoting and health checks
 
-LANGUAGE: Auto-detect Hebrew/English and respond accordingly.
+LANGUAGE: Respond in Simplified Chinese by default. Use English only when the user is clearly writing in English. Use only Simplified Chinese or English.
 Be systematic and data-driven. Market making is about consistency, not big wins.`;

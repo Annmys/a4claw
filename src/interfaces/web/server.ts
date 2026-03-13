@@ -219,6 +219,15 @@ export class WebServer extends BaseInterface {
       getModels: () => getAllModels(),
       getProviders: () => this.engine.getAIClient().getAvailableProviders(),
       getMcpServers: () => this.loadMcpServerList(),
+      getCapabilitySnapshot: (userId?: string) => this.engine.getCapabilityRegistry()?.getSnapshot(userId) ?? Promise.resolve({
+        summary: { skills: 0, pluginTools: 0, plugins: 0, loadedPlugins: 0, ready: 0, partial: 0, blocked: 0 },
+        skills: [],
+        subsystems: {
+          plugins: { status: 'partial', detail: '能力注册中心未初始化', count: 0, loadedCount: 0, failedCount: 0, items: [] },
+          memory: { status: 'partial', detail: '能力注册中心未初始化', documents: 0, chunks: 0 },
+          openclaw: { status: 'blocked', detail: '能力注册中心未初始化' },
+        },
+      }),
       getSSHServers: () => {
         try {
           const { getServerListForAgent } = require('./routes/servers-api.js');
@@ -229,12 +238,15 @@ export class WebServer extends BaseInterface {
     // Specific API routes (all require auth) — register before the catch-all
     this.app.use('/api/settings', authMiddleware, setupSettingsRoutes());
     this.app.use('/api/users', authMiddleware, setupUsersRoutes());
-    this.app.use('/api/skills', authMiddleware, setupSkillsRoutes());
+    this.app.use('/api/skills', authMiddleware, setupSkillsRoutes({
+      capabilityRegistry: this.engine.getCapabilityRegistry(),
+      skillsEngine: this.engine.getSkillsEngine(),
+    }));
     this.app.use('/api/servers', authMiddleware, setupServersRoutes());
     this.app.use('/api/logs', authMiddleware, setupLogsRoutes());
     this.app.use('/api/costs', authMiddleware, setupCostsRoutes(this.engine));
     this.app.use('/api/cron', authMiddleware, setupCronRoutes(this.engine));
-    this.app.use('/api/history', authMiddleware, setupHistoryRoutes());
+    this.app.use('/api/history', authMiddleware, setupHistoryRoutes(this.engine));
     this.app.use('/api/files', authMiddleware, setupFilesRoutes());
     this.app.use('/api/command-center', authMiddleware, setupCommandCenterRoutes());
     this.app.use('/api/whatsapp', authMiddleware, setupWhatsAppQRRoutes());

@@ -88,100 +88,73 @@ Available intents:
 - desktop_control: Control the computer — click, type, open apps, interact with the screen
 - desktop_screenshot: Take a screenshot or describe what's on screen
 - build_project: Build, scaffold, create, or deploy a new app/project/website/game (including browser games, arcade games, Phaser games)
-- schedule: Schedule recurring tasks, set up automations, cron jobs, periodic alerts (every day, every morning, כל בוקר)
-- email: Send email, check inbox, compose, שלח מייל, בדוק מיילים
-- document: Upload, analyze file, PDF, מסמך, העלה קובץ, ask about uploaded document
-- calendar: Calendar, schedule meeting, מה יש לי היום, פגישה, יומן, events
-- usage: Check costs, usage stats, how much did it cost, כמה עלה, budget
-- web_action: Sign up for a website, fill a form, scrape a page, open a URL, navigate web, תירשם, הירשם לאתר, פתח אתר, מלא טופס
-- phone: Send SMS, make a phone call, text message, שלח SMS, תתקשר, הודעה, טלפון
-- content_create: Generate AI content — video, image, music, UGC, create content, צור וידאו, תיצור תמונה, generate video, make content, AI art, AI video
-- social_publish: Publish to social media — פרסם, תפרסם, publish to, post on, share to, cross-post, schedule post, תזמן פוסט, רשתות חברתיות, tiktok, instagram, youtube
-- orchestrate: Coordinate between ClawdAgent and OpenClaw, manage OpenClaw, Facebook via OpenClaw, WhatsApp via OpenClaw, check OpenClaw status, sync data between systems, content pipeline (create + publish everywhere), affiliate management — openclaw, תשלח ל-openclaw, מה קורה ב-openclaw, תפעיל את openclaw, פייסבוק, whatsapp, ווטסאפ, affiliate, תנהל, תתאם, סינרגיה, תפרסם בכל מקום, צור ופרסם
-- remember: Save or recall facts/preferences — remember that, תזכור ש, מה אתה זוכר, תשכח את, what do you know about me, save this
-- autonomous_task: Run a complex multi-step goal autonomously — תעשה באופן אוטונומי, run autonomously, execute goal, auto-run, תריץ לבד, do this yourself, 直接执行, 继续处理, 自动处理, 帮我完成, 帮我执行
-- self_diagnose: Check system health, self-repair, diagnose issues — תבדוק את עצמך, מה המצב שלך, self check, diagnose, תתקן את עצמך
-- workflow: Create or manage automated workflows/chains — תהליך, workflow, automation, שרשרת, כל בוקר תעשה X, automate this
-- analytics: Usage stats, cost reports, API key status — סטטיסטיקות, analytics, כמה עולה, cost, דו"ח, כמה עלה, budget, תבדוק API keys
-- device_control: Control Android phone/tablet — tap, swipe, type, open app, screenshot, ADB command, Appium, send WhatsApp from phone, post TikTok from phone — תשלוט בטלפון, תלחץ על, תפתח אפליקציה, צילום מסך טלפון, תשלח ווטסאפ מהטלפון
-- device_config: Configure device connection, list devices, device info — חבר טלפון, הגדרות מכשיר, מה המכשירים
-- ugc_create: Create UGC (User Generated Content) — product showcase, AI influencer, brand content, UGC video, תוכן UGC, צור UGC, תיצור UGC, מוצר, שיווק, brand video, product video
-- podcast_create: Create podcast, audio show, multi-speaker conversation — פודקאסט, תיצור פודקאסט, podcast, audio show, שיחה, דיון, דיבייט, ראיון, interview
-- site_analyze: Analyze a website, build a clone, compare sites, tech stack analysis — תנתח אתר, נתח אתר, analyze site, analyze website, site analysis, תבנה אתר דומה, clone site, מה הטכנולוגיה של, tech stack
-- server_manage: Manage SSH servers — add, remove, connect, list servers, switch between servers, execute on specific server, upload/download files — תתחבר לשרת, חבר שרת, שרתים, servers, תוסיף שרת, add server, switch server, תעלה קובץ לשרת, /servers
-- server_health: Check server health, monitor servers, CPU/RAM/disk usage — בריאות שרת, health check, server health, מצב השרתים, how are my servers, תבדוק את כל השרתים, /health
-- crypto_trade: Buy/sell crypto, place orders, manage positions, DCA — קנה ביטקוין, מכור ETH, buy BTC, sell crypto, trade, סחר, מסחר
-- crypto_analyze: Technical analysis, signals, market scanning — נתח BTC, analyze crypto, TA, RSI, MACD, סרוק שוק, scan market, ניתוח טכני
-- crypto_portfolio: Check crypto portfolio, P&L, holdings, stats — תיק קריפטו, portfolio, P&L, רווח, הפסד, אחזקות, holdings
-- server_scan: Scan/discover what's on a server — capabilities, tools, projects, databases — תסרוק שרת, scan server, מה יש בשרת, what's on the server, discover, תגלה מה רץ, /server scan
-- whatsapp_connect: Connect WhatsApp, get QR code, check WhatsApp status — חבר ווטסאפ, התחבר לוואטסאפ, QR, קוד QR, whatsapp connect, whatsapp status, link whatsapp
-- facebook_action: Facebook account management, autonomous Facebook agent, post to Facebook, Facebook automation, manage Facebook accounts — תפרסם בפייסבוק, תפעיל אייג'נט פייסבוק, חשבון פייסבוק, facebook agent, פייסבוק אוטומטי, תעשה פוסט בפייסבוק, תנהל פייסבוק
-Hebrew examples:
-- "מה מצב השרת" → server_status
-- "תתקן את השרת" → server_fix
-- "תחפש באינטרנט" → web_search
-- "תזכיר לי בעוד 5 דקות" → reminder_set
-- "מה אתה יכול לעשות" → help
-- "תשדרג את עצמך" → general_chat
-- "תקרא את הקובץ" → server_status (use server-manager for file operations)
-- "מה חדש" → general_chat
-- "תירשם לאתר X" → web_action
-- "שלח SMS ל-..." → phone
-- "תתקשר ל-..." → phone
-- "תיצור וידאו" → content_create
-- "תפרסם בכל הרשתות" → social_publish
-- "צור תמונה של..." → content_create
-- "מה קורה ב-OpenClaw?" → orchestrate
-- "תשלח ב-פייסבוק..." → orchestrate
-- "תפרסם בכל מקום" → orchestrate
-- "מה המצב של שני המערכות?" → orchestrate
-- "תתאם בין ClawdAgent ל-OpenClaw" → orchestrate
-- "תזכור שאני אוהב פייתון" → remember
-- "מה אתה יודע עליי" → remember
-- "תעשה את זה לבד" → autonomous_task
+- schedule: Schedule recurring tasks, set up automations, cron jobs, periodic alerts (every day, every morning, 每天早上)
+- email: Send email, check inbox, compose, 发邮件, 查看邮箱
+- document: Upload, analyze file, PDF, 文档, 上传文件, ask about uploaded document
+- calendar: Calendar, schedule meeting, 今天有什么安排, 会议, 日历, events
+- usage: Check costs, usage stats, how much did it cost, 花了多少钱, budget
+- web_action: Sign up for a website, fill a form, scrape a page, open a URL, navigate web, 注册网站, 打开网站, 填表
+- phone: Send SMS, make a phone call, text message, 发短信, 打电话, 手机
+- content_create: Generate AI content — video, image, music, UGC, create content, 做视频, 做图片, generate video, make content, AI art, AI video
+- social_publish: Publish to social media — 发布, 发帖, publish to, post on, share to, cross-post, schedule post, 社交媒体, tiktok, instagram, youtube
+- orchestrate: Coordinate between ClawdAgent and OpenClaw, manage OpenClaw, Facebook via OpenClaw, WhatsApp via OpenClaw, check OpenClaw status, sync data between systems, content pipeline (create + publish everywhere), affiliate management — openclaw, 发到openclaw, openclaw状态, 启动openclaw, facebook, whatsapp, 协同, 同步, 全渠道发布
+- remember: Save or recall facts/preferences — remember that, 记住, 你记得什么, 忘记, what do you know about me, save this
+- autonomous_task: Run a complex multi-step goal autonomously — run autonomously, execute goal, auto-run, do this yourself, 直接执行, 继续处理, 自动处理, 帮我完成, 帮我执行
+- self_diagnose: Check system health, self-repair, diagnose issues — 自检, 自我修复, diagnose
+- workflow: Create or manage automated workflows/chains — 流程, workflow, automation, 每天执行, automate this
+- analytics: Usage stats, cost reports, API key status — 统计, analytics, cost, 报告, budget, 检查API key
+- device_control: Control Android phone/tablet — tap, swipe, type, open app, screenshot, ADB command, Appium, send WhatsApp from phone, post TikTok from phone — 控制手机, 点手机, 打开应用, 手机截图
+- device_config: Configure device connection, list devices, device info — 连接手机, 设备设置, 设备列表
+- ugc_create: Create UGC (User Generated Content) — product showcase, AI influencer, brand content, UGC video, 产品 UGC, 品牌视频, product video
+- podcast_create: Create podcast, audio show, multi-speaker conversation — 播客, podcast, 访谈, 讨论, interview
+- site_analyze: Analyze a website, build a clone, compare sites, tech stack analysis — 分析网站, clone site, 技术栈, 做类似网站
+- server_manage: Manage SSH servers — add, remove, connect, list servers, switch between servers, execute on specific server, upload/download files — 连接服务器, 添加服务器, 服务器列表, 上传到服务器, /servers
+- server_health: Check server health, monitor servers, CPU/RAM/disk usage — 服务器健康, health check, how are my servers, /health
+- crypto_trade: Buy/sell crypto, place orders, manage positions, DCA — 买比特币, 卖ETH, buy BTC, sell crypto, trade
+- crypto_analyze: Technical analysis, signals, market scanning — 分析 BTC, analyze crypto, TA, RSI, MACD, scan market
+- crypto_portfolio: Check crypto portfolio, P&L, holdings, stats — 加密仓位, portfolio, P&L, 盈亏, holdings
+- server_scan: Scan/discover what's on a server — capabilities, tools, projects, databases — 扫描服务器, what's on the server, discover, /server scan
+- whatsapp_connect: Connect WhatsApp, get QR code, check WhatsApp status — 连接 WhatsApp, QR, 二维码, whatsapp connect, whatsapp status
+- facebook_action: Facebook account management, autonomous Facebook agent, post to Facebook, Facebook automation, manage Facebook accounts — 发 Facebook, Facebook agent, 管理 Facebook 账号
+Chinese examples:
+- "现在服务器状态" → server_status
+- "修一下服务器" → server_fix
+- "帮我搜索一下" → web_search
+- "5分钟后提醒我" → reminder_set
+- "你能做什么" → help
+- "继续处理" → autonomous_task
+- "读取这个文件" → server_status (use server-manager for file operations)
+- "注册网站 X" → web_action
+- "发短信给..." → phone
+- "做一个视频" → content_create
+- "发布到所有平台" → social_publish
+- "帮我同步到 OpenClaw" → orchestrate
+- "记住我喜欢 Python" → remember
+- "自检一下" → self_diagnose
+- "生成自动化流程" → workflow
+- "点一下手机上的按钮" → device_control
+- "设备列表" → device_config
+- "做产品 UGC" → ugc_create
+- "做一个 AI 播客" → podcast_create
+- "分析这个网站" → site_analyze
+- "做个类似网站" → site_analyze
+- "做个游戏" → build_project
+- "连接服务器 root@10.0.0.5" → server_manage
+- "服务器健康检查" → server_health
+- "扫描服务器" → server_scan
+- "买比特币" → crypto_trade
+- "分析 BTC" → crypto_analyze
+- "我的加密仓位" → crypto_portfolio
+- "连接 WhatsApp" → whatsapp_connect
+- "发 Facebook 帖子" → facebook_action
 - "直接执行这个任务" → autonomous_task
 - "继续处理，不要解释" → autonomous_task
-- "תבדוק את עצמך" → self_diagnose
-- "כמה עלה לי היום" → analytics
-- "תבדוק API keys" → analytics
-- "תיצור תהליך אוטומטי" → workflow
-- "תלחץ על הטלפון" → device_control
-- "תשלח ווטסאפ מהטלפון" → device_control
-- "מה המכשירים המחוברים" → device_config
-- "צור UGC למוצר הזה" → ugc_create
-- "תעשה סרטון UGC לקרם פנים" → ugc_create
-- "תיצור פודקאסט על AI" → podcast_create
-- "תעשה ראיון בין שני אנשים על טכנולוגיה" → podcast_create
-- "תנתח את האתר הזה" → site_analyze
-- "מה הטכנולוגיה של wix.com" → site_analyze
-- "תבנה לי אתר דומה ל..." → site_analyze
-- "בנה לי משחק" → build_project
-- "תבנה משחק יריות" → build_project
 - "build me a game" → build_project
 - "create a space shooter" → build_project
-- "תתחבר לשרת root@10.0.0.5" → server_manage
-- "הראה את כל השרתים" → server_manage
-- "מה הבריאות של השרתים" → server_health
-- "תסרוק את השרת" → server_scan
-- "מה יש על השרת" → server_scan
-- "קנה ביטקוין" → crypto_trade
-- "מכור ETH" → crypto_trade
-- "נתח BTC" → crypto_analyze
-- "מה המצב של הקריפטו" → crypto_portfolio
-- "תיק ההשקעות שלי" → crypto_portfolio
-- "סרוק את השוק" → crypto_analyze
-- "DCA ביטקוין" → crypto_trade
-- "אני רוצה להתחבר לוואטסאפ" → whatsapp_connect
-- "חבר ווטסאפ" → whatsapp_connect
-- "תראה QR" → whatsapp_connect
 - "connect whatsapp" → whatsapp_connect
-- "תפרסם בפייסבוק" → facebook_action
-- "תפעיל אייג'נט פייסבוק" → facebook_action
 - "post to facebook" → facebook_action
 - "start facebook agent" → facebook_action
 - "facebook accounts" → facebook_action
-- "מה קורה בפייסבוק" → facebook_action
-- "תנהל את הפייסבוק" → facebook_action
 Respond ONLY with valid JSON (no markdown, no text before/after):
 {"intent":"<intent_name>","confidence":<0.0-1.0>,"agent":"<best_agent>","params":{"key":"value"}}
 
@@ -208,7 +181,7 @@ export class IntentRouter {
   async classify(message: string, conversationContext?: string): Promise<RoutingResult> {
     const contextNote = conversationContext ? `\n\nRecent conversation context:\n${conversationContext}` : '';
 
-    // Always try keyword fallback FIRST — it's instant and reliable for Hebrew
+    // Always try keyword fallback FIRST — it's instant and reliable for Chinese/English
     const keywordResult = this.keywordClassify(message);
 
     try {
@@ -248,82 +221,82 @@ export class IntentRouter {
 
   /**
    * Keyword-based intent classifier — used as fallback when AI classification fails.
-   * Catches the most common Hebrew + English patterns.
+   * Catches the most common Chinese + English patterns.
    */
   private keywordClassify(message: string): RoutingResult | null {
 
     // Crypto trading — buy/sell/trade
-    if (/\b(buy|sell|trade|long|short)\b.*\b(btc|eth|sol|bnb|xrp|crypto|usdt)\b|קנה.*\b(btc|eth|ביטקוין|אתריום|קריפטו)\b|מכור.*\b(btc|eth|ביטקוין|אתריום|קריפטו)\b|סחר.*קריפטו|מסחר.*קריפטו|DCA|dca|סקאלפ|scalp/i.test(message)) {
+    if (/\b(buy|sell|trade|long|short)\b.*\b(btc|eth|sol|bnb|xrp|crypto|usdt)\b|买.*\b(btc|eth|比特币|以太坊|加密)\b|卖.*\b(btc|eth|比特币|以太坊|加密)\b|交易.*加密|DCA|dca|scalp|波段|现货/i.test(message)) {
       return { intent: Intent.CRYPTO_TRADE, confidence: 0.9, agentId: 'crypto-trader', extractedParams: {} };
     }
 
     // Crypto analysis — TA, signals, scan
-    if (/\b(analyze|analysis|TA)\b.*\b(btc|eth|sol|crypto)\b|נתח.*\b(btc|eth|ביטקוין|אתריום|קריפטו)\b|ניתוח.*טכני|ניתוח.*קריפטו|scan.*market|סרוק.*שוק|RSI|MACD|bollinger|signals.*crypto|אותות.*מסחר/i.test(message)) {
+    if (/\b(analyze|analysis|TA)\b.*\b(btc|eth|sol|crypto)\b|分析.*\b(btc|eth|比特币|以太坊|加密)\b|技术分析|分析.*加密|scan.*market|扫描.*市场|RSI|MACD|bollinger|signals.*crypto|交易信号/i.test(message)) {
       return { intent: Intent.CRYPTO_ANALYZE, confidence: 0.9, agentId: 'crypto-analyst', extractedParams: {} };
     }
 
     // Crypto portfolio
-    if (/crypto.*portfolio|תיק.*קריפטו|תיק.*השקעות|אחזקות.*קריפטו|crypto.*P&?L|רווח.*קריפטו|הפסד.*קריפטו|trading.*stats|סטטיסטיקות.*מסחר/i.test(message)) {
+    if (/crypto.*portfolio|加密.*仓位|投资组合|持仓.*加密|crypto.*P&?L|加密.*盈利|加密.*亏损|trading.*stats|交易统计/i.test(message)) {
       return { intent: Intent.CRYPTO_PORTFOLIO, confidence: 0.9, agentId: 'crypto-trader', extractedParams: {} };
     }
 
     // UGC Factory — product showcase, AI influencer, brand content
-    if (/UGC|ugc|תוכן.*מוצר|product.*video|brand.*content|AI.*influencer|מוצר.*וידאו|שיווק.*מוצר|product.*showcase/i.test(message)) {
+    if (/UGC|ugc|产品.*内容|product.*video|brand.*content|AI.*influencer|产品.*视频|产品.*营销|product.*showcase/i.test(message)) {
       return { intent: Intent.UGC_CREATE, confidence: 0.9, agentId: 'content-creator', extractedParams: {} };
     }
 
     // Podcast creation
-    if (/פודקאסט|podcast|audio.*show|ראיון.*בין|interview.*between|דיון.*על|debate.*about|דיבייט|multi.*speaker|שיחה.*בין/i.test(message)) {
+    if (/播客|podcast|audio.*show|访谈.*(之间|对话)|interview.*between|讨论.*关于|debate.*about|多人.*对话|双人.*对谈/i.test(message)) {
       return { intent: Intent.PODCAST_CREATE, confidence: 0.9, agentId: 'content-creator', extractedParams: {} };
     }
 
     // Site analysis / clone
-    if (/תנתח.*אתר|נתח.*אתר|analyze.*site|analyze.*website|site.*analysis|clone.*site|tech.*stack|טכנולוגי.*של.*אתר|תבנה.*אתר.*דומה/i.test(message)) {
+    if (/分析.*网站|网站.*分析|analyze.*site|analyze.*website|site.*analysis|clone.*site|tech.*stack|网站.*技术栈|做.*类似网站/i.test(message)) {
       return { intent: Intent.SITE_ANALYZE, confidence: 0.9, agentId: 'orchestrator', extractedParams: {} };
     }
 
     // Facebook actions — autonomous agent, posting, account management
-    if (/facebook.*agent|agent.*facebook|אייג'?נט.*פייסבוק|פייסבוק.*אייג'?נט|תפעיל.*פייסבוק|start.*facebook|stop.*facebook|תפרסם.*בפייסבוק|post.*facebook|פוסט.*פייסבוק|תנהל.*פייסבוק|manage.*facebook|facebook.*account|חשבון.*פייסבוק|חשבונות.*פייסבוק|פייסבוק.*אוטומט|facebook.*automat|תעשה.*פוסט.*פייסבוק|לך.*לפייסבוק|go.*to.*facebook|open.*facebook|תפתח.*פייסבוק|מה.*קורה.*בפייסבוק|facebook.*status/i.test(message)) {
+    if (/facebook.*agent|agent.*facebook|启动.*facebook|start.*facebook|stop.*facebook|发.*facebook|post.*facebook|facebook.*post|管理.*facebook|manage.*facebook|facebook.*account|facebook.*账号|facebook.*自动化|facebook.*automat|go.*to.*facebook|open.*facebook|facebook.*status|facebook.*状态/i.test(message)) {
       return { intent: Intent.FACEBOOK_ACTION, confidence: 0.92, agentId: 'web-agent', extractedParams: {} };
     }
 
     // Content creation (images, videos, music)
-    if (/תיצור|צור.*תמונ|תעשה.*תמונ|generate.*image|create.*image|make.*image|תיצור.*וידאו|צור.*וידאו|generate.*video|create.*video|make.*video|תעשה.*וידאו|צור.*שיר|generate.*music|AI art|וידאו|סרטון|תמונה|שיר|מוזיקה/i.test(message)) {
+    if (/做.*图片|创建.*图片|生成.*图片|generate.*image|create.*image|make.*image|做.*视频|创建.*视频|generate.*video|create.*video|make.*video|生成.*音乐|AI art|视频|图像|图片|歌曲|音乐/i.test(message)) {
       return { intent: Intent.CONTENT_CREATE, confidence: 0.85, agentId: 'content-creator', extractedParams: {} };
     }
 
     // Social media publish — catch any mention of platforms, publishing, blotato, social
-    if (/תפרסם|פרסם|פרסום|publish|post.*to|share.*to|cross.?post|תזמן.*פוסט|schedule.*post|blotato|בלוטאטו|רשתות.*חברת|social.*media|instagram|tiktok|facebook|youtube|טיק.?טוק|אינסטגרם|פייסבוק|יוטיוב|reels|רילס|רשתות/i.test(message)) {
+    if (/发布|发帖|publish|post.*to|share.*to|cross.?post|定时.*发布|schedule.*post|blotato|social.*media|instagram|tiktok|facebook|youtube|小红书|reels|社交平台/i.test(message)) {
       return { intent: Intent.SOCIAL_PUBLISH, confidence: 0.85, agentId: 'content-creator', extractedParams: {} };
     }
 
     // Workflow / automation
-    if (/אוטומציה|automation|workflow|תהליך|כל.*יום|every.*day|cron|קרון|תזמן|schedule|פעם.*ביום|once.*day/i.test(message)) {
+    if (/自动化|automation|workflow|流程|每天|every.*day|cron|定时|schedule|一天一次|once.*day/i.test(message)) {
       return { intent: Intent.WORKFLOW, confidence: 0.8, agentId: 'content-creator', extractedParams: {} };
     }
 
     // Server health check
-    if (/בריאות.*שרת|health.*server|server.*health|מצב.*השרתים|how.*are.*servers|\/health/i.test(message)) {
+    if (/服务器.*健康|health.*server|server.*health|服务器.*状态|how.*are.*servers|\/health/i.test(message)) {
       return { intent: Intent.SERVER_HEALTH, confidence: 0.9, agentId: 'server-manager', extractedParams: {} };
     }
 
     // Server scan / discovery
-    if (/תסרוק.*שרת|scan.*server|מה.*יש.*בשרת|what.*on.*server|discover|תגלה.*מה.*רץ|\/server.*scan/i.test(message)) {
+    if (/扫描.*服务器|scan.*server|服务器.*有什么|what.*on.*server|discover|发现.*运行|\/server.*scan/i.test(message)) {
       return { intent: Intent.SERVER_SCAN, confidence: 0.9, agentId: 'server-manager', extractedParams: {} };
     }
 
     // Server management (connect, add, list, switch, upload, download)
-    if (/תתחבר.*לשרת|connect.*server|add.*server|תוסיף.*שרת|list.*server|השרתים|\/servers|switch.*server|החלף.*שרת|תעלה.*קובץ.*לשרת|upload.*server|download.*server/i.test(message)) {
+    if (/连接.*服务器|connect.*server|add.*server|添加.*服务器|list.*server|服务器列表|\/servers|switch.*server|切换.*服务器|上传.*服务器|upload.*server|download.*server/i.test(message)) {
       return { intent: Intent.SERVER_MANAGE, confidence: 0.9, agentId: 'server-manager', extractedParams: {} };
     }
 
     // General server operations (status, deploy, docker, ssh)
-    if (/שרת|server|deploy|docker|ssh|uptime|מצב.*שרת|תתקן.*שרת/i.test(message)) {
+    if (/服务器|server|deploy|docker|ssh|uptime|服务器.*状态|修.*服务器/i.test(message)) {
       return { intent: Intent.SERVER_STATUS, confidence: 0.7, agentId: 'server-manager', extractedParams: {} };
     }
 
     // Web search
-    if (/חפש|תחפש|search|חיפוש|google|find.*info/i.test(message)) {
+    if (/搜索|查一下|search|google|find.*info/i.test(message)) {
       return { intent: Intent.WEB_SEARCH, confidence: 0.8, agentId: 'researcher', extractedParams: {} };
     }
 
@@ -333,52 +306,63 @@ export class IntentRouter {
     }
 
     // Tasks
-    if (/משימ|task|todo|תוסיף.*משימ|create.*task/i.test(message)) {
+    if (/任务|task|todo|添加.*任务|create.*task/i.test(message)) {
       return { intent: Intent.TASK_CREATE, confidence: 0.8, agentId: 'task-planner', extractedParams: {} };
     }
 
     // Reminder
-    if (/תזכיר|remind|תזכורת|בעוד.*דקות|in.*minutes/i.test(message)) {
+    if (/提醒|remind|提醒我|几分钟后|in.*minutes/i.test(message)) {
       return { intent: Intent.REMINDER_SET, confidence: 0.85, agentId: 'task-planner', extractedParams: {} };
     }
 
+    // Desktop control / screenshot
+    if (/桌面|屏幕|截图|截屏|点开.*软件|点击.*按钮|打开.*应用|鼠标|键盘|click.*desktop|click.*screen|take.*screenshot|desktop.*control|screen.*shot/i.test(message)) {
+      const screenshotIntent = /截图|截屏|screen.*shot|screenshot/i.test(message);
+      return {
+        intent: screenshotIntent ? Intent.DESKTOP_SCREENSHOT : Intent.DESKTOP_CONTROL,
+        confidence: 0.86,
+        agentId: 'desktop-controller',
+        extractedParams: {},
+      };
+    }
+
     // Memory
-    if (/תזכור.*ש|remember.*that|מה.*זוכר|what.*know.*about.*me|תשכח/i.test(message)) {
+    if (/记住|remember.*that|你记得什么|what.*know.*about.*me|忘记/i.test(message)) {
       return { intent: Intent.REMEMBER, confidence: 0.85, agentId: 'general', extractedParams: {} };
     }
 
     // Analytics / costs
-    if (/כמה.*על|cost|budget|סטטיסטיק|analytics|API.*key/i.test(message)) {
+    if (/花了多少|cost|budget|统计|analytics|API.*key/i.test(message)) {
       return { intent: Intent.ANALYTICS, confidence: 0.8, agentId: 'general', extractedParams: {} };
     }
 
     // Help
-    if (/מה.*יכול|what.*can.*you|עזרה|help/i.test(message)) {
+    if (/你能做什么|what.*can.*you|帮助|help/i.test(message)) {
       return { intent: Intent.HELP, confidence: 0.8, agentId: 'general', extractedParams: {} };
     }
 
     // Device control
-    if (/טלפון|phone.*tap|phone.*swipe|adb|appium|תלחץ.*טלפון|תשלוט.*מכשיר/i.test(message)) {
+    if (/手机|设备|adb|appium|phone.*tap|phone.*swipe|点击.*手机|控制.*设备/i.test(message)) {
       return { intent: Intent.DEVICE_CONTROL, confidence: 0.8, agentId: 'device-controller', extractedParams: {} };
     }
 
     // Orchestrate / OpenClaw
-    if (/openclaw|אופנקלאו|תתאם|coordinate|סינרגיה/i.test(message)) {
+    if (/openclaw|协同|coordinate|同步|联动/i.test(message)) {
       return { intent: Intent.ORCHESTRATE, confidence: 0.8, agentId: 'orchestrator', extractedParams: {} };
     }
 
     // AI App Building / SaaS / MRR product
-    if (/\b(build|create|make)\b.*\b(ai|AI)\b.*\b(app|saas|product|tool)\b|בנה.*אפליקציי?ת?\s*AI|בנה.*מוצר\s*AI|אפליקציה.*שמכניסה.*כסף|build.*saas|build.*startup|micro.*saas|בנה.*סאאס|אפליקציות.*חזקות|revenue.*app|ai.*wrapper|בנה.*אפליקציה.*רווחית/i.test(message)) {
+    if (/\b(build|create|make)\b.*\b(ai|AI)\b.*\b(app|saas|product|tool)\b|做.*AI.*应用|做.*AI.*产品|赚钱.*应用|build.*saas|build.*startup|micro.*saas|收入.*app|ai.*wrapper|盈利.*应用/i.test(message)) {
       return { intent: Intent.BUILD_APP, confidence: 0.9, agentId: 'ai-app-builder', extractedParams: {} };
     }
 
     // MRR Strategy / Market Research / Revenue
-    if (/\bMRR\b|mrr|trustmrr|revenue.*strategy|אסטרטגיית.*הכנסות|מחקר.*שוק.*saas|pricing.*strategy|תמחור|מודל.*עסקי|business.*model|competitive.*intelligence|מודיעין.*תחרותי|מתחרים.*saas|niche.*research|חקר.*נישה|revenue.*model|הכנסה.*חודשית|monthly.*recurring/i.test(message)) {
+    if (/\bMRR\b|mrr|trustmrr|revenue.*strategy|收入.*策略|saas.*市场研究|pricing.*strategy|定价|business.*model|competitive.*intelligence|竞品.*saas|niche.*research|细分.*研究|revenue.*model|月度.*收入|monthly.*recurring/i.test(message)) {
       return { intent: Intent.MRR_STRATEGY, confidence: 0.9, agentId: 'mrr-strategist', extractedParams: {} };
     }
 
     // Game / interactive app building — route to project-builder (needs file tool + high token limit)
-    if (/\b(game|games|משחק|משחקים|phaser|arcade|shooter|platformer|puzzle|snake|tetris|pong|breakout)\b|בנה.*משחק|תבנה.*משחק|צור.*משחק|build.*game|create.*game|make.*game/i.test(message)) {
+    if (/\b(game|games|phaser|arcade|shooter|platformer|puzzle|snake|tetris|pong|breakout)\b|做.*游戏|创建.*游戏|build.*game|create.*game|make.*game/i.test(message)) {
       return { intent: Intent.BUILD_PROJECT, confidence: 0.9, agentId: 'project-builder', extractedParams: {} };
     }
 
@@ -388,22 +372,22 @@ export class IntentRouter {
     }
 
     // Code
-    if (/תכתוב.*קוד|write.*code|fix.*bug|תתקן.*באג|code.*review|PR|pull.*request/i.test(message)) {
+    if (/写.*代码|write.*code|fix.*bug|修.*bug|code.*review|PR|pull.*request/i.test(message)) {
       return { intent: Intent.CODE_WRITE, confidence: 0.7, agentId: 'code-assistant', extractedParams: {} };
     }
 
     // Email
-    if (/מייל|email|שלח.*מייל|inbox|send.*email/i.test(message)) {
+    if (/邮件|email|发.*邮件|inbox|send.*email/i.test(message)) {
       return { intent: Intent.EMAIL, confidence: 0.8, agentId: 'general', extractedParams: {} };
     }
 
     // WhatsApp connect
-    if (/whatsapp.*connect|connect.*whatsapp|whatsapp.*qr|whatsapp.*status|חבר.*ווטסאפ|התחבר.*וואטסאפ|התחבר.*ווטסאפ|להתחבר.*וואטסאפ|להתחבר.*ווטסאפ|קוד.*QR|QR.*code|תראה.*QR|חבר.*וואטסאפ|link.*whatsapp/i.test(message)) {
+    if (/whatsapp.*connect|connect.*whatsapp|whatsapp.*qr|whatsapp.*status|连接.*whatsapp|二维码|QR.*code|显示.*QR|link.*whatsapp/i.test(message)) {
       return { intent: Intent.WHATSAPP_CONNECT, confidence: 0.9, agentId: 'general', extractedParams: {} };
     }
 
     // Web action
-    if (/תירשם|sign.*up|fill.*form|scrape|מלא.*טופס|פתח.*אתר/i.test(message)) {
+    if (/注册|sign.*up|fill.*form|scrape|填写.*表单|打开.*网站/i.test(message)) {
       return { intent: Intent.WEB_ACTION, confidence: 0.8, agentId: 'web-agent', extractedParams: {} };
     }
 

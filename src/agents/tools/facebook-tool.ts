@@ -140,7 +140,7 @@ export class FacebookTool extends BaseTool {
       },
       content: {
         tone: (input.tone as string) ?? 'friendly and engaging',
-        language: (input.language as string) ?? 'Hebrew',
+        language: (input.language as string) ?? 'Chinese',
         topics: (input.topics as string[]) ?? ['general'],
         maxLength: 500,
         promoFrequency: 0,

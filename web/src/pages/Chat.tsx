@@ -1,27 +1,42 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useChatStore } from '../stores/chat';
 import { api } from '../api/client';
-import type { ChatArtifact } from '../api/client';
+import type { ArtifactPlan, ChatArtifact, ConversationRuntime, RoutePlan } from '../api/client';
 import { WsClient } from '../api/websocket';
 import {
   Send, Search, Trash2, Bot, User, Loader2, Square,
   MessageSquare, WifiOff, Wifi, X, AlertCircle,
   Brain, ChevronDown, ChevronUp, Plus, PanelLeftClose, PanelLeft, MoreVertical,
   Paperclip, FileText, Image as ImageIcon, File as FileIcon,
-  Languages, Sparkles, Palette, Cpu, Wrench, Zap, QrCode, Shield, GitBranch, Cog,
+  Languages, Sparkles, Palette, Cpu, Wrench, Zap, Shield, GitBranch, Cog,
   Monitor, Copy, Check, Download, RotateCcw,
 } from 'lucide-react';
 import hljs from 'highlight.js/lib/common';
 import 'highlight.js/styles/github-dark.css';
 
 const RESPONSE_MODES = [
-  { id: 'auto' as const, label: 'אוטומטי', labelEn: '自动', icon: Cpu, color: 'text-blue-400', desc: 'המערכת מחליטה' },
-  { id: 'quick' as const, label: 'מהיר', labelEn: '快速', icon: Zap, color: 'text-yellow-400', desc: 'תגובה מהירה' },
-  { id: 'deep' as const, label: 'מעמיק', labelEn: '深度', icon: Brain, color: 'text-purple-400', desc: 'ניתוח מלא' },
+  { id: 'auto' as const, label: '自动', labelEn: '自动', icon: Cpu, color: 'text-blue-400', desc: '系统自动决定' },
+  { id: 'quick' as const, label: '快速', labelEn: '快速', icon: Zap, color: 'text-yellow-400', desc: '快速回复' },
+  { id: 'deep' as const, label: '深度', labelEn: '深度', icon: Brain, color: 'text-purple-400', desc: '完整分析' },
 ];
 
 const DEFAULT_UI_TIMEOUT_MS = 90_000;
 const TASK_UI_TIMEOUT_MS = 300_000;
+
+const ROUTE_TYPE_LABELS: Record<RoutePlan['routeType'], string> = {
+  chat: '对话',
+  tool: '工具',
+  workflow: '任务',
+  'command-center': '组织',
+  openclaw: '协同',
+  document: '文档',
+};
+
+const ROUTE_RISK_LABELS: Record<RoutePlan['riskLevel'], string> = {
+  low: '低风险',
+  medium: '中风险',
+  high: '高风险',
+};
 
 type InteractionMode = 'chat' | 'task';
 
@@ -342,19 +357,17 @@ export default function Chat() {
     localStorage.getItem('a4claw-selected-model') || 'auto'
   );
   const [showModelMenu, setShowModelMenu] = useState(false);
+  const [showCompactSummary, setShowCompactSummary] = useState(true);
   const [modelList, setModelList] = useState<Array<{ id: string; name: string; provider: string; tier: string; supportsHebrew?: boolean; supportsVision?: boolean }>>([
     { id: 'auto', name: '自动', provider: 'auto', tier: 'auto' },
   ]);
   const [streamingText, setStreamingText] = useState('');
-  const [showWhatsAppQR, setShowWhatsAppQR] = useState(false);
-  const [whatsappQR, setWhatsappQR] = useState<{ qrDataUrl: string | null; status: string } | null>(null);
-  const [whatsappLoading, setWhatsappLoading] = useState(false);
 
   const {
     conversations, activeConversationId, isLoading, loadingConversationId,
     getMessages, addMessageTo, setConversationLoading, clear,
     newConversation, switchConversation, deleteConversation, renameConversation,
-    syncWithServer, loadConversationFromServer,
+    syncWithServer, loadConversationFromServer, updateConversationRuntime,
   } = useChatStore();
 
   type PendingWsRequest = {
@@ -362,6 +375,7 @@ export default function Chat() {
     conversationId: string;
     responseMode?: string;
     model?: string;
+    interactionMode?: InteractionMode;
   };
 
   // Track which conversation is awaiting a WS response
@@ -376,14 +390,72 @@ export default function Chat() {
   const progressLogRef = useRef<Array<{ type: string; message: string; agent?: string; tool?: string; time: number }>>([]);
   const activeConversationRef = useRef<string | null>(activeConversationId);
 
+  const buildAssistantMessage = useCallback((payload: {
+    message: string;
+    thinking?: string;
+    artifacts?: ChatArtifact[];
+    agent?: string;
+    provider?: string;
+    model?: string;
+    tokens?: { input: number; output: number };
+    elapsed?: number;
+    skillUsed?: string;
+    pluginUsed?: string[];
+    executionPath?: string[];
+    memoryHits?: number;
+    routePlan?: RoutePlan;
+    routingReason?: string;
+    requiredCapabilities?: string[];
+    artifactPlan?: ArtifactPlan;
+    progressLog?: Array<{ type: string; message: string; agent?: string; tool?: string; time: number }>;
+  }) => ({
+    role: 'assistant' as const,
+    content: payload.message,
+    thinking: payload.thinking,
+    artifacts: payload.artifacts,
+    agent: payload.agent,
+    provider: payload.provider,
+    model: payload.model,
+    tokens: payload.tokens ? { ...payload.tokens, total: payload.tokens.input + payload.tokens.output } : undefined,
+    elapsed: payload.elapsed,
+    skillUsed: payload.skillUsed,
+    pluginUsed: payload.pluginUsed,
+    executionPath: payload.executionPath,
+    memoryHits: payload.memoryHits,
+    routePlan: payload.routePlan,
+    routingReason: payload.routingReason,
+    requiredCapabilities: payload.requiredCapabilities,
+    artifactPlan: payload.artifactPlan,
+    progressLog: payload.progressLog,
+  }), []);
+
   const messages = useMemo(() => {
     return getMessages();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversations, activeConversationId, getMessages]);
 
+  const activeConversation = useMemo(
+    () => conversations.find((conversation) => conversation.id === activeConversationId) ?? null,
+    [conversations, activeConversationId],
+  );
+  const activeRuntime = activeConversation?.runtime ?? null;
+  const activeModelLabel = modelList.find((model) => model.id === (activeRuntime?.model ?? selectedModel))?.name
+    ?? activeRuntime?.model
+    ?? '自动';
+
   useEffect(() => {
     activeConversationRef.current = activeConversationId;
   }, [activeConversationId]);
+
+  useEffect(() => {
+    const defaultResponseMode = (localStorage.getItem('a4claw-response-mode') as 'auto' | 'quick' | 'deep') || 'auto';
+    const defaultInteractionMode = (localStorage.getItem('a4claw-interaction-mode') as InteractionMode) || 'task';
+    const defaultModel = localStorage.getItem('a4claw-selected-model') || 'auto';
+
+    setResponseMode(activeRuntime?.responseMode ?? defaultResponseMode);
+    setInteractionMode(activeRuntime?.interactionMode ?? defaultInteractionMode);
+    setSelectedModel(activeRuntime?.model ?? defaultModel);
+  }, [activeConversationId, activeRuntime?.responseMode, activeRuntime?.interactionMode, activeRuntime?.model]);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -392,20 +464,6 @@ export default function Chat() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const modeMenuRef = useRef<HTMLDivElement>(null);
   const modelMenuRef = useRef<HTMLDivElement>(null);
-
-  // ── WhatsApp QR auto-poll: refresh status every 3s while popup shows a QR ──
-  useEffect(() => {
-    if (!showWhatsAppQR || !whatsappQR?.qrDataUrl || whatsappQR?.status === 'authenticated') return;
-    const interval = setInterval(async () => {
-      try {
-        const data = await api.whatsappQR();
-        if (data.status === 'authenticated') {
-          setWhatsappQR({ qrDataUrl: null, status: 'authenticated' });
-        }
-      } catch { /* ignore */ }
-    }, 3000);
-    return () => clearInterval(interval);
-  }, [showWhatsAppQR, whatsappQR?.qrDataUrl, whatsappQR?.status]);
 
   // ── WebSocket lifecycle ──────────────────────────────────────────
   useEffect(() => {
@@ -445,18 +503,8 @@ export default function Chat() {
           const latest = pendingWsRequestRef.current;
           if (!latest) return;
           try {
-            const res = await api.chat(latest.text, latest.conversationId, latest.responseMode, latest.model);
-            addMessageTo(latest.conversationId, {
-              role: 'assistant',
-              content: res.message,
-              thinking: res.thinking,
-              artifacts: res.artifacts,
-              agent: res.agent,
-              provider: res.provider,
-              model: res.model,
-              tokens: res.tokens ? { ...res.tokens, total: res.tokens.input + res.tokens.output } : undefined,
-              elapsed: res.elapsed,
-            });
+            const res = await api.chat(latest.text, latest.conversationId, latest.responseMode, latest.model, latest.interactionMode);
+            addMessageTo(latest.conversationId, buildAssistantMessage(res));
             suppressedRecoveredRef.current = {
               conversationId: latest.conversationId,
               text: res.message,
@@ -478,7 +526,7 @@ export default function Chat() {
       }
     });
 
-    ws.on('message', (data: { text: string; thinking?: string; artifacts?: ChatArtifact[]; agent?: string; tokens?: { input: number; output: number; total: number }; provider?: string; model?: string; elapsed?: number; conversationId?: string }) => {
+    ws.on('message', (data: { text: string; thinking?: string; artifacts?: ChatArtifact[]; agent?: string; tokens?: { input: number; output: number; total: number }; provider?: string; model?: string; skillUsed?: string; pluginUsed?: string[]; executionPath?: string[]; memoryHits?: number; routePlan?: RoutePlan; routingReason?: string; requiredCapabilities?: string[]; artifactPlan?: ArtifactPlan; elapsed?: number; conversationId?: string }) => {
       const suppressed = suppressedRecoveredRef.current;
       if (suppressed && Date.now() < suppressed.expiresAt && data.conversationId === suppressed.conversationId && data.text === suppressed.text) {
         suppressedRecoveredRef.current = null;
@@ -503,9 +551,8 @@ export default function Chat() {
       setProgressLog([]);
       setStreamingText('');
       if (targetConv) {
-        addMessageTo(targetConv, {
-          role: 'assistant',
-          content: data.text,
+        addMessageTo(targetConv, buildAssistantMessage({
+          message: data.text,
           thinking: data.thinking,
           artifacts: data.artifacts,
           agent: data.agent,
@@ -513,8 +560,16 @@ export default function Chat() {
           model: data.model,
           tokens: data.tokens,
           elapsed: data.elapsed,
+          skillUsed: data.skillUsed,
+          pluginUsed: data.pluginUsed,
+          executionPath: data.executionPath,
+          memoryHits: data.memoryHits,
+          routePlan: data.routePlan,
+          routingReason: data.routingReason,
+          requiredCapabilities: data.requiredCapabilities,
+          artifactPlan: data.artifactPlan,
           progressLog: savedProgress.length > 0 ? savedProgress : undefined,
-        });
+        }));
       }
       setConversationLoading(null);
       requestTimeoutMsRef.current = DEFAULT_UI_TIMEOUT_MS;
@@ -587,7 +642,7 @@ export default function Chat() {
       ws.disconnect();
       wsRef.current = null;
     };
-  }, [addMessageTo, setConversationLoading]);
+  }, [addMessageTo, buildAssistantMessage, setConversationLoading]);
 
   // ── Auto-scroll on new messages ──────────────────────────────────
   useEffect(() => {
@@ -665,6 +720,88 @@ export default function Chat() {
         ? TASK_UI_TIMEOUT_MS
         : DEFAULT_UI_TIMEOUT_MS;
 
+    const convRuntimeUpdater = async (conversationId: string, patch: Partial<ConversationRuntime>) => {
+      await updateConversationRuntime(conversationId, patch);
+    };
+
+    const handleSessionCommand = async (commandText: string): Promise<boolean> => {
+      const [command, ...restParts] = commandText.split(/\s+/);
+      const rest = restParts.join(' ').trim();
+      let convId = activeConversationId;
+      if (!convId || !conversations.some((conversation) => conversation.id === convId)) {
+        convId = newConversation();
+      }
+
+      switch (command.toLowerCase()) {
+        case '/new':
+          newConversation();
+          setProgressLog([]);
+          inputRef.current?.focus();
+          return true;
+        case '/reset':
+          newConversation();
+          setProgressLog([]);
+          inputRef.current?.focus();
+          return true;
+        case '/mode': {
+          if (!['auto', 'quick', 'deep'].includes(rest)) {
+            addMessageTo(convId, { role: 'assistant', content: '用法：`/mode auto|quick|deep`' });
+            return true;
+          }
+          const nextMode = rest as 'auto' | 'quick' | 'deep';
+          setResponseMode(nextMode);
+          localStorage.setItem('a4claw-response-mode', nextMode);
+          await convRuntimeUpdater(convId, { responseMode: nextMode });
+          addMessageTo(convId, { role: 'assistant', content: `当前会话已切换到 ${nextMode} 模式。` });
+          return true;
+        }
+        case '/model': {
+          if (!rest) {
+            addMessageTo(convId, { role: 'assistant', content: '用法：`/model 模型ID`，例如 `/model auto`。' });
+            return true;
+          }
+          const targetModel = modelList.find((model) => model.id === rest);
+          if (!targetModel) {
+            addMessageTo(convId, { role: 'assistant', content: `未找到模型：${rest}` });
+            return true;
+          }
+          setSelectedModel(targetModel.id);
+          localStorage.setItem('a4claw-selected-model', targetModel.id);
+          await convRuntimeUpdater(convId, { model: targetModel.id });
+          addMessageTo(convId, { role: 'assistant', content: `当前会话模型已切换为 ${targetModel.name}。` });
+          return true;
+        }
+        case '/compact': {
+          setConversationLoading(convId);
+          try {
+            const result = await api.compactConversation(convId);
+            await convRuntimeUpdater(convId, result.runtime);
+            addMessageTo(convId, {
+              role: 'assistant',
+              content: `会话压缩完成。\n\n来源消息数：${result.sourceMessages}\n预计节省上下文令牌：${result.tokensSaved}\n\n摘要已写入当前会话运行时。`,
+            });
+          } catch (err: any) {
+            addMessageTo(convId, { role: 'assistant', content: `Error: ${err.message}` });
+          } finally {
+            setConversationLoading(null);
+          }
+          return true;
+        }
+        default:
+          return false;
+      }
+    };
+
+    if (!file && text.startsWith('/')) {
+      const handled = await handleSessionCommand(text);
+      if (handled) {
+        setInput('');
+        setAttachedFile(null);
+        if (inputRef.current) inputRef.current.style.height = 'auto';
+        return;
+      }
+    }
+
     // Backend processes one request at a time.
     // If loading flag is stale (no pending request refs), auto-clear it instead of silently blocking send.
     if (loadingConversationId) {
@@ -713,8 +850,9 @@ export default function Chat() {
           convId,
           effectiveResponseMode === 'auto' ? undefined : effectiveResponseMode,
           selectedModel === 'auto' ? undefined : selectedModel,
+          interactionMode,
         );
-        addMessageTo(convId, { role: 'assistant', content: res.message, thinking: res.thinking, artifacts: res.artifacts, agent: res.agent, provider: res.provider, model: res.model, tokens: res.tokens ? { ...res.tokens, total: res.tokens.input + res.tokens.output } : undefined, elapsed: res.elapsed });
+        addMessageTo(convId, buildAssistantMessage(res));
       } catch (err: any) {
         addMessageTo(convId, { role: 'assistant', content: `Error: ${err.message}` });
       }
@@ -735,8 +873,8 @@ export default function Chat() {
       const modeArg = effectiveResponseMode === 'auto' ? undefined : effectiveResponseMode;
       const modelArg = selectedModel === 'auto' ? undefined : selectedModel;
       try {
-        pendingWsRequestRef.current = { text: outboundText, conversationId: convId, responseMode: modeArg, model: modelArg };
-        wsRef.current.send(outboundText, convId, modeArg, modelArg);
+        pendingWsRequestRef.current = { text: outboundText, conversationId: convId, responseMode: modeArg, model: modelArg, interactionMode };
+        wsRef.current.send(outboundText, convId, modeArg, modelArg, interactionMode);
         if (wsFallbackTimerRef.current) {
           clearTimeout(wsFallbackTimerRef.current);
           wsFallbackTimerRef.current = null;
@@ -748,18 +886,8 @@ export default function Chat() {
           if (!latest || latest.conversationId !== convId) return;
           try {
             setWsError('WebSocket无响应，自动切换HTTP重试...');
-            const res = await api.chat(latest.text, latest.conversationId, latest.responseMode, latest.model);
-            addMessageTo(latest.conversationId, {
-              role: 'assistant',
-              content: res.message,
-              thinking: res.thinking,
-              artifacts: res.artifacts,
-              agent: res.agent,
-              provider: res.provider,
-              model: res.model,
-              tokens: res.tokens ? { ...res.tokens, total: res.tokens.input + res.tokens.output } : undefined,
-              elapsed: res.elapsed,
-            });
+            const res = await api.chat(latest.text, latest.conversationId, latest.responseMode, latest.model, latest.interactionMode);
+            addMessageTo(latest.conversationId, buildAssistantMessage(res));
             suppressedRecoveredRef.current = {
               conversationId: latest.conversationId,
               text: res.message,
@@ -799,8 +927,9 @@ export default function Chat() {
         convId,
         effectiveResponseMode === 'auto' ? undefined : effectiveResponseMode,
         selectedModel === 'auto' ? undefined : selectedModel,
+        interactionMode,
       );
-      addMessageTo(convId, { role: 'assistant', content: res.message, thinking: res.thinking, artifacts: res.artifacts, agent: res.agent, provider: res.provider, model: res.model, tokens: res.tokens ? { ...res.tokens, total: res.tokens.input + res.tokens.output } : undefined, elapsed: res.elapsed });
+      addMessageTo(convId, buildAssistantMessage(res));
     } catch (err: any) {
       addMessageTo(convId, { role: 'assistant', content: `Error: ${err.message}` });
     }
@@ -812,7 +941,7 @@ export default function Chat() {
     }
     setConversationLoading(null);
     requestTimeoutMsRef.current = DEFAULT_UI_TIMEOUT_MS;
-  }, [input, attachedFile, interactionMode, loadingConversationId, wsConnected, activeConversationId, conversations, addMessageTo, setConversationLoading, newConversation, responseMode, selectedModel]);
+  }, [input, attachedFile, interactionMode, loadingConversationId, wsConnected, activeConversationId, conversations, addMessageTo, buildAssistantMessage, setConversationLoading, newConversation, responseMode, selectedModel, modelList, updateConversationRuntime]);
 
   // Global fail-safe: if UI stays locked for too long, auto-unlock and show a clear error.
   useEffect(() => {
@@ -1060,7 +1189,14 @@ export default function Chat() {
                   ) : (
                     <>
                       <p className="text-xs font-medium truncate">{conv.title}</p>
-                      <p className="text-[10px] text-gray-500">{conv.messages.length} 条消息 · {formatDate(conv.updatedAt)}</p>
+                      <div className="flex items-center gap-1.5 text-[10px] text-gray-500">
+                        <span>{conv.messages.length} 条消息 · {formatDate(conv.updatedAt)}</span>
+                        {conv.runtime?.compactSummary && (
+                          <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-1.5 py-0.5 text-[9px] text-emerald-300">
+                            已压缩
+                          </span>
+                        )}
+                      </div>
                     </>
                   )}
                 </div>
@@ -1131,6 +1267,17 @@ export default function Chat() {
             )}
             <MessageSquare className="w-6 h-6 text-primary-500" />
             <h1 className="text-lg font-bold text-white">聊天</h1>
+            {activeRuntime?.compactSummary && (
+              <button
+                onClick={() => setShowCompactSummary((value) => !value)}
+                className="inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-[11px] text-emerald-200"
+                title="会话已压缩"
+              >
+                <RotateCcw className="w-3 h-3" />
+                会话摘要
+                {showCompactSummary ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+              </button>
+            )}
             {wsConnected ? (
               <span className="flex items-center gap-1 text-xs text-green-400">
                 <Wifi className="w-3 h-3" /> 实时
@@ -1196,28 +1343,6 @@ export default function Chat() {
               </div>
             </div>
 
-            {/* WhatsApp QR */}
-            <button
-              onClick={async () => {
-                setShowWhatsAppQR(true);
-                setWhatsappLoading(true);
-                try {
-                  const data = await api.whatsappQR();
-                  setWhatsappQR({ qrDataUrl: data.qrDataUrl, status: data.status });
-                } catch {
-                  setWhatsappQR({ qrDataUrl: null, status: 'error' });
-                }
-                setWhatsappLoading(false);
-              }}
-              className="p-2 text-gray-400 hover:text-green-400 hover:bg-dark-800 rounded-lg transition-colors"
-              title="WhatsApp 二维码"
-            >
-              <QrCode className="w-4 h-4" />
-            </button>
-
-            {/* Divider */}
-            <div className="w-px h-5 bg-gray-700 mx-0.5" />
-
             {/* RTL toggle */}
             <button
               onClick={toggleRtl}
@@ -1258,6 +1383,27 @@ export default function Chat() {
             </button>
           </div>
         </div>
+
+        {activeRuntime && (
+          <div className="border-b border-gray-800 bg-dark-900/70 px-4 py-2">
+            <div className="flex flex-wrap items-center gap-2 text-[11px] text-gray-300">
+              <span className="rounded-full border border-gray-700 bg-dark-800 px-2.5 py-1">模型: {activeModelLabel}</span>
+              <span className="rounded-full border border-gray-700 bg-dark-800 px-2.5 py-1">响应: {activeRuntime.responseMode ?? responseMode}</span>
+              <span className="rounded-full border border-gray-700 bg-dark-800 px-2.5 py-1">交互: {activeRuntime.interactionMode ?? interactionMode}</span>
+              {activeRuntime.compactedAt && (
+                <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-emerald-200">
+                  已压缩 {new Date(activeRuntime.compactedAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
+            </div>
+            {activeRuntime.compactSummary && showCompactSummary && (
+              <div className="mt-2 rounded-2xl border border-emerald-500/15 bg-dark-800/60 px-3 py-3">
+                <div className="mb-1 text-[11px] uppercase tracking-[0.16em] text-emerald-300">会话压缩摘要</div>
+                <div className="text-sm text-gray-200 whitespace-pre-wrap leading-relaxed">{activeRuntime.compactSummary}</div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ── Search bar (collapsible) ───────────────────────── */}
         {showSearch && (
@@ -1361,9 +1507,12 @@ export default function Chat() {
                       </div>
                     )}
 
-                    {/* THINKING — always visible, collapsible */}
+                    {/* THINKING — default collapsed */}
                     {!isUser && m.thinking && (
                       <div className="mb-2">
+                        {(() => {
+                          const thinkingExpanded = expandedThinking.has(`${m.id}_collapsed`);
+                          return (
                         <button
                           onClick={() => setExpandedThinking(prev => {
                             const next = new Set(prev);
@@ -1380,14 +1529,16 @@ export default function Chat() {
                           }`}
                         >
                           <Brain className="w-3.5 h-3.5" />
-                          <span>思考中</span>
-                          {expandedThinking.has(`${m.id}_collapsed`)
-                            ? <ChevronDown className="w-3 h-3" />
-                            : <ChevronUp className="w-3 h-3" />
+                          <span>思考</span>
+                          {thinkingExpanded
+                            ? <ChevronUp className="w-3 h-3" />
+                            : <ChevronDown className="w-3 h-3" />
                           }
                         </button>
-                        {/* Default: expanded (shown). Only hide if _collapsed flag is set */}
-                        {!expandedThinking.has(`${m.id}_collapsed`) && (
+                          );
+                        })()}
+                        {/* Default: collapsed for completed assistant messages */}
+                        {expandedThinking.has(`${m.id}_collapsed`) && (
                           <div className={`mt-1.5 px-3 py-2 rounded-lg text-[12px] whitespace-pre-wrap leading-relaxed max-h-64 overflow-y-auto ${
                             isGlass
                               ? 'bg-amber-500/8 border border-amber-500/20 text-amber-200/80 backdrop-blur-sm'
@@ -1399,9 +1550,13 @@ export default function Chat() {
                       </div>
                     )}
 
-                    {/* Progress Log — saved pipeline steps */}
+                    {/* Progress Log — default collapsed */}
                     {!isUser && m.progressLog && m.progressLog.length > 0 && (
                       <div className="mb-2">
+                        {(() => {
+                          const progressExpanded = expandedThinking.has(`${m.id}_progress_collapsed`);
+                          const toolSteps = m.progressLog.filter(e => e.type === 'tool').length;
+                          return (
                         <button
                           onClick={() => setExpandedThinking(prev => {
                             const next = new Set(prev);
@@ -1417,13 +1572,15 @@ export default function Chat() {
                           }`}
                         >
                           <Wrench className="w-3.5 h-3.5" />
-                          <span>{m.progressLog.filter(e => e.type === 'tool').length} 步</span>
-                          {expandedThinking.has(`${m.id}_progress_collapsed`)
-                            ? <ChevronDown className="w-3 h-3" />
-                            : <ChevronUp className="w-3 h-3" />
+                          <span>{toolSteps > 0 ? `工具 (${toolSteps} 步)` : '工具'}</span>
+                          {progressExpanded
+                            ? <ChevronUp className="w-3 h-3" />
+                            : <ChevronDown className="w-3 h-3" />
                           }
                         </button>
-                        {!expandedThinking.has(`${m.id}_progress_collapsed`) && (
+                          );
+                        })()}
+                        {expandedThinking.has(`${m.id}_progress_collapsed`) && (
                           <div className={`mt-1.5 px-3 py-2 rounded-lg text-[11px] leading-relaxed max-h-48 overflow-y-auto space-y-1 ${
                             isGlass
                               ? 'bg-cyan-500/5 border border-cyan-500/15 backdrop-blur-sm'
@@ -1453,6 +1610,108 @@ export default function Chat() {
                       ? renderFormattedContent(m.content)
                       : renderMessageContent(m.content)
                     }
+
+                    {!isUser && (
+                      m.routePlan
+                      || m.routingReason
+                      || (m.requiredCapabilities && m.requiredCapabilities.length > 0)
+                      || m.artifactPlan
+                      || m.skillUsed
+                      || (m.pluginUsed && m.pluginUsed.length > 0)
+                      || (m.memoryHits ?? 0) > 0
+                    ) && (
+                      <div className={`mt-2 rounded-lg border px-3 py-2 space-y-1.5 ${
+                        isGlass ? 'border-sky-500/20 bg-sky-500/5' : 'border-sky-500/15 bg-sky-500/5'
+                      }`}>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex flex-wrap gap-1.5">
+                            {m.routePlan && (
+                              <>
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-600/15 text-indigo-300 border border-indigo-500/20">
+                                  路由: {ROUTE_TYPE_LABELS[m.routePlan.routeType]}
+                                </span>
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-violet-600/15 text-violet-300 border border-violet-500/20">
+                                  模式: {m.routePlan.mode}
+                                </span>
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-600/15 text-amber-300 border border-amber-500/20">
+                                  风险: {ROUTE_RISK_LABELS[m.routePlan.riskLevel]}
+                                </span>
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-600/15 text-slate-300 border border-slate-500/20">
+                                  智能体: {m.routePlan.agentId}
+                                </span>
+                              </>
+                            )}
+                            {m.skillUsed && (
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary-600/15 text-primary-300 border border-primary-500/20">
+                                技能: {m.skillUsed}
+                              </span>
+                            )}
+                            {m.pluginUsed?.map((plugin) => (
+                              <span key={plugin} className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-600/15 text-cyan-300 border border-cyan-500/20">
+                                插件: {plugin}
+                              </span>
+                            ))}
+                            {(m.memoryHits ?? 0) > 0 && (
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-600/15 text-emerald-300 border border-emerald-500/20">
+                                记忆命中: {m.memoryHits}
+                              </span>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => setExpandedThinking(prev => {
+                              const next = new Set(prev);
+                              const key = `${m.id}_route_details`;
+                              if (prev.has(key)) {
+                                next.delete(key);
+                              } else {
+                                next.add(key);
+                              }
+                              return next;
+                            })}
+                            className={`shrink-0 inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] font-medium transition-colors ${
+                              isGlass
+                                ? 'border-sky-400/20 bg-sky-400/5 text-sky-200 hover:bg-sky-400/10'
+                                : 'border-sky-500/20 bg-sky-500/5 text-sky-300 hover:bg-sky-500/10'
+                            }`}
+                          >
+                            <span>{expandedThinking.has(`${m.id}_route_details`) ? '收起详情' : '查看详情'}</span>
+                            {expandedThinking.has(`${m.id}_route_details`)
+                              ? <ChevronUp className="w-3 h-3" />
+                              : <ChevronDown className="w-3 h-3" />
+                            }
+                          </button>
+                        </div>
+                        {expandedThinking.has(`${m.id}_route_details`) && (
+                          <>
+                            {m.routingReason && (
+                              <p className="text-[11px] text-slate-300 break-words">
+                                路由原因: {m.routingReason}
+                              </p>
+                            )}
+                            {m.routePlan?.steps && m.routePlan.steps.length > 0 && (
+                              <div className="space-y-1">
+                                {m.routePlan.steps.map((step) => (
+                                  <p key={step.id} className="text-[11px] text-gray-400 break-words">
+                                    {step.title}: {step.detail}
+                                  </p>
+                                ))}
+                              </div>
+                            )}
+                            {m.requiredCapabilities && m.requiredCapabilities.length > 0 && (
+                              <p className="text-[11px] text-gray-400 break-words">
+                                所需能力: {m.requiredCapabilities.join(' / ')}
+                              </p>
+                            )}
+                            {m.artifactPlan && (
+                              <p className="text-[11px] text-gray-400 break-words">
+                                输出文件: {m.artifactPlan.generatedFormats.join(' / ')}
+                                {m.artifactPlan.unresolvedFormats.length > 0 ? ` | 未完成: ${m.artifactPlan.unresolvedFormats.join(' / ')}` : ''}
+                              </p>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    )}
 
                     {/* Generated files */}
                     {!isUser && m.artifacts && m.artifacts.length > 0 && (
@@ -1645,12 +1904,12 @@ export default function Chat() {
                       <div className="flex items-center gap-2">
                         <Loader2 className="w-3.5 h-3.5 text-primary-400 animate-spin shrink-0" />
                         <span className="text-xs font-medium text-gray-300">
-                          {currentAgent || (isRtl ? 'מעבד...' : '处理中...')}
+                          {currentAgent || '处理中...'}
                         </span>
                       </div>
                       <div className="flex items-center gap-2 text-[10px] text-gray-500">
-                        {toolCount > 0 && <span>{toolCount} {isRtl ? 'צעדים' : '步骤'}</span>}
-                        {errorCount > 0 && <span className="text-red-400">{errorCount} {isRtl ? 'שגיאות' : '错误'}</span>}
+                        {toolCount > 0 && <span>{toolCount} 步骤</span>}
+                        {errorCount > 0 && <span className="text-red-400">{errorCount} 错误</span>}
                         {Number(elapsed) > 0 && <span>{elapsed}秒</span>}
                       </div>
                     </div>
@@ -1700,7 +1959,7 @@ export default function Chat() {
                     {/* Event log — with component badges */}
                     {visible.length === 0 ? (
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-400 animate-pulse">{isRtl ? '...מתחיל לעבוד' : '启动中...'}</span>
+                        <span className="text-xs text-gray-400 animate-pulse">启动中...</span>
                       </div>
                     ) : (
                       <div className="space-y-1.5">
@@ -1732,10 +1991,10 @@ export default function Chat() {
                             <Loader2 className="w-3 h-3 text-primary-400 animate-spin shrink-0" />
                             <span className="text-[10px] text-gray-400 animate-pulse">
                               {visible[visible.length - 1].type === 'tool'
-                                ? (isRtl ? '...מריץ כלי' : '工具执行中...')
+                                ? '工具执行中...'
                                 : visible[visible.length - 1].type === 'thinking'
-                                ? (isRtl ? '...חושב' : '思考中...')
-                                : (isRtl ? '...עובד' : '处理中...')}
+                                ? '思考中...'
+                                : '处理中...'}
                             </span>
                           </div>
                         )}
@@ -1749,62 +2008,6 @@ export default function Chat() {
 
           <div ref={bottomRef} />
         </div>
-
-        {/* ── WhatsApp QR Popup ──────────────────────────────── */}
-        {showWhatsAppQR && (
-          <div className="absolute inset-0 z-40 bg-black/60 flex items-center justify-center backdrop-blur-sm" onClick={() => setShowWhatsAppQR(false)}>
-            <div className="bg-dark-800 border border-gray-700 rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <QrCode className="w-5 h-5 text-green-400" />
-                  <h3 className="font-semibold text-white">WhatsApp 二维码</h3>
-                </div>
-                <button onClick={() => setShowWhatsAppQR(false)} className="text-gray-400 hover:text-white">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              {whatsappLoading ? (
-                <div className="flex flex-col items-center py-8">
-                  <Loader2 className="w-8 h-8 text-green-400 animate-spin mb-3" />
-                  <p className="text-sm text-gray-400">正在加载二维码...</p>
-                </div>
-              ) : whatsappQR?.status === 'authenticated' ? (
-                <div className="text-center py-6">
-                  <div className="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-3">
-                    <Wifi className="w-6 h-6 text-green-400" />
-                  </div>
-                  <p className="text-green-400 font-medium">WhatsApp 已连接</p>
-                  <p className="text-xs text-gray-500 mt-1">已完成认证</p>
-                </div>
-              ) : whatsappQR?.qrDataUrl ? (
-                <div className="text-center">
-                  <img src={whatsappQR.qrDataUrl} alt="WhatsApp 二维码" className="mx-auto rounded-lg border border-gray-700 max-w-[250px]" />
-                  <p className="text-xs text-gray-400 mt-3">使用 WhatsApp 扫码连接</p>
-                  <button
-                    onClick={async () => {
-                      setWhatsappLoading(true);
-                      try {
-                        const data = await api.whatsappQR();
-                        setWhatsappQR({ qrDataUrl: data.qrDataUrl, status: data.status });
-                      } catch { /* ignore */ }
-                      setWhatsappLoading(false);
-                    }}
-                    className="mt-3 px-4 py-2 bg-dark-900 border border-gray-700 rounded-lg text-xs text-gray-300 hover:bg-dark-800 transition-colors"
-                  >
-                    刷新二维码
-                  </button>
-                </div>
-              ) : (
-                <div className="text-center py-6">
-                  <p className="text-gray-400 text-sm">
-                    {whatsappQR?.status === 'error' ? '二维码加载失败' : '暂无二维码'}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">可能尚未启用 WhatsApp</p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
 
         {/* ── Drag & Drop Overlay ────────────────────────────── */}
         {isDragging && (
@@ -1848,7 +2051,7 @@ export default function Chat() {
               ref={fileInputRef}
               type="file"
               className="hidden"
-              accept=".txt,.md,.csv,.json,.pdf,.docx,.xlsx,.xls,.ts,.js,.py,.jpg,.jpeg,.png,.gif,.webp"
+              accept=".txt,.md,.csv,.tsv,.json,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.odp,.rtf,.html,.htm,.xml,.yaml,.yml,.ini,.log,.sql,.sh,.ts,.js,.py,.jpg,.jpeg,.png,.gif,.webp"
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (file) setAttachedFile(file);
@@ -1861,7 +2064,7 @@ export default function Chat() {
               onClick={() => fileInputRef.current?.click()}
               disabled={isLoading}
               className="p-3 rounded-xl text-gray-400 hover:text-primary-400 hover:bg-dark-800 transition-colors disabled:opacity-40 shrink-0"
-              title="添加附件（图片、PDF、文档）"
+              title="添加附件（办公文件、图片、代码、PDF）"
             >
               <Paperclip className="w-5 h-5" />
             </button>
@@ -1875,7 +2078,7 @@ export default function Chat() {
                     ? (RESPONSE_MODES.find(m => m.id === responseMode)?.color ?? 'text-gray-400')
                     : 'text-gray-400'
                 }`}
-                title={`${isRtl ? 'מצב תגובה' : '响应模式'}: ${RESPONSE_MODES.find(m => m.id === responseMode)?.label ?? '自动'}`}
+                title={`响应模式: ${RESPONSE_MODES.find(m => m.id === responseMode)?.label ?? '自动'}`}
               >
                 {responseMode === 'auto' ? <Cpu className="w-5 h-5" /> :
                  responseMode === 'quick' ? <Zap className="w-5 h-5" /> :
@@ -1891,6 +2094,9 @@ export default function Chat() {
                         onClick={() => {
                           setResponseMode(mode.id);
                           localStorage.setItem('a4claw-response-mode', mode.id);
+                          if (activeConversationId) {
+                            updateConversationRuntime(activeConversationId, { responseMode: mode.id }).catch(() => {});
+                          }
                           setShowModeMenu(false);
                         }}
                         className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-dark-700 transition-colors ${
@@ -1899,9 +2105,9 @@ export default function Chat() {
                       >
                         <ModeIcon className={`w-4 h-4 ${mode.color}`} />
                         <span className={responseMode === mode.id ? 'text-white font-medium' : 'text-gray-300'}>
-                          {isRtl ? mode.label : mode.labelEn}
+                          {mode.labelEn}
                         </span>
-                        {isRtl && <span className="text-gray-500 text-xs mr-auto">{mode.desc}</span>}
+                        <span className="text-gray-500 text-xs mr-auto">{mode.desc}</span>
                       </button>
                     );
                   })}
@@ -1916,7 +2122,7 @@ export default function Chat() {
                 className={`p-3 rounded-xl hover:bg-dark-800 transition-colors shrink-0 ${
                   selectedModel !== 'auto' ? 'text-green-400' : 'text-gray-400'
                 }`}
-                title={`${isRtl ? 'מודל' : '模型'}: ${modelList.find(m => m.id === selectedModel)?.name ?? '自动'}`}
+                title={`模型: ${modelList.find(m => m.id === selectedModel)?.name ?? '自动'}`}
               >
                 <Bot className="w-5 h-5" />
               </button>
@@ -1926,12 +2132,12 @@ export default function Chat() {
                     const modelsInTier = modelList.filter(m => m.tier === tier);
                     if (modelsInTier.length === 0) return null;
                     const tierLabel: Record<string, string> = {
-                      auto: isRtl ? 'אוטומטי' : '自动',
-                      free: isRtl ? 'חינמי' : '免费',
-                      cheap: isRtl ? 'חסכוני' : '经济',
-                      mid: isRtl ? 'סטנדרטי' : '标准',
-                      premium: isRtl ? 'פרימיום' : '高级',
-                      ultra: isRtl ? 'אולטרה' : '旗舰',
+                      auto: '自动',
+                      free: '免费',
+                      cheap: '经济',
+                      mid: '标准',
+                      premium: '高级',
+                      ultra: '旗舰',
                     };
                     const tierColor: Record<string, string> = {
                       auto: 'bg-blue-400', free: 'bg-gray-400', cheap: 'bg-green-400',
@@ -1948,6 +2154,9 @@ export default function Chat() {
                             onClick={() => {
                               setSelectedModel(model.id);
                               localStorage.setItem('a4claw-selected-model', model.id);
+                              if (activeConversationId) {
+                                updateConversationRuntime(activeConversationId, { model: model.id }).catch(() => {});
+                              }
                               setShowModelMenu(false);
                             }}
                             className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-dark-700 transition-colors ${
@@ -1975,6 +2184,9 @@ export default function Chat() {
                 onClick={() => {
                   setInteractionMode('chat');
                   localStorage.setItem('a4claw-interaction-mode', 'chat');
+                  if (activeConversationId) {
+                    updateConversationRuntime(activeConversationId, { interactionMode: 'chat' }).catch(() => {});
+                  }
                 }}
                 className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs transition-colors ${
                   interactionMode === 'chat'
@@ -1990,6 +2202,9 @@ export default function Chat() {
                 onClick={() => {
                   setInteractionMode('task');
                   localStorage.setItem('a4claw-interaction-mode', 'task');
+                  if (activeConversationId) {
+                    updateConversationRuntime(activeConversationId, { interactionMode: 'task' }).catch(() => {});
+                  }
                 }}
                 className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs transition-colors ${
                   interactionMode === 'task'
@@ -2037,11 +2252,11 @@ export default function Chat() {
               placeholder={
                 loadingConversationId
                   ? (loadingConversationId === activeConversationId
-                    ? (isRtl ? '...מעבד — לחץ Stop או Escape לביטול' : '处理中... 按 Stop 或 Escape 取消')
-                    : (isRtl ? '...שיחה אחרת מעובדת — לחץ Stop לביטול' : '另一条会话正在处理... 按 Stop 取消'))
+                    ? '处理中... 按 Stop 或 Escape 取消'
+                    : '另一条会话正在处理... 按 Stop 取消')
                   : (attachedFile
-                    ? (isRtl ? `...הודעה על ${attachedFile.name}` : `关于 ${attachedFile.name} 的消息...`)
-                    : (isRtl ? '...כתוב הודעה' : '输入消息...'))
+                    ? `关于 ${attachedFile.name} 的消息...`
+                    : '输入消息...')
               }
               disabled={false}
               rows={1}

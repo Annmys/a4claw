@@ -48,12 +48,12 @@ const CRON_PATTERNS: Array<{ pattern: RegExp; expression: string }> = [
   { pattern: /every\s*sunday/i, expression: '0 9 * * 0' },
   { pattern: /every\s*week/i, expression: '0 9 * * 1' },
   { pattern: /every\s*month/i, expression: '0 9 1 * *' },
-  { pattern: /כל\s*בוקר/i, expression: '0 8 * * *' },
-  { pattern: /כל\s*ערב/i, expression: '0 20 * * *' },
-  { pattern: /כל\s*שעה/i, expression: '0 * * * *' },
-  { pattern: /כל\s*יום/i, expression: '0 9 * * *' },
-  { pattern: /כל\s*שבוע/i, expression: '0 9 * * 0' },
-  { pattern: /כל\s*חודש/i, expression: '0 9 1 * *' },
+  { pattern: /每天早上/i, expression: '0 8 * * *' },
+  { pattern: /每天晚上/i, expression: '0 20 * * *' },
+  { pattern: /每小时/i, expression: '0 * * * *' },
+  { pattern: /每天/i, expression: '0 9 * * *' },
+  { pattern: /每周/i, expression: '0 9 * * 0' },
+  { pattern: /每月/i, expression: '0 9 1 * *' },
 ];
 
 export function parseCronExpression(input: string): string | null {

@@ -21,11 +21,13 @@ import { startWorker } from './queue/worker.js';
 import { startScheduler } from './queue/scheduler.js';
 import { startInterfaces, stopInterfaces } from './interfaces/index.js';
 import { findOrCreateUser, autoLinkUsers } from './memory/repositories/users.js';
-import { getOrCreateConversation, getCrossPlatformSummary } from './memory/repositories/conversations.js';
+import { getOrCreateConversation, getCrossPlatformSummary, getConversationMetadataForUser, extractConversationRuntime } from './memory/repositories/conversations.js';
 import { saveMessage, getRecentMessages } from './memory/repositories/messages.js';
 import { getUserKnowledge, learnFact, getKnowledgeCount } from './memory/repositories/knowledge.js';
 import { getUserTasks, getOverdueTasks } from './memory/repositories/tasks.js';
 import { getUserServers } from './memory/repositories/servers.js';
+import { getCommandCenterActorContext, listCommandCenterTasksForMember } from './memory/repositories/command-center.js';
+import { findWebCredentialByUsername } from './memory/repositories/web-credentials.js';
 import { TelegramBot } from './interfaces/telegram/bot.js';
 import { createWebhookTunnel, SSHTunnel } from './services/ssh-tunnel.js';
 import { setCronToolEngine } from './agents/tools/cron-tool.js';
@@ -58,6 +60,7 @@ import { ToolCreator } from './core/tool-creator.js';
 import { initBridge, runPeriodicIntelligence, isBridgeReady } from './core/intelligence-bridge.js';
 import { registerPromoterCron, setPromoterAI } from './core/auto-promoter.js';
 import type { Message } from './core/ai-client.js';
+import { CapabilityRegistry } from './core/capability-registry.js';
 // BaseInterface type used in variable declarations below
 
 // Cache platform ID → DB user ID mapping
@@ -194,6 +197,7 @@ async function main() {
 
   // 3. Engine + Skills + Memory Bridge
   const engine = new Engine();
+  engine.setPluginLoader(pluginLoader);
 
   // Initialize skills engine
   await engine.initSkills();
@@ -203,8 +207,18 @@ async function main() {
       try {
         const dbUserId = await resolveUserId(platformUserId, platform);
         const conversation = await getOrCreateConversation(dbUserId, platform, conversationId);
-        const msgs = await getRecentMessages(conversation.id, limit);
-        return msgs.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+        const metadata = await getConversationMetadataForUser(conversation.id, dbUserId);
+        const runtime = extractConversationRuntime(metadata);
+        const historyLimit = runtime?.compactSummary ? Math.max(1, limit - 1) : limit;
+        const msgs = await getRecentMessages(conversation.id, historyLimit);
+        const history = msgs.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+        if (runtime?.compactSummary?.trim()) {
+          return [
+            { role: 'user', content: `[Conversation Summary]\n${runtime.compactSummary}\n[End Summary — recent messages follow]` },
+            ...history,
+          ];
+        }
+        return history;
       } catch (err: any) {
         logger.warn('Failed to load history', { error: err.message });
         return [];
@@ -247,11 +261,28 @@ async function main() {
 
     getUserTasks: async (platformUserId: string): Promise<string> => {
       try {
+        const parts: string[] = [];
         const dbId = findDbUserId(platformUserId);
-        if (!dbId) return '';
-        const tasks = await getUserTasks(dbId, 'pending');
-        if (tasks.length === 0) return '';
-        return tasks.map(t => `- [${t.priority}] ${t.title} (${t.status})${t.dueDate ? ` — due ${t.dueDate.toLocaleDateString()}` : ''}`).join('\n');
+        if (dbId) {
+          const tasks = await getUserTasks(dbId, 'pending');
+          if (tasks.length > 0) {
+            parts.push(...tasks.map(t => `- [个人/${t.priority}] ${t.title} (${t.status})${t.dueDate ? ` — due ${t.dueDate.toLocaleDateString()}` : ''}`));
+          }
+        }
+
+        const credential = await findWebCredentialByUsername(platformUserId);
+        if (credential && dbId) {
+          const actorContext = await getCommandCenterActorContext(dbId, credential.id);
+          if (actorContext.binding) {
+            const assignedTasks = await listCommandCenterTasksForMember(dbId, actorContext.binding.memberId);
+            parts.push(...assignedTasks
+              .filter((task) => task.status !== 'done')
+              .slice(0, 10)
+              .map((task) => `- [组织/${task.priority}] ${task.title} (${task.status})`));
+          }
+        }
+
+        return parts.join('\n');
       } catch (err: any) {
         logger.warn('Failed to load tasks', { error: err.message });
         return '';
@@ -280,6 +311,33 @@ async function main() {
         return parts.length > 0 ? parts.join('\n') : '';
       } catch (err: any) {
         logger.warn('Failed to load servers', { error: err.message });
+        return '';
+      }
+    },
+
+    getUserOrganization: async (platformUserId: string, platform: string): Promise<string> => {
+      try {
+        if (platform !== 'web') return '';
+        const credential = await findWebCredentialByUsername(platformUserId);
+        if (!credential) return '';
+        const ownerUserId = await resolveUserId(platformUserId, platform);
+        const actorContext = await getCommandCenterActorContext(ownerUserId, credential.id);
+        if (!actorContext.binding) return '';
+
+        const lines = [
+          `中心：${actorContext.binding.centerName}`,
+          `部门：${actorContext.binding.departmentName ?? '未分配'}`,
+          `员工：${actorContext.binding.memberName}`,
+          `岗位：${actorContext.binding.title ?? actorContext.binding.memberRoleTitle ?? '未设岗位'}`,
+        ];
+        if (actorContext.skillAssignments.length > 0) {
+          lines.push(
+            `组织分配技能：${actorContext.skillAssignments.slice(0, 8).map((item) => `${item.skillName}[${item.scopeType}]`).join('、')}`,
+          );
+        }
+        return lines.join('\n');
+      } catch (err: any) {
+        logger.warn('Failed to load user organization context', { error: err.message });
         return '';
       }
     },
@@ -393,6 +451,13 @@ If no facts to extract, return []. Return ONLY valid JSON, nothing else.`,
   setPluginLoader(pluginLoader);
   const toolCreator = new ToolCreator(engine.getAIClient());
   setToolCreator(toolCreator);
+  const capabilityRegistry = new CapabilityRegistry({
+    skills: engine.getSkillsEngine(),
+    getPluginLoader: () => engine.getPluginLoader(),
+    getRAGEngine: () => engine.getRAGEngine(),
+    getProviders: () => engine.getAIClient().getAvailableProviders(),
+  });
+  engine.setCapabilityRegistry(capabilityRegistry);
   logger.info('🔧 Tool Creator initialized (dynamic tool generation enabled)');
   const skillFetcher = new SkillFetcher(engine.getAIClient(), engine.getSkillsEngine());
   const agentFactory = new AgentFactory(engine.getAIClient(), engine.getSkillsEngine());

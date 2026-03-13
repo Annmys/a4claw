@@ -1,25 +1,13 @@
 import { useEffect, useState } from 'react';
-import { api } from '../api/client';
+import { api, type CapabilitySkillItem } from '../api/client';
 import {
   Sparkles, Plus, Pencil, Trash2, X, Save, Loader2, Zap
 } from 'lucide-react';
 
-interface Skill {
-  id: string;
-  name: string;
-  description: string;
-  trigger: string;
-  prompt: string;
-  examples: string[];
-  version: string;
-  source: string;
-  createdAt: string;
-}
-
 export default function Skills() {
-  const [skills, setSkills] = useState<Skill[]>([]);
+  const [skills, setSkills] = useState<CapabilitySkillItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editingSkill, setEditingSkill] = useState<Partial<Skill> | null>(null);
+  const [editingSkill, setEditingSkill] = useState<Partial<CapabilitySkillItem> | null>(null);
   const [isNew, setIsNew] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -79,7 +67,7 @@ export default function Skills() {
           </div>
           <button
             onClick={() => {
-              setEditingSkill({ name: '', description: '', trigger: '', prompt: '', examples: [] });
+      setEditingSkill({ name: '', description: '', trigger: '', prompt: '', examples: [] });
               setIsNew(true);
             }}
             className="flex items-center gap-2 px-4 py-2 bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors font-medium"
@@ -122,7 +110,7 @@ export default function Skills() {
                 <input
                   value={editingSkill.trigger ?? ''}
                   onChange={(e) => setEditingSkill({ ...editingSkill, trigger: e.target.value })}
-                  placeholder="(morning briefing|בוקר טוב|daily briefing)"
+                  placeholder="(morning briefing|早报|daily briefing)"
                   className="w-full p-2.5 rounded bg-dark-900 border border-gray-700 text-white text-sm font-mono"
                 />
               </div>
@@ -163,27 +151,46 @@ export default function Skills() {
                     <Zap className="w-4 h-4 text-yellow-400" />
                     <h3 className="font-medium">{skill.name}</h3>
                     <span className="text-xs text-gray-500">v{skill.version}</span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${skill.source === 'dashboard' ? 'bg-primary-600/20 text-primary-400' : 'bg-gray-700 text-gray-400'}`}>
-                      {skill.source}
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                      skill.status === 'ready'
+                        ? 'bg-green-600/15 text-green-400'
+                        : skill.status === 'partial'
+                          ? 'bg-yellow-600/15 text-yellow-400'
+                          : 'bg-red-600/15 text-red-400'
+                    }`}>
+                      {skill.status === 'ready' ? '可用' : skill.status === 'partial' ? '部分可用' : '受阻'}
+                    </span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${skill.type === 'plugin-tool' ? 'bg-cyan-600/15 text-cyan-300' : 'bg-gray-700 text-gray-300'}`}>
+                      {skill.type === 'plugin-tool' ? '插件工具' : '技能'}
+                    </span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${skill.source === 'dashboard' || skill.source === 'user-created' ? 'bg-primary-600/20 text-primary-400' : 'bg-gray-700 text-gray-400'}`}>
+                      {skill.sourceLabel}
                     </span>
                   </div>
                   <p className="text-sm text-gray-400 mb-2">{skill.description}</p>
                   <p className="text-xs text-gray-500 font-mono">触发器：{skill.trigger}</p>
+                  {skill.pluginName && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      插件：{skill.pluginName} {skill.pluginVersion ? `· v${skill.pluginVersion}` : ''}{skill.pluginAuthor ? ` · ${skill.pluginAuthor}` : ''}
+                    </p>
+                  )}
                 </div>
-                <div className="flex gap-1 ml-4">
-                  <button
-                    onClick={() => { setEditingSkill(skill); setIsNew(false); }}
-                    className="p-2 text-gray-400 hover:text-white hover:bg-dark-900 rounded transition-colors"
-                  >
-                    <Pencil className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(skill.id)}
-                    className="p-2 text-gray-400 hover:text-red-400 hover:bg-dark-900 rounded transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
+                {skill.editable && (
+                  <div className="flex gap-1 ml-4">
+                    <button
+                      onClick={() => { setEditingSkill(skill); setIsNew(false); }}
+                      className="p-2 text-gray-400 hover:text-white hover:bg-dark-900 rounded transition-colors"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(skill.id)}
+                      className="p-2 text-gray-400 hover:text-red-400 hover:bg-dark-900 rounded transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           ))}

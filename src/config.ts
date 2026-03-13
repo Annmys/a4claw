@@ -133,6 +133,11 @@ const configSchema = z.object({
   OPENCLAW_DEVICE_PUBLIC_KEY: z.string().optional(),
   OPENCLAW_DEVICE_PRIVATE_KEY: z.string().optional(),
   OPENCLAW_DEVICE_TOKEN: z.string().optional(),
+  ARTIFACT_ADAPTER_URL: z.string().optional(),
+  ARTIFACT_ADAPTER_TIMEOUT_MS: z.coerce.number().default(30000),
+  DOCUMENT_EXTRACTOR_ADAPTER_URL: z.string().optional(),
+  DOCUMENT_EXTRACTOR_ADAPTER_TIMEOUT_MS: z.coerce.number().default(30000),
+  DOCUMENT_ADAPTER_EXTRA_EXTENSIONS: z.string().optional().transform(v => v?.split(',').map(s => s.trim().toLowerCase()).filter(Boolean) ?? []),
 
   // Appium (Android mobile automation)
   APPIUM_URL: z.string().default('http://localhost:4723'),

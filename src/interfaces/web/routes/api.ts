@@ -6,9 +6,10 @@ import { readFile, writeFile } from 'fs/promises';
 import { randomUUID } from 'crypto';
 import { Engine } from '../../../core/engine.js';
 import { analyzeImage } from '../../../actions/vision/analyze.js';
-import { extractText } from '../../../actions/rag/extractor.js';
+import { extractText, SUPPORTED_DOCUMENT_EXTENSIONS } from '../../../actions/rag/extractor.js';
 import { getAllModels } from '../../../core/model-router.js';
 import { publishFileToUserShare } from '../../../core/shared-artifacts.js';
+import { createDocumentResultArtifacts } from '../../../core/document-artifact-pipeline.js';
 import { findOrCreateUser } from '../../../memory/repositories/users.js';
 import {
   getOrCreateConversation,
@@ -20,6 +21,7 @@ import logger from '../../../utils/logger.js';
 
 const UPLOAD_DIR = pathResolve(process.cwd(), 'uploads');
 const DOCUMENT_PDF_FONT_PATH = '/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf';
+type DocumentOutputAction = 'translation' | 'summary' | 'rewrite' | 'analysis' | 'result';
 
 function normalizeDocumentText(input: string): string {
   return input
@@ -32,28 +34,93 @@ function normalizeDocumentText(input: string): string {
     .join('\n');
 }
 
-function buildLocalDocumentFallback(userText: string, fileName: string, extractedText: string): string {
+function isImplicitDocumentFollowup(text: string): boolean {
+  const normalized = text.trim().toLowerCase();
+  if (!normalized) return true;
+  return /^(这一份|这份|这个|这个文件|这份文件|这个pdf|这份pdf|刚才那个|刚才这份|刚才发的|刚才发的pdf|刚才的pdf|上一份|上一个文件|这一个文件|这一个pdf|继续|继续处理|继续这个|继续这一份|继续这份|继续翻这个|继续翻译这份)$/i.test(normalized);
+}
+
+function classifyDocumentOutputAction(text: string): DocumentOutputAction {
+  const normalized = text.trim().toLowerCase();
+  if (!normalized) return 'result';
+  if (/总结|摘要|概括|summary|summar|提炼|要点|写的是什么|讲了什么/.test(normalized)) return 'summary';
+  if (/翻译|translate|translation|译成|译为/.test(normalized)) return 'translation';
+  if (/改写|重写|rewrite|润色|整理|排版|编辑/.test(normalized)) return 'rewrite';
+  if (/分析|analysis|解释|问答|qa|q&a|校对/.test(normalized)) return 'analysis';
+  return 'result';
+}
+
+function resolveDocumentOutputAction(text: string, previousAction?: DocumentOutputAction): DocumentOutputAction {
+  const explicit = classifyDocumentOutputAction(text);
+  if (explicit !== 'result') return explicit;
+  if (isImplicitDocumentFollowup(text)) return previousAction ?? 'summary';
+  return explicit;
+}
+
+function buildResolvedDocumentRequest(
+  userText: string,
+  fileName: string,
+  action: DocumentOutputAction,
+  previousRequest?: string,
+): string {
+  const normalized = userText.trim();
+  if (normalized && !isImplicitDocumentFollowup(normalized)) return normalized;
+  if (previousRequest?.trim()) return previousRequest.trim();
+
+  switch (action) {
+    case 'translation':
+      return `请把《${fileName}》完整翻译成中文，尽量保留原标题、编号、列表和段落结构。`;
+    case 'summary':
+      return `请用中文总结《${fileName}》的主要内容，直接给结果。`;
+    case 'analysis':
+      return `请用中文分析《${fileName}》的核心内容和要点。`;
+    case 'rewrite':
+      return `请根据《${fileName}》的正文整理并重写为清晰的中文结果。`;
+    default:
+      return `请根据《${fileName}》的正文直接完成处理并返回结果。`;
+  }
+}
+
+function buildLocalDocumentFallback(
+  userText: string,
+  fileName: string,
+  extractedText: string,
+  previousAction?: DocumentOutputAction,
+  previousRequest?: string,
+): string {
   const normalized = normalizeDocumentText(extractedText);
   const lines = normalized.split('\n').filter(Boolean);
-  const summaryLines = lines.slice(0, 8);
+  const summaryLines = lines.slice(0, 12);
   const previewLines = lines.slice(0, 20);
-  const isSummaryRequest = /总结|摘要|概括|总结一下|summar|summary|extract|提炼|主要内容|内容/.test(userText.toLowerCase());
+  const resolvedAction = resolveDocumentOutputAction(userText, previousAction);
+  const resolvedRequest = buildResolvedDocumentRequest(userText, fileName, resolvedAction, previousRequest);
 
   if (summaryLines.length === 0) {
     return `已收到文件《${fileName}》，但本地未提取到可用正文。`;
   }
 
-  if (isSummaryRequest) {
+  if (resolvedAction === 'summary') {
     return [
-      `已为你先做本地兜底总结：《${fileName}》`,
+      `主模型链路暂时失败，先返回《${fileName}》的本地提取要点：`,
       '',
-      '核心内容：',
+      '识别到的主要内容：',
       ...summaryLines.map((line, index) => `${index + 1}. ${line}`),
+    ].join('\n');
+  }
+
+  if (resolvedAction === 'translation') {
+    return [
+      `主模型链路暂时失败，未能完成《${fileName}》的中文翻译。`,
+      `已保留本次任务要求：${resolvedRequest}`,
+      '',
+      '当前已提取到的正文预览：',
+      ...previewLines.map((line) => `- ${line}`),
     ].join('\n');
   }
 
   return [
     `主处理链路异常，先返回《${fileName}》的本地提取结果。`,
+    `任务要求：${resolvedRequest}`,
     '',
     '正文预览：',
     ...previewLines.map((line) => `- ${line}`),
@@ -61,23 +128,13 @@ function buildLocalDocumentFallback(userText: string, fileName: string, extracte
 }
 
 function isDocumentSummaryRequest(text: string): boolean {
-  return /总结|摘要|概括|总结一下|summar|summary|extract|提炼|主要内容|内容|看一下|看看|readme|说明书/.test(text.toLowerCase());
+  return /总结|摘要|概括|总结一下|summar|summary|extract|提炼|主要内容|内容|看一下|看看|readme|说明书|写的是什么|讲了什么/.test(text.toLowerCase());
 }
 
 function isDocumentDirectRequest(text: string): boolean {
   const normalized = text.trim().toLowerCase();
-  if (!normalized) return true;
+  if (!normalized || isImplicitDocumentFollowup(normalized)) return true;
   return /总结|摘要|概括|总结一下|summar|summary|extract|提炼|主要内容|内容|看一下|看看|readme|说明书|翻译|translate|translation|译成|译为|全文|完整翻译|中文|分析|analysis|解释|问答|qa|q&a|校对|润色|整理|表格|excel/.test(normalized);
-}
-
-function classifyDocumentOutputAction(text: string): 'translation' | 'summary' | 'rewrite' | 'analysis' | 'result' {
-  const normalized = text.trim().toLowerCase();
-  if (!normalized) return 'result';
-  if (/翻译|translate|translation|译成|译为|中文|英文/.test(normalized)) return 'translation';
-  if (/总结|摘要|概括|summary|summar|提炼|要点/.test(normalized)) return 'summary';
-  if (/改写|重写|rewrite|润色|整理|排版|编辑/.test(normalized)) return 'rewrite';
-  if (/分析|analysis|解释|问答|qa|q&a|校对/.test(normalized)) return 'analysis';
-  return 'result';
 }
 
 function buildDocumentOutputFileName(fileName: string, userText: string, extension: 'pdf' | 'md'): string {
@@ -209,36 +266,17 @@ async function writeTextPdf(targetPath: string, title: string, body: string): Pr
   await writeFile(targetPath, bytes);
 }
 
-async function createDocumentResultArtifact(params: {
+async function createDocumentArtifacts(params: {
   userId: string;
   fileName: string;
   userText: string;
   content: string;
-}): Promise<{ artifact: any; format: 'pdf' | 'md' }> {
-  const artifactBody = buildDocumentArtifactBody(params.fileName, params.userText, params.content);
-  const preferredPdfName = buildDocumentOutputFileName(params.fileName, params.userText, 'pdf');
-  const tmpPdfPath = `/tmp/${randomUUID()}-${preferredPdfName}`;
-
-  try {
-    await writeTextPdf(tmpPdfPath, preferredPdfName.replace(/\.pdf$/i, ''), artifactBody);
-    const artifact = await publishFileToUserShare(tmpPdfPath, params.userId, preferredPdfName);
-    try { unlinkSync(tmpPdfPath); } catch {}
-    return { artifact, format: 'pdf' };
-  } catch (pdfErr: any) {
-    logger.warn('Failed to generate PDF artifact for document result, falling back to markdown', {
-      userId: params.userId,
-      fileName: params.fileName,
-      error: pdfErr.message,
-    });
-    try { unlinkSync(tmpPdfPath); } catch {}
-  }
-
-  const preferredMdName = buildDocumentOutputFileName(params.fileName, params.userText, 'md');
-  const tmpMdPath = `/tmp/${randomUUID()}-${preferredMdName}`;
-  await writeFile(tmpMdPath, artifactBody, 'utf-8');
-  const artifact = await publishFileToUserShare(tmpMdPath, params.userId, preferredMdName);
-  try { unlinkSync(tmpMdPath); } catch {}
-  return { artifact, format: 'md' };
+}): Promise<{ artifacts: any[]; artifactPlan: Record<string, unknown> }> {
+  const generated = await createDocumentResultArtifacts(params);
+  return {
+    artifacts: generated.artifacts,
+    artifactPlan: generated.plan as unknown as Record<string, unknown>,
+  };
 }
 
 function looksLikeModelFailure(text: string | undefined): boolean {
@@ -247,14 +285,40 @@ function looksLikeModelFailure(text: string | undefined): boolean {
     'Circuit breaker [',
     'No providers available',
     'Insufficient credits',
-    'משהו השתבש',
-    'שגיאה:',
+    '处理失败',
+    '错误：',
     'API keys',
   ].some((pattern) => text.includes(pattern));
 }
 
 function shouldReuseConversationDocumentContext(text: string): boolean {
-  return /这个文件|这份文件|这个pdf|这份pdf|这个文档|这份文档|里面的内容|开始翻译|继续翻译|完整翻译|全文翻译|翻译成中文|总结一下|总结这份|总结这个|继续总结|接着总结|提取要点|继续处理|继续分析|分析这份|分析这个|这个readme|summar|summary|translate|this file|the file|this pdf|the pdf|this document|the document|continue translation|continue summary/i.test(text);
+  return /这一份|这份|这个文件|这份文件|这个pdf|这份pdf|这个文档|这份文档|里面的内容|开始翻译|继续翻译|完整翻译|全文翻译|翻译成中文|总结一下|总结这份|总结这个|继续总结|接着总结|提取要点|继续处理|继续分析|分析这份|分析这个|这个readme|summar|summary|translate|this file|the file|this pdf|the pdf|this document|the document|continue translation|continue summary/i.test(text);
+}
+
+function sanitizeDocumentMessageWithArtifacts(text: string, artifacts: any[] | undefined): string {
+  if (!text?.trim() || !artifacts || artifacts.length === 0) return text;
+  const attachmentLine = `已生成并作为附件返回：${artifacts.map((artifact) => artifact.originalName || artifact.name).join('、')}`;
+  const generatedNames = artifacts.map((artifact) => String(artifact.originalName || artifact.name || '').toLowerCase());
+  const hasOfficeBinary = generatedNames.some((name) => /\.(pdf|docx|xlsx|pptx)$/.test(name));
+  let cleaned = text
+    .replace(/我(?:当前|目前)?无法(?:直接)?在?(?:此会话|此对话|当前对话)?中?(?:直接)?生成并传输二进制\s*(PDF|Word|DOCX|XLSX|PPTX?)\s*文件[^。\n]*[。\n]?/gi, '')
+    .replace(/我(?:当前|目前)?无法(?:直接)?(?:生成|输出|传输)\s*(PDF|Word|DOCX|XLSX|PPTX?)\s*(?:文件)?[^。\n]*[。\n]?/gi, '')
+    .replace(/你可以(?:直接)?将(?:以上|下面这份|下方这份)?[^。\n]*(?:另存为|导出为)\s*(PDF|Word|DOCX|XLSX|PPTX?)[^。\n]*[。\n]?/gi, '')
+    .replace(/如果你愿意，我也可以下一步给你[^。\n]*[。\n]?/gi, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  if (hasOfficeBinary) {
+    cleaned = cleaned
+      .replace(/(?:^|\n)##\s*(?:PDF|Word|DOCX|XLSX|PPTX?)\s*输出[\s\S]*$/i, '')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
+  if (!cleaned.includes(attachmentLine)) {
+    cleaned = cleaned ? `${cleaned}\n\n${attachmentLine}` : attachmentLine;
+  }
+  return cleaned;
 }
 
 async function resolveDbUserId(jwtUserId: string): Promise<string> {
@@ -298,6 +362,8 @@ async function getConversationDocumentContext(conversationId: string, dbUserId: 
   mimeType?: string;
   artifactPath?: string;
   cachedText?: string;
+  lastAction?: DocumentOutputAction;
+  lastUserRequest?: string;
 }> {
   const metadata = await getConversationMetadataForUser(conversationId, dbUserId);
   const raw = metadata?.lastDocumentContext;
@@ -309,6 +375,10 @@ async function getConversationDocumentContext(conversationId: string, dbUserId: 
     mimeType: typeof doc.mimeType === 'string' ? doc.mimeType : undefined,
     artifactPath: typeof doc.artifactPath === 'string' ? doc.artifactPath : undefined,
     cachedText: typeof doc.cachedText === 'string' ? doc.cachedText : undefined,
+    lastAction: doc.lastAction === 'translation' || doc.lastAction === 'summary' || doc.lastAction === 'rewrite' || doc.lastAction === 'analysis' || doc.lastAction === 'result'
+      ? doc.lastAction
+      : undefined,
+    lastUserRequest: typeof doc.lastUserRequest === 'string' ? doc.lastUserRequest : undefined,
   };
 }
 
@@ -321,6 +391,39 @@ async function resolveConversationDocumentText(context: {
   }
   if (context.cachedText?.trim()) return context.cachedText;
   return '';
+}
+
+async function persistConversationDocumentContext(params: {
+  conversationId?: string;
+  dbUserId?: string;
+  fileName: string;
+  mimeType?: string;
+  artifactPath?: string;
+  cachedText?: string;
+  userText: string;
+  previousAction?: DocumentOutputAction;
+  previousRequest?: string;
+}) {
+  if (!params.conversationId || !params.dbUserId) return;
+  const lastAction = resolveDocumentOutputAction(params.userText, params.previousAction);
+  const lastUserRequest = buildResolvedDocumentRequest(
+    params.userText,
+    params.fileName,
+    lastAction,
+    params.previousRequest,
+  );
+
+  await mergeConversationMetadataForUser(params.conversationId, params.dbUserId, {
+    lastDocumentContext: {
+      fileName: params.fileName,
+      mimeType: params.mimeType,
+      artifactPath: params.artifactPath,
+      cachedText: params.cachedText?.slice(0, 20000),
+      lastAction,
+      lastUserRequest,
+      updatedAt: new Date().toISOString(),
+    },
+  });
 }
 
 async function processDocumentDirect(
@@ -348,6 +451,13 @@ async function processDocumentDirect(
   }
 
   const userRequest = params.userText.trim() || `请总结这份文档《${params.fileName}》的主要内容。`;
+  const outputHint = /\b(xlsx|excel|spreadsheet|csv)\b|表格|报价单|清单/.test(userRequest.toLowerCase())
+    ? '如果用户要求 Excel、CSV、报价单或表格输出，请优先把结果整理成规范 Markdown 表格，表头清晰，便于后续导出为电子表格。'
+    : /\b(docx|word)\b|word文档|word文件/.test(userRequest.toLowerCase())
+      ? '如果用户要求 Word 文档输出，请尽量使用清晰标题、分段和项目符号，便于直接生成 DOCX。'
+      : /\b(pptx|ppt|powerpoint|slides?)\b|演示文稿|幻灯片|汇报/.test(userRequest.toLowerCase())
+        ? '如果用户要求 PowerPoint 输出，请按“标题 + 要点列表”的结构组织内容，便于直接生成 PPTX。'
+        : '请优先使用清晰标题、分段和列表结构，便于后续生成办公文件。';
   const promptText = [
     `文档文件名：${params.fileName}`,
     `用户请求：${userRequest}`,
@@ -364,12 +474,13 @@ async function processDocumentDirect(
       '默认直接给最终结果，不要写“目标、步骤、信息缺口、下一步建议”这类任务模板。',
       '如果用户要求翻译成中文，则完整翻译当前提供的正文，并尽量保留原有标题、编号、列表和段落结构。',
       '如果用户要求总结、分析、提取要点或整理内容，则默认用中文回答，结构清晰，直接给结果。',
+      outputHint,
       '如果当前提供的正文可能被截断，请明确说明回答是基于已提取内容。',
     ].join('\n'),
     messages: [{ role: 'user', content: promptText }],
     maxTokens: 8000,
     temperature: 0.2,
-    model: params.model,
+    model: params.model && params.model !== 'auto' ? params.model : undefined,
   });
 
   return {
@@ -393,12 +504,19 @@ export function setupApiRoutes(engine: Engine): Router {
   // Allowed MIME types and extensions for file uploads
   const ALLOWED_MIMES = new Set([
     'text/plain', 'text/markdown', 'text/csv', 'text/html',
-    'application/pdf', 'application/json',
+    'application/pdf', 'application/json', 'application/rtf', 'text/rtf', 'application/xml', 'text/xml',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // docx
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // xlsx
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation', // pptx
+    'application/msword', // doc
+    'application/vnd.ms-excel', // xls
+    'application/vnd.ms-powerpoint', // ppt
+    'application/vnd.oasis.opendocument.text', // odt
+    'application/vnd.oasis.opendocument.spreadsheet', // ods
+    'application/vnd.oasis.opendocument.presentation', // odp
     'image/jpeg', 'image/png', 'image/gif', 'image/webp',
   ]);
-  const ALLOWED_EXTS = new Set(['txt', 'md', 'csv', 'pdf', 'json', 'docx', 'xlsx', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'html', 'ts', 'js', 'py']);
+  const ALLOWED_EXTS = new Set([...SUPPORTED_DOCUMENT_EXTENSIONS, 'jpg', 'jpeg', 'png', 'gif', 'webp']);
 
   // Multer for chat file uploads (images + documents)
   const upload = multer({
@@ -422,6 +540,9 @@ export function setupApiRoutes(engine: Engine): Router {
     const conversationId = req.body.conversationId as string | undefined;
     const responseMode = req.body.responseMode as string | undefined;
     const model = req.body.model as string | undefined;
+    const interactionMode = req.body.interactionMode === 'chat' || req.body.interactionMode === 'task'
+      ? req.body.interactionMode
+      : undefined;
     const file = (req as any).file as Express.Multer.File | undefined;
 
     let attachments: Array<{ type: string; url: string }> | undefined;
@@ -430,6 +551,11 @@ export function setupApiRoutes(engine: Engine): Router {
     let uploadedArtifact: any | undefined;
     let extractedDocumentText = '';
     let activeDocumentFileName: string | undefined;
+    let dbUserId: string | undefined;
+    let previousDocumentAction: DocumentOutputAction | undefined;
+    let previousDocumentRequest: string | undefined;
+    let resolvedDocumentAction: DocumentOutputAction = 'result';
+    let resolvedDocumentRequest = text || '';
 
     try {
       logger.info('Chat API request', {
@@ -440,6 +566,7 @@ export function setupApiRoutes(engine: Engine): Router {
         textLength: typeof text === 'string' ? text.length : 0,
         responseMode: responseMode ?? 'auto',
         model: model ?? 'auto',
+        interactionMode: interactionMode ?? 'chat',
       });
 
       if (file) {
@@ -541,14 +668,19 @@ export function setupApiRoutes(engine: Engine): Router {
           try {
             const dbUserId = await resolveDbUserId(user.userId);
             await ensureConversationExists(conversationId, dbUserId);
-            await mergeConversationMetadataForUser(conversationId, dbUserId, {
-              lastDocumentContext: {
-                fileName: file.originalname,
-                mimeType: file.mimetype,
-                artifactPath: uploadedArtifact?.path,
-                cachedText: extractedDocumentText.slice(0, 20000),
-                updatedAt: new Date().toISOString(),
-              },
+            const existingContext = await getConversationDocumentContext(conversationId, dbUserId);
+            previousDocumentAction = existingContext?.lastAction;
+            previousDocumentRequest = existingContext?.lastUserRequest;
+            await persistConversationDocumentContext({
+              conversationId,
+              dbUserId,
+              fileName: file.originalname,
+              mimeType: file.mimetype,
+              artifactPath: uploadedArtifact?.path,
+              cachedText: extractedDocumentText,
+              userText: text,
+              previousAction: previousDocumentAction,
+              previousRequest: previousDocumentRequest,
             });
           } catch (contextErr: any) {
             logger.warn('Failed to persist conversation document context', {
@@ -558,11 +690,13 @@ export function setupApiRoutes(engine: Engine): Router {
             });
           }
         }
-      } else if (conversationId && shouldReuseConversationDocumentContext(text)) {
+      } else if (conversationId && (interactionMode === 'task' || shouldReuseConversationDocumentContext(text))) {
         try {
           const dbUserId = await resolveDbUserId(user.userId);
           const documentContext = await getConversationDocumentContext(conversationId, dbUserId);
           if (documentContext) {
+            previousDocumentAction = documentContext.lastAction;
+            previousDocumentRequest = documentContext.lastUserRequest;
             const documentText = await resolveConversationDocumentText(documentContext);
             if (documentText.trim()) {
               activeDocumentFileName = documentContext.fileName;
@@ -592,67 +726,96 @@ export function setupApiRoutes(engine: Engine): Router {
         return;
       }
 
-      if (activeDocumentFileName && extractedDocumentText.trim() && isDocumentDirectRequest(text || '')) {
-        try {
-          let dbUserId: string | undefined;
-          if (conversationId) {
-            dbUserId = await resolveDbUserId(user.userId);
-            await ensureConversationExists(conversationId, dbUserId);
-          }
+      if (conversationId) {
+        dbUserId = await resolveDbUserId(user.userId);
+        await ensureConversationExists(conversationId, dbUserId);
+      }
 
+      resolvedDocumentAction = resolveDocumentOutputAction(text || '', previousDocumentAction);
+      resolvedDocumentRequest = activeDocumentFileName
+        ? buildResolvedDocumentRequest(text || '', activeDocumentFileName, resolvedDocumentAction, previousDocumentRequest)
+        : (text || '');
+      const shouldHandleDocumentDirectly =
+        Boolean(activeDocumentFileName)
+        && Boolean(extractedDocumentText.trim())
+        && (
+          Boolean(file)
+          || interactionMode === 'task'
+          || isDocumentDirectRequest(text || '')
+          || shouldReuseConversationDocumentContext(text || '')
+        );
+
+      if (activeDocumentFileName && extractedDocumentText.trim() && shouldHandleDocumentDirectly) {
+        try {
           const direct = await processDocumentDirect(engine, {
-            userText: text,
+            userText: resolvedDocumentRequest,
             fileName: activeDocumentFileName,
             documentText: extractedDocumentText,
             model,
           });
 
-          let generatedArtifact: any | undefined;
+          let generatedArtifacts: any[] = [];
+          let artifactPlan: Record<string, unknown> | undefined;
           try {
-            const generated = await createDocumentResultArtifact({
+            const generated = await createDocumentArtifacts({
               userId: user.userId,
               fileName: activeDocumentFileName,
-              userText: text,
+              userText: resolvedDocumentRequest,
               content: direct.message,
             });
-            generatedArtifact = generated.artifact;
+            generatedArtifacts = generated.artifacts;
+            artifactPlan = generated.artifactPlan;
           } catch (artifactErr: any) {
             logger.warn('Failed to generate document result artifact', {
               requestId,
-              userId: user.userId,
-              fileName: activeDocumentFileName,
-              error: artifactErr.message,
-            });
+                userId: user.userId,
+                fileName: activeDocumentFileName,
+                error: artifactErr.message,
+              });
           }
 
-          const responseArtifacts = [generatedArtifact, uploadedArtifact].filter(Boolean);
+          const responseArtifacts = [...generatedArtifacts, uploadedArtifact].filter(Boolean);
+          const finalMessage = sanitizeDocumentMessageWithArtifacts(direct.message, responseArtifacts);
 
           if (conversationId && dbUserId) {
+            await persistConversationDocumentContext({
+              conversationId,
+              dbUserId,
+              fileName: activeDocumentFileName,
+              mimeType: file?.mimetype,
+              artifactPath: uploadedArtifact?.path,
+              cachedText: extractedDocumentText,
+              userText: resolvedDocumentRequest,
+              previousAction: previousDocumentAction,
+              previousRequest: previousDocumentRequest,
+            });
             await saveDocumentConversationExchange({
               conversationId,
               jwtUserId: user.userId,
               fileName: activeDocumentFileName,
-              userText: text,
-              assistantText: direct.message,
+              userText: resolvedDocumentRequest,
+              assistantText: finalMessage,
               metadata: {
                 agent: 'document-direct',
                 provider: direct.provider,
                 model: direct.model,
                 tokens: direct.tokens,
                 artifacts: responseArtifacts.length > 0 ? responseArtifacts : undefined,
+                artifactPlan,
                 source: 'document-direct',
               },
             });
           }
 
           res.json({
-            message: direct.message,
+            message: finalMessage,
             thinking: direct.thinking,
             artifacts: responseArtifacts.length > 0 ? responseArtifacts : undefined,
             agent: 'document-direct',
             provider: direct.provider,
             model: direct.model,
             tokens: direct.tokens,
+            artifactPlan,
           });
           return;
         } catch (directErr: any) {
@@ -660,22 +823,31 @@ export function setupApiRoutes(engine: Engine): Router {
             requestId,
             userId: user?.userId,
             conversationId: conversationId ?? null,
+            action: resolvedDocumentAction,
             error: directErr.message,
           });
         }
       }
 
-      if (file && extractedDocumentText.trim() && isDocumentSummaryRequest(text || '')) {
-        const fallbackMessage = buildLocalDocumentFallback(text, file.originalname, extractedDocumentText);
+      if (file && extractedDocumentText.trim() && isDocumentSummaryRequest(resolvedDocumentRequest || text || '')) {
+        const fallbackMessage = buildLocalDocumentFallback(
+          resolvedDocumentRequest,
+          file.originalname,
+          extractedDocumentText,
+          previousDocumentAction,
+          previousDocumentRequest,
+        );
         const responseArtifacts = [];
+        let artifactPlan: Record<string, unknown> | undefined;
         try {
-          const generated = await createDocumentResultArtifact({
+          const generated = await createDocumentArtifacts({
             userId: user.userId,
             fileName: file.originalname,
-            userText: text,
+            userText: resolvedDocumentRequest,
             content: fallbackMessage,
           });
-          responseArtifacts.push(generated.artifact);
+          responseArtifacts.push(...generated.artifacts);
+          artifactPlan = generated.artifactPlan;
         } catch (artifactErr: any) {
           logger.warn('Failed to generate fallback document artifact', {
             requestId,
@@ -686,17 +858,31 @@ export function setupApiRoutes(engine: Engine): Router {
         }
         if (uploadedArtifact) responseArtifacts.push(uploadedArtifact);
         try {
+          if (conversationId && dbUserId) {
+            await persistConversationDocumentContext({
+              conversationId,
+              dbUserId,
+              fileName: file.originalname,
+              mimeType: file.mimetype,
+              artifactPath: uploadedArtifact?.path,
+              cachedText: extractedDocumentText,
+              userText: resolvedDocumentRequest,
+              previousAction: previousDocumentAction,
+              previousRequest: previousDocumentRequest,
+            });
+          }
           await saveDocumentConversationExchange({
             conversationId,
             jwtUserId: user.userId,
             fileName: file.originalname,
-            userText: text,
+            userText: resolvedDocumentRequest,
             assistantText: fallbackMessage,
             metadata: {
               agent: 'document-fallback',
               provider: 'local',
               model: 'local-document-fallback',
               artifacts: responseArtifacts.length > 0 ? responseArtifacts : undefined,
+              artifactPlan,
               source: 'document-fallback',
             },
           });
@@ -714,6 +900,7 @@ export function setupApiRoutes(engine: Engine): Router {
           agent: 'document-fallback',
           provider: 'local',
           model: 'local-document-fallback',
+          artifactPlan,
         });
         return;
       }
@@ -729,6 +916,7 @@ export function setupApiRoutes(engine: Engine): Router {
         attachments,
         responseMode: responseMode as any,
         model,
+        interactionMode,
       });
 
       const shouldUseLocalFallback =
@@ -737,16 +925,24 @@ export function setupApiRoutes(engine: Engine): Router {
         && looksLikeModelFailure(response.text);
 
       if (shouldUseLocalFallback) {
-        const fallbackMessage = buildLocalDocumentFallback(text, file!.originalname, extractedDocumentText);
+        const fallbackMessage = buildLocalDocumentFallback(
+          resolvedDocumentRequest,
+          file!.originalname,
+          extractedDocumentText,
+          previousDocumentAction,
+          previousDocumentRequest,
+        );
         const responseArtifacts = [];
+        let artifactPlan: Record<string, unknown> | undefined;
         try {
-          const generated = await createDocumentResultArtifact({
+          const generated = await createDocumentArtifacts({
             userId: user.userId,
             fileName: file!.originalname,
-            userText: text,
+            userText: resolvedDocumentRequest,
             content: fallbackMessage,
           });
-          responseArtifacts.push(generated.artifact);
+          responseArtifacts.push(...generated.artifacts);
+          artifactPlan = generated.artifactPlan;
         } catch (artifactErr: any) {
           logger.warn('Failed to generate fallback artifact after model failure', {
             requestId,
@@ -757,17 +953,31 @@ export function setupApiRoutes(engine: Engine): Router {
         }
         if (uploadedArtifact) responseArtifacts.push(uploadedArtifact);
         try {
+          if (conversationId && dbUserId) {
+            await persistConversationDocumentContext({
+              conversationId,
+              dbUserId,
+              fileName: file!.originalname,
+              mimeType: file!.mimetype,
+              artifactPath: uploadedArtifact?.path,
+              cachedText: extractedDocumentText,
+              userText: resolvedDocumentRequest,
+              previousAction: previousDocumentAction,
+              previousRequest: previousDocumentRequest,
+            });
+          }
           await saveDocumentConversationExchange({
             conversationId,
             jwtUserId: user.userId,
             fileName: file!.originalname,
-            userText: text,
+            userText: resolvedDocumentRequest,
             assistantText: fallbackMessage,
             metadata: {
               agent: 'document-fallback',
               provider: 'local',
               model: 'local-document-fallback',
               artifacts: responseArtifacts.length > 0 ? responseArtifacts : undefined,
+              artifactPlan,
               source: 'document-fallback',
             },
           });
@@ -786,6 +996,7 @@ export function setupApiRoutes(engine: Engine): Router {
           agent: 'document-fallback',
           provider: 'local',
           model: 'local-document-fallback',
+          artifactPlan,
           elapsed: response.elapsed,
         });
         return;
@@ -816,6 +1027,14 @@ export function setupApiRoutes(engine: Engine): Router {
         provider: response.provider,
         model: response.modelUsed,
         tokens: response.tokensUsed,
+        skillUsed: response.skillUsed,
+        pluginUsed: response.pluginUsed,
+        executionPath: response.executionPath,
+        memoryHits: response.memoryHits,
+        routePlan: response.routePlan,
+        routingReason: response.routingReason,
+        requiredCapabilities: response.requiredCapabilities,
+        artifactPlan: response.artifactPlan,
         elapsed: response.elapsed,
       });
     } catch (error: any) {
@@ -830,16 +1049,24 @@ export function setupApiRoutes(engine: Engine): Router {
       if (res.headersSent) return;
 
       if (file && extractedDocumentText.trim()) {
-        const fallbackMessage = buildLocalDocumentFallback(text, file.originalname, extractedDocumentText);
+        const fallbackMessage = buildLocalDocumentFallback(
+          resolvedDocumentRequest || text,
+          file.originalname,
+          extractedDocumentText,
+          previousDocumentAction,
+          previousDocumentRequest,
+        );
         const responseArtifacts = [];
+        let artifactPlan: Record<string, unknown> | undefined;
         try {
-          const generated = await createDocumentResultArtifact({
+          const generated = await createDocumentArtifacts({
             userId: user.userId,
             fileName: file.originalname,
-            userText: text,
+            userText: resolvedDocumentRequest || text,
             content: fallbackMessage,
           });
-          responseArtifacts.push(generated.artifact);
+          responseArtifacts.push(...generated.artifacts);
+          artifactPlan = generated.artifactPlan;
         } catch (artifactErr: any) {
           logger.warn('Failed to generate document artifact in error fallback', {
             requestId,
@@ -850,17 +1077,31 @@ export function setupApiRoutes(engine: Engine): Router {
         }
         if (uploadedArtifact) responseArtifacts.push(uploadedArtifact);
         try {
+          if (conversationId && dbUserId) {
+            await persistConversationDocumentContext({
+              conversationId,
+              dbUserId,
+              fileName: file.originalname,
+              mimeType: file.mimetype,
+              artifactPath: uploadedArtifact?.path,
+              cachedText: extractedDocumentText,
+              userText: resolvedDocumentRequest || text,
+              previousAction: previousDocumentAction,
+              previousRequest: previousDocumentRequest,
+            });
+          }
           await saveDocumentConversationExchange({
             conversationId,
             jwtUserId: user.userId,
             fileName: file.originalname,
-            userText: text,
+            userText: resolvedDocumentRequest || text,
             assistantText: fallbackMessage,
             metadata: {
               agent: 'document-fallback',
               provider: 'local',
               model: 'local-document-fallback',
               artifacts: responseArtifacts.length > 0 ? responseArtifacts : undefined,
+              artifactPlan,
               source: 'document-fallback',
             },
           });
@@ -878,6 +1119,7 @@ export function setupApiRoutes(engine: Engine): Router {
           agent: 'document-fallback',
           provider: 'local',
           model: 'local-document-fallback',
+          artifactPlan,
         });
         return;
       }

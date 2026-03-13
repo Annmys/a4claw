@@ -128,7 +128,7 @@ export class LLMEcosystemTracker {
               id: `upd_${now}_${Math.random().toString(36).slice(2, 6)}`,
               type: 'new_model', provider, modelId: id, modelName: name,
               details: `New model: ${name} (${provider}) — context: ${contextLength.toLocaleString()}, cost: $${costInput.toFixed(4)}/$${costOutput.toFixed(4)}/1k tokens`,
-              detailsHe: `מודל חדש: ${name} (${provider}) — הקשר: ${contextLength.toLocaleString()}, עלות: $${costInput.toFixed(4)}/$${costOutput.toFixed(4)} לאלף טוקנים`,
+              detailsHe: `新模型：${name} (${provider}) — 上下文：${contextLength.toLocaleString()}，成本：$${costInput.toFixed(4)}/$${costOutput.toFixed(4)}/1k tokens`,
               significance, detectedAt: now,
             };
             updates.push(update);
@@ -136,7 +136,7 @@ export class LLMEcosystemTracker {
             if (this.notifyNewModels && significance !== 'low') {
               notificationStore.push({
                 type: 'model_new',
-                title: `🆕 מודל חדש: ${name}`,
+                title: `🆕 新模型：${name}`,
                 body: update.detailsHe,
                 severity: significance === 'high' ? 'warning' : 'info',
                 source: 'llm-tracker',
@@ -153,7 +153,7 @@ export class LLMEcosystemTracker {
               id: `upd_${now}_${Math.random().toString(36).slice(2, 6)}`,
               type: 'price_change', provider, modelId: id, modelName: name,
               details: `Price change: ${name} — input $${existing.costPer1kInput.toFixed(4)}→$${costInput.toFixed(4)}, output $${existing.costPer1kOutput.toFixed(4)}→$${costOutput.toFixed(4)}`,
-              detailsHe: `שינוי מחיר: ${name} — קלט $${existing.costPer1kInput.toFixed(4)}→$${costInput.toFixed(4)}, פלט $${existing.costPer1kOutput.toFixed(4)}→$${costOutput.toFixed(4)}`,
+              detailsHe: `价格变化：${name} — 输入 $${existing.costPer1kInput.toFixed(4)}→$${costInput.toFixed(4)}，输出 $${existing.costPer1kOutput.toFixed(4)}→$${costOutput.toFixed(4)}`,
               significance: 'low', detectedAt: now,
             };
             updates.push(update);
@@ -162,7 +162,7 @@ export class LLMEcosystemTracker {
 
             if (this.notifyPriceChanges) {
               notificationStore.push({
-                type: 'price_change', title: `💰 שינוי מחיר: ${name}`,
+                type: 'price_change', title: `💰 价格变化：${name}`,
                 body: update.detailsHe, severity: 'info', source: 'llm-tracker', actionUrl: '/evolution',
               });
             }
@@ -178,13 +178,13 @@ export class LLMEcosystemTracker {
               id: `upd_${now}_${Math.random().toString(36).slice(2, 6)}`,
               type: 'deprecation', provider: model.provider, modelId: id, modelName: model.name,
               details: `Deprecated: ${model.name} — no longer available`,
-              detailsHe: `הוצא משימוש: ${model.name} — לא זמין יותר`,
+              detailsHe: `已下线：${model.name} — 不再可用`,
               significance: 'medium', detectedAt: now,
             };
             updates.push(update);
             if (this.notifyDeprecations) {
               notificationStore.push({
-                type: 'model_deprecated', title: `⚠️ הוצא משימוש: ${model.name}`,
+                type: 'model_deprecated', title: `⚠️ 已下线：${model.name}`,
                 body: update.detailsHe, severity: 'warning', source: 'llm-tracker', actionUrl: '/evolution',
               });
             }

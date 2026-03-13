@@ -12,7 +12,6 @@ export interface Behavior {
 
 const BEHAVIORS_DIR = path.resolve('config/behaviors');
 
-// Hebrew detection regex
 const HEBREW_REGEX = /[\u0590-\u05FF]/;
 const ARABIC_REGEX = /[\u0600-\u06FF]/;
 const CYRILLIC_REGEX = /[\u0400-\u04FF]/;
@@ -74,11 +73,11 @@ export class BehaviorEngine {
         systemPromptFragment: 'Be thorough in your analysis. Cover edge cases, potential issues, and alternatives. Provide complete solutions.',
       },
       {
-        id: 'hebrew-aware',
-        name: 'Hebrew Aware',
-        description: 'Responds in Hebrew when user writes in Hebrew',
-        language: 'he',
-        systemPromptFragment: 'If the user writes in Hebrew, respond in Hebrew. Support RTL formatting. Be aware of Israeli cultural context.',
+        id: 'chinese-priority',
+        name: 'Chinese Priority',
+        description: 'Uses Simplified Chinese by default unless the user is clearly writing in English',
+        language: 'zh',
+        systemPromptFragment: 'Respond in Simplified Chinese by default. Use English only when the user is clearly writing in English. Use only Simplified Chinese or English.',
       },
     ];
 
@@ -175,9 +174,9 @@ export class BehaviorEngine {
     // Auto-add language behavior based on user message
     if (userMessage) {
       const lang = this.detectLanguage(userMessage);
-      if (lang === 'he' && !behaviorIds.includes('hebrew-aware')) {
-        const heBehavior = this.behaviors.get('hebrew-aware');
-        if (heBehavior) fragments.push(heBehavior.systemPromptFragment);
+      if (lang !== 'en' && !behaviorIds.includes('chinese-priority')) {
+        const zhBehavior = this.behaviors.get('chinese-priority');
+        if (zhBehavior) fragments.push(zhBehavior.systemPromptFragment);
       }
     }
 

@@ -85,7 +85,7 @@ export function calculateCost(
   return (tokens.input / 1000) * pricing.input + (tokens.output / 1000) * pricing.output;
 }
 
-/** Format a cost footer for chat responses (Hebrew) */
+/** Format a cost footer for chat responses */
 export function formatCostFooter(
   tokens?: { input: number; output: number },
   provider?: string,
@@ -96,7 +96,7 @@ export function formatCostFooter(
   if (!tokens) return '';
   const cost = calculateCost(tokens, model);
   const totalTokens = tokens.input + tokens.output;
-  const costStr = cost === 0 ? 'חינם' : `$${cost.toFixed(4)}`;
+  const costStr = cost === 0 ? '免费' : `$${cost.toFixed(4)}`;
   const providerShort = provider === 'claude-code' ? 'CLI'
     : provider === 'ollama' ? 'Local'
     : provider === 'openrouter' ? 'OR'

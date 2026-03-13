@@ -16,6 +16,8 @@ import {
   Building2,
   CalendarClock,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   CircleDashed,
   ClipboardList,
   Flag,
@@ -87,6 +89,7 @@ export default function CommandCenter() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [executorAudit, setExecutorAudit] = useState<TaskExecutorAuditItem[]>([]);
+  const [expandedAuditId, setExpandedAuditId] = useState<string | null>(null);
 
   const [centerForm, setCenterForm] = useState({ name: '', code: '', description: '' });
   const [departmentForm, setDepartmentForm] = useState({ centerId: '', name: '', code: '' });
@@ -126,6 +129,15 @@ export default function CommandCenter() {
       if (!taskForm.centerId && data.centers[0]) {
         setTaskForm((prev) => ({ ...prev, centerId: data.centers[0].id }));
       }
+      if (data.actorContext?.binding) {
+        setTaskForm((prev) => ({
+          ...prev,
+          centerId: prev.centerId || data.actorContext!.binding!.centerId,
+          departmentId: prev.departmentId || data.actorContext!.binding!.departmentId || '',
+          assigneeMemberId: prev.assigneeMemberId || data.actorContext!.binding!.memberId,
+          requestedBy: prev.requestedBy || data.actorContext!.binding!.memberName,
+        }));
+      }
     } catch (err: any) {
       setError(err.message ?? '加载任务中枢失败');
     } finally {
@@ -164,6 +176,8 @@ export default function CommandCenter() {
   const departments = overview?.departments ?? [];
   const members = overview?.members ?? [];
   const tasks = overview?.tasks ?? [];
+  const actorBinding = overview?.actorContext?.binding ?? null;
+  const actorSkillAssignments = overview?.actorContext?.skillAssignments ?? [];
 
   const filteredDepartments = useMemo(() => {
     if (centerFilter === 'all') return departments;
@@ -306,6 +320,18 @@ export default function CommandCenter() {
     });
   };
 
+  const handleAutoDispatch = async () => {
+    if (!detail?.task.id) return;
+    await setBusyAction(async () => {
+      const result = await api.commandCenterAutoDispatchTask(detail.task.id);
+      await loadOverview();
+      await loadDetail(detail.task.id);
+      const executor = result.recommendation.executorMember?.displayName ?? '未指定员工';
+      const skill = result.recommendation.skillAssignment?.skillName ?? '未匹配技能';
+      setNotice(`已自动分派执行：${executor} / ${skill}`);
+    });
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -382,6 +408,22 @@ export default function CommandCenter() {
           }`}>
             {error ? <AlertCircle className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
             <span>{error || notice}</span>
+          </div>
+        )}
+
+        {actorBinding && (
+          <div className="mt-4 rounded-2xl border border-primary-500/20 bg-primary-500/5 px-4 py-3">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-primary-200">
+              <span className="rounded-full bg-primary-500/15 px-2.5 py-1">当前身份：{actorBinding.memberName}</span>
+              <span className="rounded-full bg-primary-500/15 px-2.5 py-1">{actorBinding.centerName}</span>
+              <span className="rounded-full bg-primary-500/15 px-2.5 py-1">{actorBinding.departmentName ?? '未分配部门'}</span>
+              <span className="rounded-full bg-primary-500/15 px-2.5 py-1">{actorBinding.title ?? '未设岗位'}</span>
+              {actorSkillAssignments.slice(0, 4).map((item) => (
+                <span key={item.id} className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-emerald-200">
+                  技能 {item.skillName}
+                </span>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -717,12 +759,24 @@ export default function CommandCenter() {
                     : typeof details.taskPreview === 'string'
                       ? details.taskPreview
                       : '';
+                  const isExpanded = expandedAuditId === item.id;
 
                   return (
                     <div key={item.id} className="rounded-2xl border border-gray-800 bg-dark-800/70 p-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="text-sm font-medium text-white">{formatAuditAction(item.action)}</div>
-                        <div className="text-[11px] text-gray-500">{formatDateTime(item.createdAt)}</div>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="text-sm font-medium text-white">{formatAuditAction(item.action)}</div>
+                          <div className="mt-1 text-[11px] text-gray-500">{formatDateTime(item.createdAt)}</div>
+                        </div>
+                        <button
+                          onClick={() => setExpandedAuditId((prev) => prev === item.id ? null : item.id)}
+                          className="shrink-0 rounded-full bg-dark-900 px-2.5 py-1 text-[11px] text-gray-300 hover:bg-dark-950"
+                        >
+                          <span className="inline-flex items-center gap-1">
+                            {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                            {isExpanded ? '收起' : '展开详情'}
+                          </span>
+                        </button>
                       </div>
                       <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
                         {agentId && <span className="rounded-full bg-sky-500/15 px-2 py-1 text-sky-300">{agentId}</span>}
@@ -738,6 +792,41 @@ export default function CommandCenter() {
                       {textPreview && (
                         <div className="mt-2 rounded-xl bg-dark-900/80 px-3 py-2 text-xs text-gray-400 line-clamp-4 whitespace-pre-wrap">
                           {textPreview}
+                        </div>
+                      )}
+                      {isExpanded && (
+                        <div className="mt-3 space-y-3 rounded-2xl border border-gray-800 bg-dark-900/70 p-3">
+                          {reason && (
+                            <div>
+                              <div className="text-[11px] uppercase tracking-[0.16em] text-gray-500">触发原因</div>
+                              <div className="mt-1 text-xs text-gray-200 whitespace-pre-wrap">{reason}</div>
+                            </div>
+                          )}
+                          {textPreview && (
+                            <div>
+                              <div className="text-[11px] uppercase tracking-[0.16em] text-gray-500">完整任务文本</div>
+                              <div className="mt-1 text-xs text-gray-300 whitespace-pre-wrap break-words">{textPreview}</div>
+                            </div>
+                          )}
+                          {members.length > 0 && (
+                            <div>
+                              <div className="text-[11px] uppercase tracking-[0.16em] text-gray-500">调度成员详情</div>
+                              <div className="mt-1 space-y-1">
+                                {members.map((member, index) => (
+                                  <div key={`${item.id}-member-${index}`} className="text-xs text-gray-300">
+                                    {member.agentId || 'unknown'}
+                                    {member.role ? ` · ${member.role}` : ''}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          <div>
+                            <div className="text-[11px] uppercase tracking-[0.16em] text-gray-500">原始审计数据</div>
+                            <pre className="mt-1 overflow-x-auto rounded-xl bg-dark-950 px-3 py-2 text-[11px] leading-relaxed text-gray-400">
+{JSON.stringify(details, null, 2)}
+                            </pre>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -811,6 +900,13 @@ export default function CommandCenter() {
                 <div className="rounded-2xl border border-gray-800 bg-dark-800/70 p-4">
                   <div className="text-xs uppercase tracking-[0.18em] text-gray-400">快速流转</div>
                   <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      onClick={handleAutoDispatch}
+                      disabled={busy}
+                      className="rounded-full px-3 py-1.5 text-xs transition bg-sky-600 text-white hover:bg-sky-500 disabled:opacity-60"
+                    >
+                      自动分派执行
+                    </button>
                     {STATUS_META.map((item) => (
                       <button
                         key={item.key}
@@ -824,6 +920,38 @@ export default function CommandCenter() {
                       >
                         {item.label}
                       </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-gray-800 bg-dark-800/70 p-4">
+                  <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-gray-400">
+                    <ClipboardList className="w-3.5 h-3.5" />
+                    执行单
+                  </div>
+
+                  <div className="mt-4 space-y-3">
+                    {(detail.runs ?? []).length === 0 && (
+                      <div className="text-sm text-gray-500">还没有执行单，可以直接点击“自动分派执行”。</div>
+                    )}
+
+                    {(detail.runs ?? []).map((run) => (
+                      <div key={run.id} className="rounded-2xl border border-gray-800 bg-dark-900/80 px-3 py-3">
+                        <div className="flex flex-wrap items-center gap-2 text-xs">
+                          <span className="rounded-full bg-sky-500/15 px-2 py-1 text-sky-300">{run.executorType}</span>
+                          <span className="rounded-full bg-emerald-500/15 px-2 py-1 text-emerald-300">{run.status}</span>
+                          {run.skillName && <span className="rounded-full bg-violet-500/15 px-2 py-1 text-violet-300">{run.skillName}</span>}
+                        </div>
+                        <div className="mt-2 text-sm text-gray-200">
+                          执行人：{run.executorMemberName ?? lookupMember(run.executorMemberId)?.displayName ?? '未分配'}
+                        </div>
+                        {run.inputSummary && (
+                          <div className="mt-2 text-xs text-gray-400 whitespace-pre-wrap">{run.inputSummary}</div>
+                        )}
+                        {run.outputSummary && (
+                          <div className="mt-2 text-xs text-emerald-200 whitespace-pre-wrap">{run.outputSummary}</div>
+                        )}
+                      </div>
                     ))}
                   </div>
                 </div>

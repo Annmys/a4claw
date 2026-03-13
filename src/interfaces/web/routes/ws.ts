@@ -198,7 +198,7 @@ function setupMessageHandler(ws: WebSocket, engine: Engine, user: { userId: stri
         return;
       }
 
-      const { text, conversationId, responseMode, model } = msg;
+      const { text, conversationId, responseMode, model, interactionMode } = msg;
       if (!text) return;
       logger.info('WebSocket chat message received', {
         userId: user.userId,
@@ -245,7 +245,7 @@ function setupMessageHandler(ws: WebSocket, engine: Engine, user: { userId: stri
           sendSafe(ws, { type: 'progress', data: { type: 'tool', message: `⚡ ${command.slice(0, 100)}` } });
 
           if (dangerous.some(p => p.test(command))) {
-            results.push(`$ ${command}\n🚫 פקודה מסוכנת — חסומה`);
+            results.push(`$ ${command}\n🚫 危险命令，已拦截`);
             continue;
           }
 
@@ -337,6 +337,7 @@ function setupMessageHandler(ws: WebSocket, engine: Engine, user: { userId: stri
         const response = await engine.process({
           platform: 'web', userId: user.userId, userName: user.userId, chatId: 'ws', text, userRole: user.role,
           conversationId, responseMode, model,
+          interactionMode: interactionMode === 'chat' || interactionMode === 'task' ? interactionMode : undefined,
           onProgress: (event) => {
             if (cancelled) return;
             lastRealEventTime = Date.now();
@@ -372,6 +373,14 @@ function setupMessageHandler(ws: WebSocket, engine: Engine, user: { userId: stri
           provider: response.provider,
           model: response.modelUsed,
           modelDisplay: (response as any).modelDisplay || response.modelUsed, // Human-readable model name
+          skillUsed: response.skillUsed,
+          pluginUsed: response.pluginUsed,
+          executionPath: response.executionPath,
+          memoryHits: response.memoryHits,
+          routePlan: response.routePlan,
+          routingReason: response.routingReason,
+          requiredCapabilities: response.requiredCapabilities,
+          artifactPlan: (response as any).artifactPlan,
           tokens: response.tokensUsed ? {
             input: response.tokensUsed.input,
             output: response.tokensUsed.output,

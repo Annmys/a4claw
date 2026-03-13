@@ -49,7 +49,7 @@ Respond ONLY with JSON:
     {
       "type": "warning|opportunity|suggestion|maintenance",
       "priority": 1-10,
-      "message": "Hebrew message to send (only for priority >= 7, null otherwise)"
+      "message": "Chinese or English message to send (only for priority >= 7, null otherwise)"
     }
   ]
 }
@@ -57,7 +57,7 @@ Respond ONLY with JSON:
 Rules:
 - Max 3 thoughts
 - Only include message for priority >= 7
-- Think in HEBREW for messages
+- Think in Simplified Chinese by default. Use English only when clearly required.
 - Be concise`,
 
         `SYSTEM:\n${status}\n\nMEMORY:\n${memoryContext}`,

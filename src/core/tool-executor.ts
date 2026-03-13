@@ -344,7 +344,7 @@ export function getToolDefinitions(allowedTools: string[]): any[] {
   if (allowedTools.includes('cron') || allowedTools.includes('scheduler')) {
     definitions.push({
       name: 'cron',
-      description: 'Manage scheduled/recurring tasks (cron jobs). Create, list, remove, enable, or disable recurring automated tasks. Supports natural language schedules (e.g. "every morning", "every 5 min", "כל בוקר") and cron expressions.',
+      description: 'Manage scheduled/recurring tasks (cron jobs). Create, list, remove, enable, or disable recurring automated tasks. Supports natural language schedules (e.g. "every morning", "every 5 min", "每天早上") and cron expressions.',
       input_schema: {
         type: 'object' as const,
         properties: {
@@ -532,14 +532,14 @@ export function getToolDefinitions(allowedTools: string[]): any[] {
   if (allowedTools.includes('elevenlabs')) {
     definitions.push({
       name: 'elevenlabs',
-      description: 'ElevenLabs audio platform — TTS (140+ voices, Hebrew!), voice cloning, podcasts, dubbing, sound effects, speech-to-text, audio isolation. Actions: tts(text, voice?, model?, language?), voices(), clone_voice(name, files[], description?), podcast(script[{speaker,voice,text}], title?), dub(source_url, target_lang), sfx(text, duration?), stt(audio_url, language?), isolate(audio_url).',
+      description: 'ElevenLabs audio platform — TTS (140+ voices, multilingual), voice cloning, podcasts, dubbing, sound effects, speech-to-text, audio isolation. Actions: tts(text, voice?, model?, language?), voices(), clone_voice(name, files[], description?), podcast(script[{speaker,voice,text}], title?), dub(source_url, target_lang), sfx(text, duration?), stt(audio_url, language?), isolate(audio_url).',
       input_schema: {
         type: 'object' as const,
         properties: {
           action: { type: 'string' as const, enum: ['tts', 'voices', 'clone_voice', 'podcast', 'dub', 'sfx', 'stt', 'isolate'], description: 'ElevenLabs action' },
           text: { type: 'string' as const, description: 'Text for TTS or SFX description' },
           voice: { type: 'string' as const, description: 'Voice name (Rachel, Adam, Bella, Antoni, Elli, Josh, Sam) or voice_id' },
-          model: { type: 'string' as const, description: 'Model: eleven_multilingual_v2 (Hebrew!), eleven_turbo_v2' },
+          model: { type: 'string' as const, description: 'Model: eleven_multilingual_v2, eleven_turbo_v2' },
           language: { type: 'string' as const, description: 'Language code: he, en, es, etc.' },
           name: { type: 'string' as const, description: 'Voice name for cloning' },
           files: { type: 'array' as const, items: { type: 'string' as const }, description: 'Audio file URLs for voice cloning (30s min)' },
@@ -789,7 +789,7 @@ export function getToolDefinitions(allowedTools: string[]): any[] {
           content: { type: 'string' as const, description: 'Post content (for post action)' },
           url: { type: 'string' as const, description: 'URL to navigate to (for navigate/open_facebook)' },
           actions: { type: 'array' as const, items: { type: 'string' as const }, description: 'Agent actions: post, comment, friend_request, group_join, message' },
-          language: { type: 'string' as const, description: 'Content language (default: Hebrew)' },
+          language: { type: 'string' as const, description: 'Content language (default: Chinese)' },
           tone: { type: 'string' as const, description: 'Content tone (default: friendly and engaging)' },
           topics: { type: 'array' as const, items: { type: 'string' as const }, description: 'Content topics' },
           groups: { type: 'array' as const, items: { type: 'string' as const }, description: 'Facebook group URLs for the agent' },
@@ -811,7 +811,7 @@ export function getToolDefinitions(allowedTools: string[]): any[] {
           action: { type: 'string' as const, enum: ['list_accounts', 'account_status', 'start_agent', 'stop_agent', 'pause_agent', 'resume_agent', 'agent_status', 'agent_logs', 'open_twitter', 'tweet', 'navigate'], description: 'Twitter action' },
           accountId: { type: 'string' as const, description: 'Twitter account ID' },
           actions: { type: 'array' as const, items: { type: 'string' as const }, description: 'Agent action types: tweet, reply, like, retweet, follow, thread' },
-          language: { type: 'string' as const, description: 'Content language (e.g. English, Hebrew)' },
+          language: { type: 'string' as const, description: 'Content language (e.g. Chinese, English)' },
           tone: { type: 'string' as const, description: 'Content tone (e.g. insightful and authentic)' },
           topics: { type: 'array' as const, items: { type: 'string' as const }, description: 'Content topics' },
           hashtags: { type: 'array' as const, items: { type: 'string' as const }, description: 'Preferred hashtags' },

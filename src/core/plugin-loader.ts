@@ -180,6 +180,14 @@ export class PluginLoader {
     return tools;
   }
 
+  findPluginForTool(toolName: string): string | null {
+    for (const plugin of this.plugins.values()) {
+      const hasTool = plugin.manifest.tools?.some((tool) => tool.name === toolName);
+      if (hasTool) return plugin.manifest.name;
+    }
+    return null;
+  }
+
   /** Get system prompt fragments from all loaded plugins */
   getSystemPromptFragments(): string[] {
     const fragments: string[] = [];

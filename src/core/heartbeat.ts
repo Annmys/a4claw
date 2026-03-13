@@ -383,8 +383,8 @@ export class Heartbeat {
               alerts.push({
                 type: 'openclaw_recovery',
                 severity: 'medium',
-                title: '🟢 OpenClaw שוחזר בהצלחה!',
-                message: 'OpenClaw היה למטה אבל הצלחתי להפעיל אותו מחדש אוטומטית.',
+                title: '🟢 OpenClaw 已恢复',
+                message: 'OpenClaw 之前离线，系统已自动完成重启恢复。',
                 userId: 'admin',
                 platform: 'telegram',
               });
@@ -401,8 +401,8 @@ export class Heartbeat {
           alerts.push({
             type: 'openclaw_health',
             severity: 'critical',
-            title: '🔴 OpenClaw למטה!',
-            message: `OpenClaw לא מגיב. ניסיתי הפעלה מחדש אוטומטית אבל לא הצלחתי.\nשגיאה: ${healthResult.error || healthResult.output?.slice(0, 200) || 'No response'}`,
+            title: '🔴 OpenClaw 离线',
+            message: `OpenClaw 当前无响应。系统已尝试自动重启，但未恢复。\n错误：${healthResult.error || healthResult.output?.slice(0, 200) || 'No response'}`,
             userId: 'admin',
             platform: 'telegram',
           });
@@ -414,8 +414,8 @@ export class Heartbeat {
           alerts.push({
             type: 'openclaw_recovery',
             severity: 'low',
-            title: '🟢 OpenClaw חזר לפעולה!',
-            message: 'OpenClaw חזר לעבוד כרגיל.',
+            title: '🟢 OpenClaw 已重新上线',
+            message: 'OpenClaw 已恢复正常运行。',
             userId: 'admin',
             platform: 'telegram',
           });
@@ -433,7 +433,7 @@ export class Heartbeat {
                 alerts.push({
                   type: 'openclaw_health',
                   severity: 'medium',
-                  title: `⚠️ ${errorCrons.length} cron jobs נכשלים ב-OpenClaw`,
+                  title: `⚠️ OpenClaw 有 ${errorCrons.length} 个定时任务失败`,
                   message: errorCrons.map((c: any) => `- ${c.name || c.label}: ${c.lastError || 'error'}`).join('\n'),
                   userId: 'admin',
                   platform: 'telegram',
@@ -599,7 +599,7 @@ export class Heartbeat {
 
       if (newMessages.length === 0) return [];
 
-      // Format as clean, human-readable Hebrew summary
+      // Format as a clean, human-readable summary
       const summary = newMessages
         .map(m => {
           const truncated = m.text.length > 300 ? m.text.slice(0, 300) + '...' : m.text;
@@ -637,10 +637,10 @@ export class Heartbeat {
     this.dailySummaryLastDate = today;
 
     const alerts: HeartbeatAlert[] = [];
-    const lines: string[] = ['📊 דו"ח יומי — ' + today, ''];
+    const lines: string[] = ['📊 每日状态报告 — ' + today, ''];
 
     // ClawdAgent status
-    lines.push('🧠 ClawdAgent: ✅ פעיל');
+    lines.push('🧠 ClawdAgent: ✅ 正常');
     const uptime = process.uptime();
     const hours = Math.floor(uptime / 3600);
     const mins = Math.floor((uptime % 3600) / 60);
@@ -653,7 +653,7 @@ export class Heartbeat {
         const health = await this.openclawExecutor('health');
         if (health.success) {
           lines.push('');
-          lines.push('💪 OpenClaw: ✅ פעיל');
+          lines.push('💪 OpenClaw: ✅ 正常');
 
           const sessions = await this.openclawExecutor('sessions_list');
           if (sessions.success) {
@@ -678,11 +678,11 @@ export class Heartbeat {
           }
         } else {
           lines.push('');
-          lines.push('💪 OpenClaw: ❌ לא מגיב');
+          lines.push('💪 OpenClaw: ❌ 无响应');
         }
       } catch {
         lines.push('');
-        lines.push('💪 OpenClaw: ❌ שגיאה בבדיקה');
+        lines.push('💪 OpenClaw: ❌ 检查失败');
       }
     }
 
@@ -691,21 +691,21 @@ export class Heartbeat {
       try {
         const uptimeResult = await this.sshExecutor('uptime -p 2>/dev/null && free -h | grep Mem | awk \'{print $3"/"$2}\' && df -h / | tail -1 | awk \'{print $5}\'');
         lines.push('');
-        lines.push('🖥️ שרת:');
+        lines.push('🖥️ 服务器：');
         const serverLines = uptimeResult.trim().split('\n');
         if (serverLines[0]) lines.push(`  ⏱️ ${serverLines[0]}`);
         if (serverLines[1]) lines.push(`  💾 RAM: ${serverLines[1]}`);
-        if (serverLines[2]) lines.push(`  📀 דיסק: ${serverLines[2]} תפוס`);
+        if (serverLines[2]) lines.push(`  📀 磁盘占用：${serverLines[2]}`);
       } catch { /* skip */ }
     }
 
     lines.push('');
-    lines.push('💡 שלח "מה המצב?" לסטטוס מפורט');
+    lines.push('💡 发送“现在状态”可查看详细信息');
 
     alerts.push({
       type: 'daily_summary',
       severity: 'low',
-      title: '📊 דו"ח בוקר',
+      title: '📊 早报',
       message: lines.join('\n'),
       userId: 'admin',
       platform: 'telegram',

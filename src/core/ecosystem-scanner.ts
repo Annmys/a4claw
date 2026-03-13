@@ -65,8 +65,8 @@ export class EcosystemScanner {
         this.discoveries.push(item);
         notificationStore.push({
           type: 'ecosystem_discovery',
-          title: `🔍 נמצא: ${item.name}`,
-          body: `${item.description}\n⭐ ${item.stars || 0} כוכבים | ציון: ${item.relevanceScore}/10`,
+          title: `🔍 发现：${item.name}`,
+          body: `${item.description}\n⭐ ${item.stars || 0} stars | 评分：${item.relevanceScore}/10`,
           severity: item.relevanceScore >= 8 ? 'warning' : 'info',
           source: 'ecosystem-scanner',
           actionUrl: '/evolution',

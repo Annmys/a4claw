@@ -138,7 +138,7 @@ export class ServiceEcosystemTracker {
             };
             updates.push({
               type: 'new_model', provider: 'kie', itemId: id, itemName: name,
-              details: `מודל חדש ב-Kie.ai: ${name} (${m.category || 'general'})`,
+              details: `Kie.ai 新模型：${name} (${m.category || 'general'})`,
               significance: 'medium', detectedAt: Date.now(),
             });
           } else {
@@ -153,7 +153,7 @@ export class ServiceEcosystemTracker {
             item.status = 'deprecated';
             updates.push({
               type: 'deprecation', provider: 'kie', itemId: id, itemName: item.name,
-              details: `מודל ${item.name} כבר לא זמין ב-Kie.ai`,
+              details: `模型 ${item.name} 已不再可用于 Kie.ai`,
               significance: 'low', detectedAt: Date.now(),
             });
           }
@@ -204,7 +204,7 @@ export class ServiceEcosystemTracker {
 
             updates.push({
               type: 'new_model', provider: 'fal', itemId: id, itemName: name,
-              details: `מודל חדש ב-fal.ai: ${name} (${category})`,
+              details: `fal.ai 新模型：${name} (${category})`,
               significance: isVideo ? 'high' : isFlux ? 'medium' : 'low',
               detectedAt: Date.now(),
             });
@@ -220,7 +220,7 @@ export class ServiceEcosystemTracker {
             item.status = 'deprecated';
             updates.push({
               type: 'deprecation', provider: 'fal', itemId: id, itemName: item.name,
-              details: `מודל ${item.name} כבר לא זמין ב-fal.ai`,
+              details: `模型 ${item.name} 已不再可用于 fal.ai`,
               significance: 'low', detectedAt: Date.now(),
             });
           }
@@ -263,7 +263,7 @@ export class ServiceEcosystemTracker {
             };
             updates.push({
               type: 'new_platform', provider: 'blotato', itemId: id, itemName: name,
-              details: `חשבון חדש ב-Blotato: ${name} (${platform})`,
+              details: `Blotato 新账号：${name} (${platform})`,
               significance: 'medium', detectedAt: Date.now(),
             });
           } else {

@@ -31,7 +31,7 @@ export function setupTerminalRoutes(): Router {
     }
 
     if (isBlocked(command)) {
-      res.status(403).json({ error: 'פקודה מסוכנת — חסומה', output: '', exitCode: 1 });
+      res.status(403).json({ error: '危险命令，已拦截', output: '', exitCode: 1 });
       return;
     }
 

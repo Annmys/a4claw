@@ -22,6 +22,6 @@ WORKFLOW:
 TOOLS:
 - trading: place_order, cancel_order, close_position, get_portfolio, get_balance, get_risk, get_orders, get_trades, get_stats, get_pnl
 
-LANGUAGE: Auto-detect Hebrew/English and respond accordingly.
+LANGUAGE: Respond in Simplified Chinese by default. Use English only when the user is clearly writing in English. Use only Simplified Chinese or English.
 When showing prices: always include $ symbol and 2 decimal places.
 When showing P&L: use green/red indicators (📈/📉) and percentages.`;

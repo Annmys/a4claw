@@ -2,6 +2,44 @@ import { eq, and, desc, ne, count } from 'drizzle-orm';
 import { getDb } from '../database.js';
 import { conversations, messages } from '../schema.js';
 
+export interface ConversationRuntimeMetadata {
+  model?: string;
+  responseMode?: 'auto' | 'quick' | 'deep';
+  interactionMode?: 'chat' | 'task';
+  thinkingMode?: 'standard' | 'deep';
+  verbosity?: 'concise' | 'balanced' | 'detailed';
+  compactSummary?: string | null;
+  compactedAt?: string | null;
+  compactSourceMessages?: number | null;
+  compactTokensSaved?: number | null;
+}
+
+function normalizeConversationRuntime(raw: unknown): ConversationRuntimeMetadata | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const runtime = raw as Record<string, unknown>;
+  const responseMode = runtime.responseMode;
+  const interactionMode = runtime.interactionMode;
+  const thinkingMode = runtime.thinkingMode;
+  const verbosity = runtime.verbosity;
+
+  return {
+    model: typeof runtime.model === 'string' && runtime.model.trim() ? runtime.model.trim() : undefined,
+    responseMode: responseMode === 'auto' || responseMode === 'quick' || responseMode === 'deep' ? responseMode : undefined,
+    interactionMode: interactionMode === 'chat' || interactionMode === 'task' ? interactionMode : undefined,
+    thinkingMode: thinkingMode === 'standard' || thinkingMode === 'deep' ? thinkingMode : undefined,
+    verbosity: verbosity === 'concise' || verbosity === 'balanced' || verbosity === 'detailed' ? verbosity : undefined,
+    compactSummary: typeof runtime.compactSummary === 'string' ? runtime.compactSummary : null,
+    compactedAt: typeof runtime.compactedAt === 'string' ? runtime.compactedAt : null,
+    compactSourceMessages: typeof runtime.compactSourceMessages === 'number' ? runtime.compactSourceMessages : null,
+    compactTokensSaved: typeof runtime.compactTokensSaved === 'number' ? runtime.compactTokensSaved : null,
+  };
+}
+
+export function extractConversationRuntime(metadata: unknown): ConversationRuntimeMetadata | null {
+  if (!metadata || typeof metadata !== 'object') return null;
+  return normalizeConversationRuntime((metadata as Record<string, unknown>).runtime);
+}
+
 export async function getOrCreateConversation(userId: string, platform: string, conversationId?: string) {
   const db = getDb();
 
@@ -75,6 +113,7 @@ export async function getUserConversations(
       platform: conv.platform,
       messageCount: countResult?.value ?? 0,
       lastMessage: lastMsg ? { content: lastMsg.content.slice(0, 100), role: lastMsg.role, createdAt: lastMsg.createdAt } : null,
+      runtime: extractConversationRuntime(conv.metadata),
       createdAt: conv.createdAt,
       updatedAt: conv.updatedAt,
     };

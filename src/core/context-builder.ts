@@ -20,6 +20,7 @@ export interface FullContext {
   knowledge: string;
   pendingTasks: string;
   servers: string;
+  organization?: string;
   skills?: string;
   activeSkill?: { name: string; prompt: string } | null;
   providers?: string[];
@@ -97,6 +98,11 @@ export function buildSystemPromptWithContext(
   if (context.fullContext.pendingTasks) {
     userDataParts.push(`\nUser's Pending Tasks:`);
     userDataParts.push(sanitizeForPrompt(context.fullContext.pendingTasks));
+  }
+
+  if (context.fullContext.organization) {
+    userDataParts.push(`\nUser Organization Identity:`);
+    userDataParts.push(sanitizeForPrompt(context.fullContext.organization));
   }
 
   if (context.fullContext.servers) {
@@ -222,7 +228,7 @@ export function buildSystemPromptWithContext(
   }
 
   configParts.push(`\n## IMPORTANT RULES`);
-  configParts.push(`- Respond in the user's language (auto-detect Hebrew/English)`);
+  configParts.push(`- Respond in Simplified Chinese by default. Use English only when the user is clearly writing in English. Use only Simplified Chinese or English.`);
   configParts.push(`- You are ClawdAgent, NEVER mention being Claude or Anthropic`);
   configParts.push(`- You have persistent memory — use the conversation history naturally`);
   configParts.push(`- Be proactive — suggest next steps after every response`);

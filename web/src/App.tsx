@@ -18,9 +18,9 @@ import Users from './pages/Users';
 import Trading from './pages/Trading';
 import Knowledge from './pages/Knowledge';
 import Intelligence from './pages/Intelligence';
-import Graph from './pages/Graph';
 import OpenClaw from './pages/OpenClaw';
 import Evolution from './pages/Evolution';
+import Graph from './pages/Graph';
 import BrowserView from './pages/BrowserView';
 import TerminalPage from './pages/Terminal';
 import ToastContainer, { pushToast } from './components/shared/ToastContainer';
@@ -137,20 +137,20 @@ export default function App() {
         <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
           <Route index element={<Chat />} />
           <Route path="openclaw" element={<AdminRoute><OpenClaw /></AdminRoute>} />
-          <Route path="dashboard" element={<Dashboard />} />
-          <Route path="tasks" element={<Tasks />} />
-          <Route path="command-center" element={<CommandCenter />} />
+          <Route path="dashboard" element={<AdminRoute><Dashboard /></AdminRoute>} />
+          <Route path="tasks" element={<AdminRoute><Tasks /></AdminRoute>} />
+          <Route path="command-center" element={<AdminRoute><CommandCenter /></AdminRoute>} />
           <Route path="skills" element={<Skills />} />
           <Route path="browser" element={<AdminRoute><BrowserView /></AdminRoute>} />
           <Route path="terminal" element={<AdminRoute><TerminalPage /></AdminRoute>} />
-          <Route path="servers" element={<Servers />} />
+          <Route path="servers" element={<AdminRoute><Servers /></AdminRoute>} />
           <Route path="agents" element={<Agents />} />
           <Route path="cron" element={<Cron />} />
           <Route path="trading" element={<AdminRoute><Trading /></AdminRoute>} />
           <Route path="knowledge" element={<Knowledge />} />
-          <Route path="intelligence" element={<Intelligence />} />
+          <Route path="intelligence" element={<AdminRoute><Intelligence /></AdminRoute>} />
           <Route path="evolution" element={<Evolution />} />
-          <Route path="graph" element={<Graph />} />
+          <Route path="graph" element={<AdminRoute><Graph /></AdminRoute>} />
           <Route path="costs" element={<AdminRoute><Costs /></AdminRoute>} />
           <Route path="logs" element={<Logs />} />
           <Route path="history" element={<History />} />

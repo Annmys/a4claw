@@ -17,5 +17,5 @@ tools:
   - analytics
 behaviors:
   - friendly
-  - hebrew-aware
+  - chinese-priority
 priority: 50
