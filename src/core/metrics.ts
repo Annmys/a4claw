@@ -1,189 +1,441 @@
-/**
- * Metrics & Observability — Prometheus-compatible metrics export.
- *
- * Tracks: HTTP requests, AI provider calls, tool executions, memory usage,
- * cron tasks, WebSocket connections, and circuit breaker state.
- *
- * Exposed at GET /metrics in Prometheus text exposition format.
- * Zero external dependencies — uses built-in counters and gauges.
- */
-
+import { Counter, Gauge, Histogram, Registry } from 'prom-client';
 import logger from '../utils/logger.js';
 
-// ── Metric Types ─────────────────────────────────────────────────────────────
+// ============================================================================
+// Prometheus Metrics Collection
+// ============================================================================
 
-interface Counter {
-  type: 'counter';
-  help: string;
-  values: Map<string, number>;
-}
+class MetricsCollector {
+  private registry: Registry;
+  private initialized = false;
 
-interface Gauge {
-  type: 'gauge';
-  help: string;
-  values: Map<string, number>;
-}
+  // Task metrics
+  public taskCreatedCounter: Counter;
+  public taskCompletedCounter: Counter;
+  public taskFailedCounter: Counter;
+  public taskDurationHistogram: Histogram;
+  public activeTasksGauge: Gauge;
 
-interface Histogram {
-  type: 'histogram';
-  help: string;
-  buckets: number[];
-  observations: Map<string, number[]>;
-}
+  // Workflow metrics
+  public workflowStartedCounter: Counter;
+  public workflowCompletedCounter: Counter;
+  public workflowFailedCounter: Counter;
+  public workflowDurationHistogram: Histogram;
+  public activeWorkflowsGauge: Gauge;
 
-type Metric = Counter | Gauge | Histogram;
+  // Skill execution metrics
+  public skillExecutionCounter: Counter;
+  public skillExecutionDuration: Histogram;
+  public skillExecutionErrors: Counter;
 
-// ── Registry ─────────────────────────────────────────────────────────────────
+  // Approval gate metrics
+  public approvalRequestCounter: Counter;
+  public approvalDecisionCounter: Counter;
+  public approvalDurationHistogram: Histogram;
 
-const registry = new Map<string, Metric>();
+  // Database metrics
+  public dbQueryDuration: Histogram;
+  public dbQueryErrors: Counter;
+  public dbConnectionsGauge: Gauge;
 
-function getOrCreateCounter(name: string, help: string): Counter {
-  let m = registry.get(name);
-  if (!m) { m = { type: 'counter', help, values: new Map() }; registry.set(name, m); }
-  return m as Counter;
-}
+  // Multi-agent collaboration metrics
+  public collaborationStartedCounter: Counter;
+  public collaborationCompletedCounter: Counter;
+  public collaborationFailedCounter: Counter;
+  public agentExecutionDuration: Histogram;
 
-function getOrCreateGauge(name: string, help: string): Gauge {
-  let m = registry.get(name);
-  if (!m) { m = { type: 'gauge', help, values: new Map() }; registry.set(name, m); }
-  return m as Gauge;
-}
+  // System metrics
+  public memoryUsageGauge: Gauge;
+  public cpuUsageGauge: Gauge;
+  public eventLoopLagGauge: Gauge;
+  public httpRequestDuration: Histogram;
+  public httpRequestErrors: Counter;
 
-function getOrCreateHistogram(name: string, help: string, buckets: number[]): Histogram {
-  let m = registry.get(name);
-  if (!m) { m = { type: 'histogram', help, buckets, observations: new Map() }; registry.set(name, m); }
-  return m as Histogram;
-}
-
-function labelsToKey(labels: Record<string, string>): string {
-  const entries = Object.entries(labels).sort((a, b) => a[0].localeCompare(b[0]));
-  if (entries.length === 0) return '';
-  return '{' + entries.map(([k, v]) => `${k}="${v}"`).join(',') + '}';
-}
-
-// ── Public API ───────────────────────────────────────────────────────────────
-
-/** Increment a counter */
-export function incCounter(name: string, help: string, labels: Record<string, string> = {}, value = 1): void {
-  const c = getOrCreateCounter(name, help);
-  const key = labelsToKey(labels);
-  c.values.set(key, (c.values.get(key) ?? 0) + value);
-}
-
-/** Set a gauge value */
-export function setGauge(name: string, help: string, labels: Record<string, string> = {}, value: number): void {
-  const g = getOrCreateGauge(name, help);
-  g.values.set(labelsToKey(labels), value);
-}
-
-/** Observe a histogram value */
-export function observeHistogram(name: string, help: string, buckets: number[], labels: Record<string, string> = {}, value: number): void {
-  const h = getOrCreateHistogram(name, help, buckets);
-  const key = labelsToKey(labels);
-  const obs = h.observations.get(key) ?? [];
-  obs.push(value);
-  h.observations.set(key, obs);
-}
-
-// ── Pre-defined Metrics ──────────────────────────────────────────────────────
-
-const HTTP_DURATION_BUCKETS = [0.01, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10];
-const AI_DURATION_BUCKETS = [0.5, 1, 2, 5, 10, 30, 60, 120];
-
-/** Track HTTP request */
-export function trackHTTPRequest(method: string, path: string, statusCode: number, durationMs: number): void {
-  const route = normalizePath(path);
-  incCounter('http_requests_total', 'Total HTTP requests', { method, route, status: String(statusCode) });
-  observeHistogram('http_request_duration_seconds', 'HTTP request duration', HTTP_DURATION_BUCKETS, { method, route }, durationMs / 1000);
-}
-
-/** Track AI provider call */
-export function trackAICall(provider: string, model: string, durationMs: number, inputTokens: number, outputTokens: number, success: boolean): void {
-  incCounter('ai_requests_total', 'Total AI provider requests', { provider, model, status: success ? 'success' : 'error' });
-  incCounter('ai_tokens_total', 'Total AI tokens used', { provider, direction: 'input' }, inputTokens);
-  incCounter('ai_tokens_total', 'Total AI tokens used', { provider, direction: 'output' }, outputTokens);
-  observeHistogram('ai_request_duration_seconds', 'AI request duration', AI_DURATION_BUCKETS, { provider }, durationMs / 1000);
-}
-
-/** Track tool execution */
-export function trackToolExecution(tool: string, success: boolean, durationMs: number): void {
-  incCounter('tool_executions_total', 'Total tool executions', { tool, status: success ? 'success' : 'error' });
-  observeHistogram('tool_execution_duration_seconds', 'Tool execution duration', HTTP_DURATION_BUCKETS, { tool }, durationMs / 1000);
-}
-
-/** Track WebSocket connections */
-export function trackWSConnection(action: 'open' | 'close'): void {
-  const g = getOrCreateGauge('websocket_connections', 'Active WebSocket connections');
-  const current = g.values.get('') ?? 0;
-  g.values.set('', action === 'open' ? current + 1 : Math.max(0, current - 1));
-}
-
-/** Track cron execution */
-export function trackCronExecution(taskName: string, success: boolean): void {
-  incCounter('cron_executions_total', 'Total cron executions', { task: taskName, status: success ? 'success' : 'error' });
-}
-
-/** Update system metrics (call periodically) */
-export function updateSystemMetrics(): void {
-  const mem = process.memoryUsage();
-  setGauge('process_heap_used_bytes', 'Process heap used bytes', {}, mem.heapUsed);
-  setGauge('process_heap_total_bytes', 'Process heap total bytes', {}, mem.heapTotal);
-  setGauge('process_rss_bytes', 'Process RSS bytes', {}, mem.rss);
-  setGauge('process_uptime_seconds', 'Process uptime seconds', {}, process.uptime());
-}
-
-// ── Prometheus Text Format Export ────────────────────────────────────────────
-
-/** Render all metrics in Prometheus text exposition format */
-export function renderMetrics(): string {
-  updateSystemMetrics();
-  const lines: string[] = [];
-
-  for (const [name, metric] of registry) {
-    lines.push(`# HELP ${name} ${metric.help}`);
-    lines.push(`# TYPE ${name} ${metric.type === 'histogram' ? 'histogram' : metric.type}`);
-
-    if (metric.type === 'counter' || metric.type === 'gauge') {
-      for (const [key, val] of metric.values) {
-        lines.push(`${name}${key} ${val}`);
-      }
-    } else if (metric.type === 'histogram') {
-      for (const [key, observations] of metric.observations) {
-        const sorted = [...observations].sort((a, b) => a - b);
-        const count = sorted.length;
-        const sum = sorted.reduce((a, b) => a + b, 0);
-
-        for (const bucket of metric.buckets) {
-          const le = sorted.filter(v => v <= bucket).length;
-          const bucketKey = key ? key.replace('}', `,le="${bucket}"}`) : `{le="${bucket}"}`;
-          lines.push(`${name}_bucket${bucketKey} ${le}`);
-        }
-        const infKey = key ? key.replace('}', ',le="+Inf"}') : '{le="+Inf"}';
-        lines.push(`${name}_bucket${infKey} ${count}`);
-        lines.push(`${name}_sum${key} ${sum}`);
-        lines.push(`${name}_count${key} ${count}`);
-      }
-    }
+  constructor() {
+    this.registry = new Registry();
+    this.initializeMetrics();
   }
 
-  return lines.join('\n') + '\n';
+  private initializeMetrics(): void {
+    if (this.initialized) return;
+
+    // Task metrics
+    this.taskCreatedCounter = new Counter({
+      name: 'command_center_tasks_created_total',
+      help: 'Total number of tasks created',
+      labelNames: ['source', 'priority'],
+      registers: [this.registry],
+    });
+
+    this.taskCompletedCounter = new Counter({
+      name: 'command_center_tasks_completed_total',
+      help: 'Total number of tasks completed',
+      labelNames: ['status'],
+      registers: [this.registry],
+    });
+
+    this.taskFailedCounter = new Counter({
+      name: 'command_center_tasks_failed_total',
+      help: 'Total number of tasks failed',
+      labelNames: ['error_type'],
+      registers: [this.registry],
+    });
+
+    this.taskDurationHistogram = new Histogram({
+      name: 'command_center_task_duration_seconds',
+      help: 'Task execution duration in seconds',
+      labelNames: ['status', 'priority'],
+      buckets: [0.1, 0.5, 1, 2, 5, 10, 30, 60, 120, 300, 600],
+      registers: [this.registry],
+    });
+
+    this.activeTasksGauge = new Gauge({
+      name: 'command_center_active_tasks',
+      help: 'Number of currently active tasks',
+      labelNames: ['status'],
+      registers: [this.registry],
+    });
+
+    // Workflow metrics
+    this.workflowStartedCounter = new Counter({
+      name: 'command_center_workflows_started_total',
+      help: 'Total number of workflows started',
+      labelNames: ['workflow_type'],
+      registers: [this.registry],
+    });
+
+    this.workflowCompletedCounter = new Counter({
+      name: 'command_center_workflows_completed_total',
+      help: 'Total number of workflows completed',
+      labelNames: ['workflow_type'],
+      registers: [this.registry],
+    });
+
+    this.workflowFailedCounter = new Counter({
+      name: 'command_center_workflows_failed_total',
+      help: 'Total number of workflows failed',
+      labelNames: ['workflow_type', 'error_type'],
+      registers: [this.registry],
+    });
+
+    this.workflowDurationHistogram = new Histogram({
+      name: 'command_center_workflow_duration_seconds',
+      help: 'Workflow execution duration in seconds',
+      labelNames: ['workflow_type'],
+      buckets: [1, 5, 10, 30, 60, 120, 300, 600, 1800, 3600],
+      registers: [this.registry],
+    });
+
+    this.activeWorkflowsGauge = new Gauge({
+      name: 'command_center_active_workflows',
+      help: 'Number of currently active workflows',
+      registers: [this.registry],
+    });
+
+    // Skill execution metrics
+    this.skillExecutionCounter = new Counter({
+      name: 'command_center_skill_executions_total',
+      help: 'Total number of skill executions',
+      labelNames: ['skill_id', 'skill_name', 'status'],
+      registers: [this.registry],
+    });
+
+    this.skillExecutionDuration = new Histogram({
+      name: 'command_center_skill_execution_duration_seconds',
+      help: 'Skill execution duration in seconds',
+      labelNames: ['skill_id', 'skill_name'],
+      buckets: [0.1, 0.5, 1, 2, 5, 10, 30, 60],
+      registers: [this.registry],
+    });
+
+    this.skillExecutionErrors = new Counter({
+      name: 'command_center_skill_execution_errors_total',
+      help: 'Total number of skill execution errors',
+      labelNames: ['skill_id', 'error_type'],
+      registers: [this.registry],
+    });
+
+    // Approval gate metrics
+    this.approvalRequestCounter = new Counter({
+      name: 'command_center_approval_requests_total',
+      help: 'Total number of approval requests',
+      labelNames: ['gate_type', 'status'],
+      registers: [this.registry],
+    });
+
+    this.approvalDecisionCounter = new Counter({
+      name: 'command_center_approval_decisions_total',
+      help: 'Total number of approval decisions',
+      labelNames: ['decision'],
+      registers: [this.registry],
+    });
+
+    this.approvalDurationHistogram = new Histogram({
+      name: 'command_center_approval_duration_seconds',
+      help: 'Time from request to decision in seconds',
+      buckets: [60, 300, 600, 1800, 3600, 7200, 86400],
+      registers: [this.registry],
+    });
+
+    // Database metrics
+    this.dbQueryDuration = new Histogram({
+      name: 'command_center_db_query_duration_seconds',
+      help: 'Database query duration in seconds',
+      labelNames: ['operation', 'table'],
+      buckets: [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1],
+      registers: [this.registry],
+    });
+
+    this.dbQueryErrors = new Counter({
+      name: 'command_center_db_query_errors_total',
+      help: 'Total number of database query errors',
+      labelNames: ['operation', 'error_type'],
+      registers: [this.registry],
+    });
+
+    this.dbConnectionsGauge = new Gauge({
+      name: 'command_center_db_connections',
+      help: 'Number of active database connections',
+      registers: [this.registry],
+    });
+
+    // Multi-agent collaboration metrics
+    this.collaborationStartedCounter = new Counter({
+      name: 'command_center_collaborations_started_total',
+      help: 'Total number of multi-agent collaborations started',
+      labelNames: ['strategy'],
+      registers: [this.registry],
+    });
+
+    this.collaborationCompletedCounter = new Counter({
+      name: 'command_center_collaborations_completed_total',
+      help: 'Total number of multi-agent collaborations completed',
+      labelNames: ['strategy'],
+      registers: [this.registry],
+    });
+
+    this.collaborationFailedCounter = new Counter({
+      name: 'command_center_collaborations_failed_total',
+      help: 'Total number of multi-agent collaborations failed',
+      labelNames: ['strategy', 'error_type'],
+      registers: [this.registry],
+    });
+
+    this.agentExecutionDuration = new Histogram({
+      name: 'command_center_agent_execution_duration_seconds',
+      help: 'Individual agent execution duration in seconds',
+      labelNames: ['agent_id'],
+      buckets: [0.5, 1, 2, 5, 10, 30, 60, 120],
+      registers: [this.registry],
+    });
+
+    // System metrics
+    this.memoryUsageGauge = new Gauge({
+      name: 'command_center_memory_usage_bytes',
+      help: 'Memory usage in bytes',
+      labelNames: ['type'],
+      registers: [this.registry],
+    });
+
+    this.cpuUsageGauge = new Gauge({
+      name: 'command_center_cpu_usage_percent',
+      help: 'CPU usage percentage',
+      registers: [this.registry],
+    });
+
+    this.eventLoopLagGauge = new Gauge({
+      name: 'command_center_event_loop_lag_seconds',
+      help: 'Event loop lag in seconds',
+      registers: [this.registry],
+    });
+
+    this.httpRequestDuration = new Histogram({
+      name: 'command_center_http_request_duration_seconds',
+      help: 'HTTP request duration in seconds',
+      labelNames: ['method', 'route', 'status_code'],
+      buckets: [0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10],
+      registers: [this.registry],
+    });
+
+    this.httpRequestErrors = new Counter({
+      name: 'command_center_http_request_errors_total',
+      help: 'Total number of HTTP request errors',
+      labelNames: ['method', 'route', 'error_type'],
+      registers: [this.registry],
+    });
+
+    this.initialized = true;
+    logger.info('Metrics collector initialized');
+  }
+
+  // Metric helper methods
+  public recordTaskCreated(source: string, priority: string): void {
+    this.taskCreatedCounter.inc({ source, priority });
+  }
+
+  public recordTaskCompleted(status: string, durationSeconds: number, priority: string): void {
+    this.taskCompletedCounter.inc({ status });
+    this.taskDurationHistogram.observe({ status, priority }, durationSeconds);
+  }
+
+  public recordTaskFailed(errorType: string): void {
+    this.taskFailedCounter.inc({ error_type: errorType });
+  }
+
+  public setActiveTasks(status: string, count: number): void {
+    this.activeTasksGauge.set({ status }, count);
+  }
+
+  public recordWorkflowStarted(workflowType: string): void {
+    this.workflowStartedCounter.inc({ workflow_type: workflowType });
+    this.activeWorkflowsGauge.inc();
+  }
+
+  public recordWorkflowCompleted(workflowType: string, durationSeconds: number): void {
+    this.workflowCompletedCounter.inc({ workflow_type: workflowType });
+    this.workflowDurationHistogram.observe({ workflow_type: workflowType }, durationSeconds);
+    this.activeWorkflowsGauge.dec();
+  }
+
+  public recordWorkflowFailed(workflowType: string, errorType: string): void {
+    this.workflowFailedCounter.inc({ workflow_type: workflowType, error_type: errorType });
+    this.activeWorkflowsGauge.dec();
+  }
+
+  public recordSkillExecution(skillId: string, skillName: string, status: string, durationSeconds: number): void {
+    this.skillExecutionCounter.inc({ skill_id: skillId, skill_name: skillName, status });
+    this.skillExecutionDuration.observe({ skill_id: skillId, skill_name: skillName }, durationSeconds);
+  }
+
+  public recordSkillExecutionError(skillId: string, errorType: string): void {
+    this.skillExecutionErrors.inc({ skill_id: skillId, error_type: errorType });
+  }
+
+  public recordApprovalRequest(gateType: string, status: string): void {
+    this.approvalRequestCounter.inc({ gate_type: gateType, status });
+  }
+
+  public recordApprovalDecision(decision: string, durationSeconds: number): void {
+    this.approvalDecisionCounter.inc({ decision });
+    this.approvalDurationHistogram.observe(durationSeconds);
+  }
+
+  public recordDbQuery(operation: string, table: string, durationSeconds: number): void {
+    this.dbQueryDuration.observe({ operation, table }, durationSeconds);
+  }
+
+  public recordDbQueryError(operation: string, errorType: string): void {
+    this.dbQueryErrors.inc({ operation, error_type: errorType });
+  }
+
+  public recordCollaborationStarted(strategy: string): void {
+    this.collaborationStartedCounter.inc({ strategy });
+  }
+
+  public recordCollaborationCompleted(strategy: string): void {
+    this.collaborationCompletedCounter.inc({ strategy });
+  }
+
+  public recordCollaborationFailed(strategy: string, errorType: string): void {
+    this.collaborationFailedCounter.inc({ strategy, error_type: errorType });
+  }
+
+  public recordAgentExecution(agentId: string, durationSeconds: number): void {
+    this.agentExecutionDuration.observe({ agent_id: agentId }, durationSeconds);
+  }
+
+  public updateSystemMetrics(): void {
+    const memUsage = process.memoryUsage();
+    this.memoryUsageGauge.set({ type: 'rss' }, memUsage.rss);
+    this.memoryUsageGauge.set({ type: 'heap_total' }, memUsage.heapTotal);
+    this.memoryUsageGauge.set({ type: 'heap_used' }, memUsage.heapUsed);
+    this.memoryUsageGauge.set({ type: 'external' }, memUsage.external);
+
+    const cpuUsage = process.cpuUsage();
+    const totalCpu = (cpuUsage.user + cpuUsage.system) / 1000000; // Convert to seconds
+    this.cpuUsageGauge.set(totalCpu);
+  }
+
+  public recordHttpRequest(method: string, route: string, statusCode: number, durationSeconds: number): void {
+    this.httpRequestDuration.observe({ method, route, status_code: statusCode.toString() }, durationSeconds);
+  }
+
+  public recordHttpRequestError(method: string, route: string, errorType: string): void {
+    this.httpRequestErrors.inc({ method, route, error_type: errorType });
+  }
+
+  public getMetrics(): Promise<string> {
+    return this.registry.metrics();
+  }
+
+  public getContentType(): string {
+    return this.registry.contentType;
+  }
+
+  public reset(): void {
+    this.registry.resetMetrics();
+  }
 }
 
-/** Normalize route path for metric labels (collapse IDs) */
-function normalizePath(path: string): string {
-  return path
-    .replace(/\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '/:id')
-    .replace(/\/\d+/g, '/:id')
-    .split('?')[0];
+// Singleton instance
+export const metrics = new MetricsCollector();
+
+// System metrics collection loop
+export function startSystemMetricsCollection(intervalMs = 30000): () => void {
+  const interval = setInterval(() => {
+    metrics.updateSystemMetrics();
+    
+    // Measure event loop lag
+    const start = process.hrtime.bigint();
+    setImmediate(() => {
+      const lag = Number(process.hrtime.bigint() - start) / 1e9;
+      metrics.eventLoopLagGauge.set(lag);
+    });
+  }, intervalMs);
+
+  return () => clearInterval(interval);
 }
 
-/** Express middleware that tracks request metrics */
-export function metricsMiddleware(req: any, res: any, next: () => void): void {
-  const start = Date.now();
-  res.on('finish', () => {
-    trackHTTPRequest(req.method, req.path, res.statusCode, Date.now() - start);
-  });
-  next();
+// Decorator for timing function execution
+export function timed(metricName: string, labels?: Record<string, string>) {
+  return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    const originalMethod = descriptor.value;
+
+    descriptor.value = async function (...args: any[]) {
+      const start = Date.now();
+      try {
+        const result = await originalMethod.apply(this, args);
+        const duration = (Date.now() - start) / 1000;
+        
+        // Record based on metric name
+        if (metricName === 'task') {
+          metrics.taskDurationHistogram.observe({ ...(labels || {}), status: 'success' }, duration);
+        } else if (metricName === 'workflow') {
+          metrics.workflowDurationHistogram.observe({ ...(labels || {}) }, duration);
+        } else if (metricName === 'skill') {
+          metrics.skillExecutionDuration.observe({ ...(labels || {}) }, duration);
+        } else if (metricName === 'db') {
+          metrics.dbQueryDuration.observe({ ...(labels || {}) }, duration);
+        }
+        
+        return result;
+      } catch (error) {
+        const duration = (Date.now() - start) / 1000;
+        
+        if (metricName === 'task') {
+          metrics.taskDurationHistogram.observe({ ...(labels || {}), status: 'failed' }, duration);
+        } else if (metricName === 'skill') {
+          metrics.skillExecutionErrors.inc({ ...(labels || {}), error_type: (error as Error).name });
+        } else if (metricName === 'db') {
+          metrics.dbQueryErrors.inc({ ...(labels || {}), error_type: (error as Error).name });
+        }
+        
+        throw error;
+      }
+    };
+
+    return descriptor;
+  };
 }
 
-logger.info('Metrics module initialized');
+export default metrics;

@@ -498,45 +498,5 @@ export const approvalRequests = pgTable('approval_requests', {
   index('idx_approval_requests_expires').on(table.expiresAt),
 ]);
 
-// Approval Gate System (Phase 2)
-export const approvalGates = pgTable('approval_gates', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  name: varchar('name', { length: 120 }).notNull(),
-  gateType: varchar('gate_type', { length: 40 }).notNull(), // skill_execution, high_cost_operation, destructive_action, external_api_call, custom
-  description: text('description'),
-  approverMemberIds: text('approver_member_ids').notNull(), // JSON array of member IDs
-  autoApproveConditions: jsonb('auto_approve_conditions'), // { maxCost, trustedSkills, maxDuration }
-  requireAllApprovers: integer('require_all_approvers').default(0).notNull(), // 0=any, 1=all
-  timeoutHours: integer('timeout_hours').default(24).notNull(),
-  enabled: integer('enabled').default(1).notNull(),
-  centerId: uuid('center_id').references(() => commandCenterCenters.id),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
-}, (table) => [
-  index('idx_approval_gates_type').on(table.gateType),
-  index('idx_approval_gates_center').on(table.centerId),
-  index('idx_approval_gates_enabled').on(table.enabled),
-]);
-
-export const approvalRequests = pgTable('approval_requests', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  gateId: uuid('gate_id').references(() => approvalGates.id).notNull(),
-  taskId: uuid('task_id').references(() => commandCenterTasks.id).notNull(),
-  requesterId: varchar('requester_id', { length: 120 }).notNull(),
-  requesterMemberId: uuid('requester_member_id').references(() => commandCenterMembers.id),
-  payload: jsonb('payload').notNull(), // { action, details, estimatedCost, estimatedDuration, skills }
-  status: varchar('status', { length: 30 }).default('pending').notNull(), // pending, approved, rejected, expired, auto_approved
-  decisions: text('decisions').default('[]').notNull(), // JSON array of { approverId, decision, comment, decidedAt }
-  requestedAt: timestamp('requested_at').defaultNow().notNull(),
-  decidedAt: timestamp('decided_at'),
-  expiresAt: timestamp('expires_at').notNull(),
-}, (table) => [
-  index('idx_approval_requests_gate').on(table.gateId),
-  index('idx_approval_requests_task').on(table.taskId),
-  index('idx_approval_requests_status').on(table.status),
-  index('idx_approval_requests_requester').on(table.requesterId),
-  index('idx_approval_requests_expires').on(table.expiresAt),
-]);
-
 export type ApprovalGateType = 'skill_execution' | 'high_cost_operation' | 'destructive_action' | 'external_api_call' | 'custom';
 export type ApprovalRequestStatus = 'pending' | 'approved' | 'rejected' | 'expired' | 'auto_approved';
