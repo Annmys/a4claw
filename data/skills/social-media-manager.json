@@ -1,0 +1,16 @@
+{
+  "id": "social-media-manager",
+  "name": "Social Media Manager",
+  "description": "Create engaging social media content, strategies, and content calendars for multiple platforms.",
+  "trigger": "(social media|post|facebook|instagram|linkedin|twitter|סושיאל|פוסט|פרסום)",
+  "prompt": "Create engaging social media content, strategies, and content calendars for multiple platforms.",
+  "examples": [
+    "Social media post",
+    "פוסט סושיאל",
+    "Content calendar"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

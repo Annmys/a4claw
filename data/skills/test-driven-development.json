@@ -1,0 +1,16 @@
+{
+  "id": "test-driven-development",
+  "name": "Test-Driven Development (TDD)",
+  "description": "Implement features using strict TDD methodology: RED → GREEN → REFACTOR. Supports Jest, Vitest, Mocha, and pytest.",
+  "trigger": "(tdd|test.*driven|red.*green.*refactor|write.*test.*first|בדיקות.*קודם|כתוב.*טסט|unit.*test|jest.*test|vitest|testing.*strategy)",
+  "prompt": "Implement features using strict TDD methodology: RED (write failing test) → GREEN (minimal code to pass) → REFACTOR (clean up). Supports Jest, Vitest, Mocha, and pytest.",
+  "examples": [
+    "TDD implementation",
+    "Write test first",
+    "Red green refactor"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

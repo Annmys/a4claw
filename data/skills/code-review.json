@@ -1,0 +1,16 @@
+{
+  "id": "code-review",
+  "name": "Code Review",
+  "description": "Review code for bugs, security vulnerabilities, performance issues, and best practices.",
+  "trigger": "(code review|review code|בדוק קוד|סקירת קוד|review my code|check my code)",
+  "prompt": "Review code for bugs, security vulnerabilities, performance issues, and best practices.",
+  "examples": [
+    "Review my code",
+    "בדוק את הקוד",
+    "Code review this file"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

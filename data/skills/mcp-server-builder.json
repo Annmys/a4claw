@@ -1,0 +1,16 @@
+{
+  "id": "mcp-server-builder",
+  "name": "MCP Server Builder",
+  "description": "Build Model Context Protocol (MCP) servers for tool integrations. Create custom MCP servers that expose APIs, databases, file systems, and external services as tools for AI agents.",
+  "trigger": "(mcp.*server|mcp.*build|build.*mcp|model.*context.*protocol|create.*tool.*server|בנה.*שרת.*mcp|tool.*integration|custom.*tool|mcp.*tool)",
+  "prompt": "Build Model Context Protocol (MCP) servers for tool integrations. Create custom MCP servers that expose APIs, databases, file systems, and external services as tools for AI agents.",
+  "examples": [
+    "Build MCP server",
+    "Create custom tool",
+    "MCP integration"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

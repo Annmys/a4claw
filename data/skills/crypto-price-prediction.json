@@ -1,0 +1,16 @@
+{
+  "id": "crypto-price-prediction",
+  "name": "Crypto Price Prediction",
+  "description": "AI-powered crypto price prediction patterns: feature engineering from OHLCV data, ensemble model approaches (LSTM, gradient boosting, transformer), regime detection, prediction confidence scoring, and backtesting validation.",
+  "trigger": "(predict.*price|חיזוי.*מחיר|price.*prediction|forecast.*crypto|תחזית.*קריפטו|AI.*trading|machine.*learn.*trad|ML.*crypto|model.*predict|neural.*network.*trad|deep.*learn.*trad|LSTM.*trad|ensemble.*model|regime.*detect|market.*regime)",
+  "prompt": "AI-powered crypto price prediction patterns: feature engineering from OHLCV data, ensemble model approaches (LSTM, gradient boosting, transformer), regime detection, prediction confidence scoring, and backtesting validation. Uses existing TA engine data as input features.",
+  "examples": [
+    "Predict BTC price",
+    "חיזוי מחיר ETH",
+    "AI price forecast"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

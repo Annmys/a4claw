@@ -1,0 +1,16 @@
+{
+  "id": "trading-strategy-adaptive-learning",
+  "name": "Trading Strategy Adaptive Learning",
+  "description": "Trading-specific adaptive learning: walk-forward parameter optimization, A/B testing for strategy variants, failure clustering and root cause analysis, auto-tuning risk parameters from live results, and Bayesian optimization for indicator thresholds.",
+  "trigger": "(adaptive.*learn|למידה.*אדפטיבית|parameter.*tun|כיוונון.*פרמטר|walk.*forward|A.*B.*test|strategy.*optim|אופטימיזציית.*אסטרטגי|auto.*tune|כיוונון.*אוטומטי|backtest.*optim|failure.*cluster|bayesian.*optim)",
+  "prompt": "Trading-specific adaptive learning: walk-forward parameter optimization, A/B testing for strategy variants, failure clustering and root cause analysis, auto-tuning risk parameters from live results, and Bayesian optimization for indicator thresholds. Complements the general evolution-engine with crypto-trading-specific learning.",
+  "examples": [
+    "Optimize my trading strategy parameters",
+    "Walk-forward test my indicators",
+    "A/B test strategy variants"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

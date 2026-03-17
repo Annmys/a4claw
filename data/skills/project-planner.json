@@ -1,0 +1,16 @@
+{
+  "id": "project-planner",
+  "name": "Project Planner",
+  "description": "Break down projects into actionable plans with milestones, timelines, risk assessment, and team structure.",
+  "trigger": "(plan project|project plan|תכנן פרויקט|roadmap|milestone|שלבים|תכנון)",
+  "prompt": "Break down projects into actionable plans with milestones, timelines, risk assessment, and team structure.",
+  "examples": [
+    "Plan project",
+    "תכנן פרויקט",
+    "Project roadmap"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

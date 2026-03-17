@@ -1,0 +1,340 @@
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { api } from '../api/client';
+import {
+  Send, User, Loader2, Square, Wifi, WifiOff,
+  Terminal, Trash2, AlertCircle, RefreshCw,
+} from 'lucide-react';
+
+interface Message {
+  id: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  timestamp: Date;
+  raw?: any;
+}
+
+/** Detect RTL text */
+function detectDir(text: string): 'rtl' | undefined {
+  const rtlChars = text.match(/[\u0590-\u05FF\u0600-\u06FF]/g);
+  if (!rtlChars) return undefined;
+  const nonSpace = text.replace(/\s/g, '');
+  return nonSpace.length > 0 && rtlChars.length / nonSpace.length > 0.3 ? 'rtl' : undefined;
+}
+
+export default function OpenClaw() {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [elapsed, setElapsed] = useState(0);
+  const [connected, setConnected] = useState<boolean | null>(null);
+  const [connectError, setConnectError] = useState('');
+  const [context, setContext] = useState<{
+    userId: string;
+    role: 'admin' | 'user';
+    scope: { sessionKey: string; agentId: string };
+    permissions: { canUseRaw: boolean; canViewAllSessions: boolean };
+    limits: { chatPerMinute: number; agentPerMinute: number };
+  } | null>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Check OpenClaw status on mount
+  useEffect(() => {
+    void refreshOpenClaw();
+  }, []);
+
+  // Auto-scroll
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const mapHistoryToMessages = (items: Array<{
+    role: 'user' | 'assistant' | 'system';
+    content?: Array<{ type?: string; text?: string }>;
+    timestamp?: number;
+    provider?: string;
+    model?: string;
+  }>): Message[] => {
+    return items.reduce<Message[]>((acc, item, index) => {
+        const parts = Array.isArray(item.content)
+          ? item.content
+              .filter((part) => part?.type === 'text' && typeof part.text === 'string')
+              .map((part) => part.text?.trim())
+              .filter(Boolean)
+          : [];
+        const content = parts.join('\n').trim();
+        if (!content) return acc;
+        acc.push({
+          id: `history-${item.timestamp ?? Date.now()}-${index}`,
+          role: item.role,
+          content,
+          timestamp: new Date(item.timestamp ?? Date.now()),
+          raw: item,
+        });
+        return acc;
+      }, []);
+  };
+
+  const checkStatus = async () => {
+    try {
+      const [res, ctx] = await Promise.all([
+        api.openclawStatus(),
+        api.openclawContext(),
+      ]);
+      setConnected(res.connected);
+      setContext(ctx);
+      const reason =
+        typeof res.error === 'string' && res.error.trim()
+          ? res.error.trim()
+          : typeof res.data === 'string' && res.data.trim()
+            ? res.data.trim()
+            : '';
+      setConnectError(res.connected ? '' : reason);
+    } catch {
+      setConnected(false);
+      setContext(null);
+      setConnectError('状态检查失败，请确认后端服务已启动');
+    }
+  };
+
+  const loadHistory = useCallback(async () => {
+    setHistoryLoading(true);
+    try {
+      const res = await api.openclawHistory(100);
+      setMessages(mapHistoryToMessages(res.messages));
+    } catch (err: any) {
+      addMessage('system', `历史记录加载失败：${err.message}`);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, []);
+
+  const refreshOpenClaw = useCallback(async () => {
+    await checkStatus();
+    await loadHistory();
+  }, [loadHistory]);
+
+  const addMessage = (role: Message['role'], content: string, raw?: any) => {
+    setMessages(prev => [...prev, {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      role,
+      content,
+      timestamp: new Date(),
+      raw,
+    }]);
+  };
+
+  const send = useCallback(async () => {
+    const text = input.trim();
+    if (!text || loading) return;
+
+    setInput('');
+    if (inputRef.current) inputRef.current.style.height = 'auto';
+    addMessage('user', text);
+    setLoading(true);
+    setElapsed(0);
+    timerRef.current = setInterval(() => setElapsed(t => t + 1), 1000);
+
+    try {
+      const res = await api.openclawChat(text);
+      addMessage('assistant', res.message);
+    } catch (err: any) {
+      addMessage('system', `错误：${err.message}`);
+    }
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+    setLoading(false);
+  }, [input, loading]);
+
+  const clearChat = () => setMessages([]);
+
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
+  };
+
+  return (
+    <div className="flex flex-col h-full bg-dark-950">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800 bg-dark-900">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-orange-500/20 flex items-center justify-center">
+            <Terminal className="w-4 h-4 text-orange-400" />
+          </div>
+          <div>
+            <h1 className="text-lg font-bold text-white">OpenClaw</h1>
+            <p className="text-[10px] text-gray-500">直连模式</p>
+            {context && (
+              <p className="text-[10px] text-gray-500 mt-0.5">
+                用户: {context.userId} · 作用域: {context.scope.sessionKey}
+              </p>
+            )}
+          </div>
+          {connected === true ? (
+            <span className="flex items-center gap-1 text-xs text-green-400 ml-2">
+              <Wifi className="w-3 h-3" /> 已连接
+            </span>
+          ) : connected === false ? (
+            <span className="flex items-center gap-1 text-xs text-red-400 ml-2">
+              <WifiOff className="w-3 h-3" /> 未连接
+            </span>
+          ) : null}
+        </div>
+
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => void refreshOpenClaw()}
+            className="p-2 text-gray-400 hover:text-orange-400 hover:bg-dark-800 rounded-lg transition-colors"
+            title="刷新状态和历史"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
+          <button
+            onClick={clearChat}
+            disabled={messages.length === 0}
+            className="p-2 text-gray-400 hover:text-red-400 hover:bg-dark-800 rounded-lg transition-colors disabled:opacity-30"
+            title="清空当前显示（不删除后端历史）"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Status banner */}
+      {connected === false && (
+        <div className="flex items-center gap-2 px-4 py-2 bg-red-500/10 border-b border-red-500/20 text-red-400 text-sm">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          <span>
+            {connectError
+              ? `OpenClaw 未连接：${connectError}`
+              : 'OpenClaw 未连接，请检查 SSH 连接和 OPENCLAW_GATEWAY_TOKEN 配置。'}
+            </span>
+        </div>
+      )}
+      {context && (
+        <div className="px-4 py-2 border-b border-gray-800 bg-dark-900/70 text-[11px] text-gray-400">
+          当前隔离会话: <span className="text-gray-200">{context.scope.sessionKey}</span> · Agent: <span className="text-gray-200">{context.scope.agentId}</span> ·
+          {context.role === 'admin' ? ' 管理员（可用 raw）' : ' 普通用户（raw 已禁用）'}
+        </div>
+      )}
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
+        {historyLoading && messages.length === 0 && (
+          <div className="flex items-center justify-center h-full text-gray-500">
+            <div className="flex items-center gap-2 text-sm">
+              <Loader2 className="w-4 h-4 animate-spin text-orange-400" />
+              <span>正在加载历史会话...</span>
+            </div>
+          </div>
+        )}
+
+        {!historyLoading && messages.length === 0 && (
+          <div className="flex flex-col items-center justify-center h-full text-gray-500 select-none">
+            <div className="w-20 h-20 mb-6 rounded-2xl bg-dark-800 border border-gray-800 flex items-center justify-center">
+              <Terminal className="w-10 h-10 text-orange-400 opacity-60" />
+            </div>
+            <p className="text-2xl font-bold text-gray-400 mb-2">OpenClaw 直连模式</p>
+            <p className="text-sm text-gray-600 mb-1">直接向 OpenClaw 发送消息</p>
+            <p className="text-xs text-gray-700">与主聊天助手会话独立</p>
+          </div>
+        )}
+
+        {messages.map((m) => {
+          const isUser = m.role === 'user';
+          const isSystem = m.role === 'system';
+          const msgDir = detectDir(m.content);
+
+          return (
+            <div key={m.id} className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+              <div className={`flex items-end gap-2 max-w-[80%] md:max-w-2xl ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
+                <div className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center ${
+                  isUser ? 'bg-primary-600'
+                    : isSystem ? 'bg-red-500/20 border border-red-500/30'
+                    : 'bg-orange-500/20 border border-orange-500/30'
+                }`}>
+                  {isUser ? <User className="w-3.5 h-3.5 text-white" />
+                    : isSystem ? <AlertCircle className="w-3.5 h-3.5 text-red-400" />
+                    : <Terminal className="w-3.5 h-3.5 text-orange-400" />}
+                </div>
+
+                <div dir={msgDir} className={`rounded-2xl px-4 py-2.5 ${
+                  isUser ? 'bg-primary-600 text-white rounded-br-md'
+                    : isSystem ? 'bg-red-500/10 text-red-300 border border-red-500/20 rounded-bl-md'
+                    : 'bg-dark-800 text-gray-100 border border-gray-800 rounded-bl-md'
+                }`}>
+                  {!isUser && !isSystem && (
+                    <span className="text-xs font-semibold text-orange-400 block mb-1">OpenClaw</span>
+                  )}
+                  <p className="whitespace-pre-wrap text-sm leading-relaxed break-words">{m.content}</p>
+                  <p className={`text-[10px] mt-1 ${isUser ? 'text-white/50' : 'text-gray-500'} ${msgDir === 'rtl' ? 'text-left' : 'text-right'}`} dir="ltr">
+                    {formatTime(m.timestamp)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+
+        {loading && (
+          <div className="flex justify-start">
+            <div className="flex items-end gap-2">
+              <div className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center bg-orange-500/20 border border-orange-500/30">
+                <Terminal className="w-3.5 h-3.5 text-orange-400 animate-pulse" />
+              </div>
+              <div className="bg-dark-800 border border-gray-800 rounded-2xl rounded-bl-md px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 text-orange-400 animate-spin" />
+                  <span className="text-xs text-gray-400">
+                    {elapsed < 5 ? '正在连接 OpenClaw...'
+                      : elapsed < 15 ? 'OpenClaw 正在思考...'
+                      : `OpenClaw 正在处理...（${elapsed}秒）`}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Input */}
+      <div className="px-4 py-3 border-t border-gray-800 bg-dark-900">
+        <div className="flex items-end gap-2 max-w-4xl mx-auto">
+          <textarea
+            ref={inputRef}
+            value={input}
+            dir={detectDir(input) || undefined}
+            onChange={(e) => {
+              setInput(e.target.value);
+              e.target.style.height = 'auto';
+              e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px';
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey && !loading) {
+                e.preventDefault();
+                send();
+              }
+            }}
+            placeholder="向 OpenClaw 发送消息..."
+            rows={1}
+            className="flex-1 px-4 py-3 rounded-xl bg-dark-800 border border-gray-700 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-orange-500 transition-colors resize-none overflow-y-auto"
+            style={{ maxHeight: '160px' }}
+          />
+          <button
+            onClick={send}
+            disabled={!input.trim() || loading}
+            className="p-3 rounded-xl bg-orange-600 text-white hover:bg-orange-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+            title="发送"
+          >
+            {loading ? <Square className="w-5 h-5" /> : <Send className="w-5 h-5" />}
+          </button>
+        </div>
+        <p className="text-center text-[11px] text-gray-600 mt-2">
+          直连 OpenClaw · 自动恢复同一作用域历史 · 回车发送 · Shift+回车换行
+        </p>
+      </div>
+    </div>
+  );
+}

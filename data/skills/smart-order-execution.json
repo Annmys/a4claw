@@ -1,0 +1,16 @@
+{
+  "id": "smart-order-execution",
+  "name": "Smart Order Execution & Optimization",
+  "description": "Advanced order execution: TWAP/VWAP splitting for large orders, pre-trade slippage estimation, order book depth analysis, exchange latency benchmarking, smart order routing across exchanges.",
+  "trigger": "(execution.*optim|ביצוע.*אופטימ|order.*split|פיצול.*הזמנ|TWAP|VWAP|slippage|החלקה|order.*book.*depth|עומק.*ספר|smart.*routing|ניתוב.*חכם|latency.*optim|partial.*fill|מילוי.*חלקי|execution.*cost|עלות.*ביצוע|iceberg.*order)",
+  "prompt": "Advanced order execution: TWAP/VWAP splitting for large orders, pre-trade slippage estimation, order book depth analysis, exchange latency benchmarking, smart order routing across exchanges, partial fill handling, and retry logic with backoff.",
+  "examples": [
+    "TWAP order for BTC",
+    "Smart order routing",
+    "Slippage optimization"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

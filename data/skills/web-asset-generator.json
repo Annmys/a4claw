@@ -1,0 +1,16 @@
+{
+  "id": "web-asset-generator",
+  "name": "Web Asset Generator",
+  "description": "Generate favicons, app icons, social media images (OG tags), splash screens, and brand asset packages using Sharp and SVG.",
+  "trigger": "(favicon|app.*icon|og.*image|social.*image|splash.*screen|brand.*asset|web.*asset|אייקון|לוגו|תמונת.*שיתוף|asset.*generat)",
+  "prompt": "Generate favicons, app icons, social media images (OG tags), splash screens, and brand asset packages using Sharp and SVG. Outputs optimized PNG/ICO/SVG in all required sizes.",
+  "examples": [
+    "Generate favicon",
+    "Create app icons",
+    "Web assets"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

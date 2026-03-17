@@ -1,0 +1,21 @@
+{
+  "name": "example-plugin",
+  "version": "1.0.0",
+  "description": "Example plugin showing how to extend ClawdAgent",
+  "author": "ClawdAgent",
+  "main": "index.mjs",
+  "tools": [
+    {
+      "name": "example_hello",
+      "description": "Says hello — example plugin tool",
+      "parameters": {
+        "name": { "type": "string", "required": false, "description": "Name to greet" }
+      }
+    }
+  ],
+  "behaviors": [],
+  "requires": [],
+  "config": {
+    "greeting": { "type": "string", "default": "Hello", "description": "Greeting prefix" }
+  }
+}

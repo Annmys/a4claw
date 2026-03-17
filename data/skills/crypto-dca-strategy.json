@@ -1,0 +1,16 @@
+{
+  "id": "crypto-dca-strategy",
+  "name": "Crypto DCA Strategy",
+  "description": "Dollar-cost averaging strategies for cryptocurrency — scheduled purchases, smart timing, portfolio allocation, and DCA performance tracking.",
+  "trigger": "(\\bDCA\\b|dollar.*cost.*averag|קניה.*קבועה|ממוצע.*עלות|auto.*buy|recurring.*buy|קנה.*כל.*חודש|scheduled.*buy|periodic.*invest|השקעה.*תקופתית)",
+  "prompt": "Dollar-cost averaging strategies for cryptocurrency — scheduled purchases, smart timing, portfolio allocation, and DCA performance tracking.",
+  "examples": [
+    "Set up DCA for BTC",
+    "תוכנית קניה קבועה",
+    "DCA strategy"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

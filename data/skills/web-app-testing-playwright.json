@@ -1,0 +1,16 @@
+{
+  "id": "web-app-testing-playwright",
+  "name": "Web App Testing (Playwright)",
+  "description": "End-to-end web application testing using Playwright. Write and run browser tests for UI flows, form validation, authentication, responsive design, accessibility, and visual regression.",
+  "trigger": "(playwright|e2e.*test|end.*to.*end|browser.*test|ui.*test|בדיקות.*דפדפן|visual.*regression|accessibility.*test|a11y.*test|selenium|cypress|web.*test)",
+  "prompt": "End-to-end web application testing using Playwright. Write and run browser tests for UI flows, form validation, authentication, responsive design, accessibility, and visual regression.",
+  "examples": [
+    "E2E test",
+    "Playwright test",
+    "Browser testing"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

@@ -1,0 +1,16 @@
+{
+  "id": "mrr-market-research",
+  "name": "MRR Market Research",
+  "description": "MRR-focused market research: trend analysis, TAM/SAM/SOM sizing, revenue model selection, customer segments, and competitive landscape for building profitable digital products.",
+  "trigger": "(market.*research|מחקר.*שוק|TAM.*SAM|market.*size|גודל.*שוק|target.*market|שוק.*יעד|trend.*analysis|ניתוח.*טרנד|niche.*research|חקר.*נישה|market.*opportunity|הזדמנות.*שוק|validate.*idea|ולידציה)",
+  "prompt": "MRR-focused market research: trend analysis, TAM/SAM/SOM sizing, revenue model selection (SaaS, Credits, Marketplace), customer segments, and competitive landscape for building profitable digital products.",
+  "examples": [
+    "Market research for SaaS",
+    "מחקר שוק",
+    "Validate my idea"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

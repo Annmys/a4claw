@@ -1,0 +1,16 @@
+{
+  "id": "crypto-scalping",
+  "name": "Crypto Scalping",
+  "description": "Short-term scalping signals and execution strategies on 1m-5m timeframes. Entry/exit points, risk management, and momentum indicators.",
+  "trigger": "(scalp|scalping|סקאלפ|סקאלפינג|quick.*trade|short.*term.*trade|מסחר.*מהיר|day.*trad|intraday|1m.*chart|5m.*chart|momentum.*trade|swing.*trade)",
+  "prompt": "Short-term scalping signals and execution strategies on 1m-5m timeframes. Entry/exit points, risk management, and momentum indicators.",
+  "examples": [
+    "Scalping setup BTC",
+    "סקאלפינג ETH",
+    "Quick trade signal"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

@@ -1,0 +1,16 @@
+{
+  "id": "systematic-debugging",
+  "name": "Systematic Debugging",
+  "description": "4-phase root cause analysis methodology: Observe → Hypothesize → Test → Fix. For complex bugs, race conditions, memory leaks, performance issues, and production incidents.",
+  "trigger": "(debug|באג|bug|root.*cause|race.*condition|memory.*leak|crash|error.*trace|stack.*trace|דיבאג|תקלה|חקירת.*תקלה|incident|postmortem|troubleshoot)",
+  "prompt": "4-phase root cause analysis methodology: Observe → Hypothesize → Test → Fix. For complex bugs, race conditions, memory leaks, performance issues, and production incidents.",
+  "examples": [
+    "Debug this bug",
+    "Root cause analysis",
+    "דיבאג"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

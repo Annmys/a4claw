@@ -1,0 +1,16 @@
+{
+  "id": "trustmrr-deep-research",
+  "name": "TrustMRR Deep Research",
+  "description": "Deep market intelligence by scraping TrustMRR.com and similar verified revenue platforms. Analyzes real startup MRR data, identifies profitable niches, finds acquisition targets.",
+  "trigger": "(trustmrr|trust.*mrr|verified.*revenue|startup.*revenue|revenue.*database|מחקר.*הכנסות|scrape.*mrr|revenue.*verified|startup.*data|benchmark.*mrr|acquisition.*target|niche.*profitable|profitable.*niche|רכישת.*סטארטאפ|מחקר.*סטארטאפים|revenue.*intelligence)",
+  "prompt": "Deep market intelligence by scraping TrustMRR.com and similar verified revenue platforms. Analyzes real startup MRR data, identifies profitable niches, finds acquisition targets, and benchmarks against verified competitors.",
+  "examples": [
+    "TrustMRR research",
+    "מחקר הכנסות",
+    "Profitable niches"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

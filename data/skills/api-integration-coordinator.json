@@ -1,0 +1,16 @@
+{
+  "id": "api-integration-coordinator",
+  "name": "API Integration Coordinator",
+  "description": "Orchestrate multi-API integrations: Stripe, PayPlus, OpenAI, Replicate, Google Ads, Meta Ads, WhatsApp Business, and more. Webhooks, authentication, error handling, rate limiting, and monitoring.",
+  "trigger": "(api.*integrat|אינטגרציית.*API|webhook|ווב.*הוק|stripe.*integrat|payplus|connect.*api|חיבור.*API|third.*party.*api|api.*coordinator|multi.*api|orchestrat.*api|api.*gateway|payment.*integrat|אינטגרציית.*תשלום)",
+  "prompt": "Orchestrate multi-API integrations: Stripe, PayPlus, OpenAI, Replicate, Google Ads, Meta Ads, WhatsApp Business, and more. Webhooks, authentication, error handling, rate limiting, and monitoring.",
+  "examples": [
+    "Integrate Stripe API",
+    "Connect PayPlus",
+    "Multi-API orchestration"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

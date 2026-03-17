@@ -1,0 +1,16 @@
+{
+  "id": "advanced-multi-agent-coordination",
+  "name": "Advanced Multi-Agent Coordination Patterns",
+  "description": "Novel multi-agent coordination patterns sourced from 500+ AI Agent projects (AutoGen, LangGraph, CrewAI): Society of Mind deliberation, nested chat hierarchies, FSM-based workflows, agent teachability, function inception, and corrective RAG.",
+  "trigger": "(society.*mind|nested.*chat|FSM.*agent|agent.*teach|teachab|function.*inception|corrective.*RAG|CRAG|agent.*debat|deliberat|multi.*agent.*pattern|תבנית.*רב.*סוכן|agent.*coordinat|תיאום.*סוכנים|swarm.*pattern|agent.*eval)",
+  "prompt": "Novel multi-agent coordination patterns: Society of Mind deliberation, nested chat hierarchies, FSM-based workflows, agent teachability, function inception, and corrective RAG. Extends ClawdAgent crew-orchestrator with advanced coordination strategies from AutoGen, LangGraph, CrewAI.",
+  "examples": [
+    "Set up society of mind deliberation",
+    "Multi-agent coordination pattern",
+    "Agent team workflow"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

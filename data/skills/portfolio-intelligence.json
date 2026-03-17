@@ -1,0 +1,16 @@
+{
+  "id": "portfolio-intelligence",
+  "name": "Portfolio Intelligence & Strategy Attribution",
+  "description": "Holistic portfolio intelligence: per-strategy P&L attribution, cross-strategy exposure tracking, dynamic rebalancing triggers, strategy-regime heat map, and drawdown-based position scaling.",
+  "trigger": "(portfolio.*intellig|אינטליגנציית.*תיק|strategy.*attribution|ייחוס.*אסטרטגיה|cross.*strategy.*risk|סיכון.*צולב|dynamic.*rebalance|איזון.*דינמי|strategy.*heat.*map|drawdown.*scal|performance.*attribution|strategy.*rotation|רוטציית.*אסטרטגי)",
+  "prompt": "Holistic portfolio intelligence: per-strategy P&L attribution, cross-strategy exposure tracking, dynamic rebalancing triggers (time + event based), strategy-regime heat map, and drawdown-based position scaling.",
+  "examples": [
+    "Portfolio attribution",
+    "Strategy P&L",
+    "Portfolio intelligence"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

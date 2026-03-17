@@ -1,0 +1,97 @@
+# Dependencies
+node_modules/
+web/node_modules/
+
+# Build
+dist/
+web/dist/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+
+# Data (runtime — ignore contents, not the directory itself)
+data/*
+!data/skills/
+*.sqlite
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Docker
+docker-compose.override.yml
+
+# WhatsApp session
+data/whatsapp-session/
+
+# Coverage
+coverage/
+
+# Drizzle
+drizzle/meta/
+
+# Temp
+tmp/
+*.tmp
+*.bak
+nul
+
+# Secrets & credentials
+*.pem
+*.key
+credentials.json
+*.p12
+*.pfx
+*.jks
+
+# SSH keys
+.ssh/
+
+# Conversation history & user data (NOT skills — those ship with the repo)
+data/conversations/
+data/whatsapp-session/
+data/memory/
+
+# Claude Code local settings
+.claude/settings.local.json
+
+# Claude Code reports
+docs/quality-reports/*.md
+docs/evolution-reports/*.md
+docs/scout-reports/*.md
+
+# Separate projects (not part of core)
+tiktok-app/
+molttik/
+ai-quote-generator/
+
+# Screenshots and media
+*.png
+*.jpg
+*.jpeg
+*.docx
+*.zip
+
+# Playwright MCP
+.playwright-mcp/
+
+# Local helper files
+.lh/
+tsc-*.txt
+
+# Uploads
+uploads/
+.wwebjs_cache/

@@ -1,0 +1,16 @@
+{
+  "id": "advanced-position-sizing",
+  "name": "Advanced Position Sizing & Risk",
+  "description": "Advanced position sizing methods for crypto trading: Kelly Criterion, volatility-adjusted sizing, VaR (Value at Risk), correlation-adjusted exposure, regime-based allocation, and portfolio-level risk metrics.",
+  "trigger": "(position.*siz|גודל.*פוזיציה|kelly.*criterion|קלי|risk.*sizing|ניהול.*סיכונים.*מתקדם|VaR|value.*at.*risk|drawdown.*limit|portfolio.*risk|סיכון.*תיק|allocation|הקצאה|risk.*reward|rebalance|איזון.*מחדש|exposure|חשיפה|hedge|גידור)",
+  "prompt": "Advanced position sizing methods for crypto trading: Kelly Criterion, volatility-adjusted sizing, VaR (Value at Risk), correlation-adjusted exposure, regime-based allocation, and portfolio-level risk metrics.",
+  "examples": [
+    "Calculate position size",
+    "Kelly Criterion for BTC",
+    "Risk management"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

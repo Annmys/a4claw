@@ -1,0 +1,16 @@
+{
+  "id": "word-document-generator",
+  "name": "Word Document Generator",
+  "description": "Create professional Word documents (DOCX) — reports, proposals, contracts, letters, and documentation with formatting, tables, images, headers/footers, and Hebrew RTL support.",
+  "trigger": "(docx|word|document|מסמך|word.*document|create.*doc|כתוב.*מסמך|תיעוד|documentation|letter|מכתב|memo|סיכום.*ישיבה|meeting.*notes)",
+  "prompt": "Create professional Word documents (DOCX) — reports, proposals, contracts, letters, and documentation with formatting, tables, images, headers/footers, and Hebrew RTL support.",
+  "examples": [
+    "Create Word document",
+    "כתוב מסמך",
+    "Generate report DOCX"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

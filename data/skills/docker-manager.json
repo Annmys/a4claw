@@ -1,0 +1,16 @@
+{
+  "id": "docker-manager",
+  "name": "Docker Manager",
+  "description": "Help with Docker containers, Dockerfiles, docker-compose, image optimization, and container debugging.",
+  "trigger": "(docker|container|קונטיינר|dockerfile|docker-compose|compose)",
+  "prompt": "Help with Docker containers, Dockerfiles, docker-compose, image optimization, and container debugging.",
+  "examples": [
+    "Create Dockerfile",
+    "Docker compose setup",
+    "Container debugging"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

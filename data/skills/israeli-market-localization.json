@@ -1,0 +1,16 @@
+{
+  "id": "israeli-market-localization",
+  "name": "Israeli Market Localization",
+  "description": "Localize products for the Israeli market: PayPlus/Cardcom payment integration, VAT (17%) compliance, BIT/Apple Pay, Israeli legal requirements, GDPR/Privacy Protection Act, Hebrew content, and local business conventions.",
+  "trigger": "(israel.*market|שוק.*ישראלי|locali[sz].*israel|לוקליזציה.*ישראל|payplus|cardcom|Israeli.*payment|תשלום.*ישראלי|VAT.*israel|מעמ|israeli.*legal|חוק.*ישראלי|BIT.*payment|apple.*pay.*israel|privacy.*protection.*act|הגנת.*הפרטיות|israeli.*compliance|תקנות.*ישראליות)",
+  "prompt": "Localize products for the Israeli market: PayPlus/Cardcom payment integration, VAT (17%) compliance, BIT/Apple Pay, Israeli legal requirements, GDPR/Privacy Protection Act, Hebrew content, and local business conventions.",
+  "examples": [
+    "Localize for Israel",
+    "שוק ישראלי",
+    "PayPlus integration"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

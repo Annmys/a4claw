@@ -1,0 +1,16 @@
+{
+  "id": "huggingface-model-integration",
+  "name": "Hugging Face Model Integration",
+  "description": "Integrate Hugging Face models, Inference API, Spaces, and open-source model ecosystem. Model discovery, deployment, fine-tuning, and serverless inference.",
+  "trigger": "(hugging.*face|HF.*model|transformers|inference.*api|hf.*space|open.*model|huggingface|diffusers|text.*generation.*inference|TGI|hugging.*face.*hub)",
+  "prompt": "Integrate Hugging Face models, Inference API, Spaces, and open-source model ecosystem. Model discovery, deployment, fine-tuning, and serverless inference for text, image, audio, and multimodal tasks.",
+  "examples": [
+    "Find HuggingFace model",
+    "Deploy on HF Spaces",
+    "Transformers integration"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

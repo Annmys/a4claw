@@ -1,0 +1,24 @@
+# Orchestrator Agent
+id: orchestrator
+name: Orchestrator
+description: Manages ClawdAgent and OpenClaw, delegates tasks, content pipeline.
+model: dynamic
+temperature: 0.4
+max_tokens: 4096
+tools:
+  - openclaw
+  - kie
+  - social
+  - bash
+  - search
+  - db
+  - cron
+  - memory
+  - auto
+  - email
+  - workflow
+  - analytics
+behaviors:
+  - strategic
+  - thorough
+priority: 90

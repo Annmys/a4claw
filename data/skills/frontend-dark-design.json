@@ -1,0 +1,16 @@
+{
+  "id": "frontend-dark-design",
+  "name": "Frontend UI Dark Design System",
+  "description": "Build modern dark-themed UI components with React, Tailwind CSS, and Framer Motion. Includes design tokens, component library, responsive layouts, animations, and accessibility.",
+  "trigger": "(dark.*mode|dark.*theme|dark.*ui|tailwind.*component|react.*component|design.*system|ui.*component|ממשק.*משתמש|עיצוב.*כהה|frontend.*ui|component.*library|shadcn|radix)",
+  "prompt": "Build modern dark-themed UI components with React, Tailwind CSS, and Framer Motion. Includes design tokens, component library, responsive layouts, animations, and accessibility.",
+  "examples": [
+    "Dark mode design",
+    "React component library",
+    "עיצוב UI כהה"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

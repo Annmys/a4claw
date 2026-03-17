@@ -1,0 +1,64 @@
+# ClawdAgent — Main Configuration
+# Edit this file to customize your agent's behavior
+
+agent:
+  name: ClawdAgent
+  version: "5.0.0"
+  language: auto          # auto-detect, or force: en, he, etc
+  timezone: Asia/Jerusalem
+  personality: professional  # professional, friendly, casual, formal
+
+providers:
+  claude-code:
+    enabled: true               # FREE via Claude Max subscription ($200/month flat)
+    path: claude                 # Path to Claude Code CLI binary
+    priority: 1                  # Highest priority — always try first (free!)
+    timeout_ms: 120000           # 2 min timeout for regular chat
+    agent_timeout_ms: 300000     # 5 min timeout for agentic tasks
+  anthropic:
+    priority: 2                  # Fallback when Claude Code CLI unavailable
+  openrouter:
+    priority: 3                  # Budget fallback with 400+ models
+
+models:
+  default: "stepfun/step-3.5-flash:free"
+  economy: "nvidia/nemotron-nano-9b-v2:free"
+  reasoning: "deepseek/deepseek-r1-0528:free"
+  vision: "google/gemini-2.0-flash-exp:free"
+  prefer_free: true
+  daily_budget_usd: 2
+
+features:
+  heartbeat: true
+  auto_upgrade: true
+  self_repair: true
+  self_improve: true
+  proactive_thinker: true
+  rag: true
+  voice: false
+  vision: true
+  desktop: false
+
+security:
+  rate_limit_max: 30
+  rate_limit_window_ms: 60000
+  require_admin: true
+  sandbox_bash: true
+  encrypt_secrets: true
+  rotate_keys: false
+  rotate_interval_hours: 72
+
+interfaces:
+  telegram: true
+  discord: false
+  whatsapp: false
+  web: true
+
+plugins:
+  enabled: true
+  directory: ./plugins
+  auto_load: true
+
+mcp:
+  enabled: true
+  config_path: ./config/mcp/servers.yaml

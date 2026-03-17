@@ -1,0 +1,16 @@
+{
+  "id": "crypto-market-making",
+  "name": "Crypto Market Making",
+  "description": "Professional market making knowledge: two-sided quoting, dynamic spread calculation, inventory management, adverse selection protection, toxic flow detection, and market maker PnL analysis.",
+  "trigger": "(market.*mak|עשיית.*שוק|spread.*manag|ניהול.*מרווח|inventory.*risk|סיכון.*מלאי|two.*sided.*quot|ציטוט.*דו.*צדדי|bid.*ask.*spread|adverse.*selection|toxic.*flow|liquidity.*provid|ספק.*נזילות)",
+  "prompt": "Professional market making knowledge: two-sided quoting, dynamic spread calculation, inventory management, adverse selection protection, toxic flow detection, and market maker PnL analysis. Designed for the market-maker agent.",
+  "examples": [
+    "Market making strategy",
+    "עשיית שוק",
+    "Spread management"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

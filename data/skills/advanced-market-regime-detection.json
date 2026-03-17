@@ -1,0 +1,16 @@
+{
+  "id": "advanced-market-regime-detection",
+  "name": "Advanced Market Regime Detection",
+  "description": "Multi-timeframe market regime detection with correlation breakdown alerts, black swan indicators, and regime consensus scoring.",
+  "trigger": "(regime.*detect|זיהוי.*משטר|correlation.*break|מתאם.*שבירה|black.*swan|ברבור.*שחור|tail.*risk|סיכון.*זנב|flash.*crash|liquidation.*cascade|multi.*timeframe.*regime|VIX|fear.*index|market.*stress)",
+  "prompt": "Multi-timeframe market regime detection with correlation breakdown alerts, black swan indicators, and regime consensus scoring. Extends basic regime detection with cross-asset correlation monitoring, tail risk metrics, and cascading liquidation detection.",
+  "examples": [
+    "Detect market regime",
+    "Black swan alert",
+    "Market stress analysis"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

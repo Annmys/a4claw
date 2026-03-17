@@ -1,0 +1,16 @@
+{
+  "id": "crypto-analysis",
+  "name": "Crypto Analysis",
+  "description": "Technical analysis of cryptocurrency pairs — indicators, trends, signals, chart patterns, and market sentiment analysis.",
+  "trigger": "(analyze.*crypto|technical.*analysis|\\bTA\\b|analyze.*btc|analyze.*eth|ניתוח.*קריפטו|נתח.*את|ניתוח.*טכני|מה.*המצב.*של.*btc|how.*is.*btc|crypto.*chart|גרף.*קריפטו|RSI|MACD|moving.*average|support.*resistance|תמיכה.*התנגדות)",
+  "prompt": "Technical analysis of cryptocurrency pairs — indicators, trends, signals, chart patterns, and market sentiment analysis.",
+  "examples": [
+    "Analyze BTC chart",
+    "ניתוח טכני ETH",
+    "What is BTC doing?"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

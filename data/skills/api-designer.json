@@ -1,0 +1,16 @@
+{
+  "id": "api-designer",
+  "name": "API Designer",
+  "description": "Design REST and GraphQL API endpoints with proper schemas, authentication, and error handling.",
+  "trigger": "(design api|api design|תכנן API|בנה API|create api|build api|rest api)",
+  "prompt": "Design REST and GraphQL API endpoints with proper schemas, authentication, and error handling.",
+  "examples": [
+    "Design a REST API",
+    "תכנן API",
+    "Create API endpoints"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

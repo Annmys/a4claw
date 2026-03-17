@@ -1,0 +1,16 @@
+{
+  "id": "ai-agent-automation",
+  "name": "AI Agent Automation",
+  "description": "Build AI-powered automation bots for Telegram, WhatsApp, Slack, Email, and Discord. Message handling, AI response generation, workflow triggers, webhook integration, and multi-platform bot orchestration.",
+  "trigger": "(bot.*build|בנה.*בוט|telegram.*bot|בוט.*טלגרם|whatsapp.*bot|בוט.*ווטסאפ|slack.*bot|discord.*bot|chat.*bot|צ'אטבוט|automation.*bot|בוט.*אוטומציה|ai.*bot|agent.*automation|אוטומציית.*סוכן|message.*automation)",
+  "prompt": "Build AI-powered automation bots for Telegram, WhatsApp, Slack, Email, and Discord. Message handling, AI response generation, workflow triggers, webhook integration, and multi-platform bot orchestration.",
+  "examples": [
+    "Build a Telegram bot",
+    "בנה בוט ווטסאפ",
+    "Create automation bot"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

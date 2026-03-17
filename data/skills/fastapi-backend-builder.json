@@ -1,0 +1,16 @@
+{
+  "id": "fastapi-backend-builder",
+  "name": "FastAPI Backend Builder",
+  "description": "Build production-ready Python FastAPI backends with routers, Pydantic models, middleware, authentication, database integration, and OpenAPI documentation.",
+  "trigger": "(fastapi|fast.*api|python.*api|pydantic|uvicorn|python.*backend|python.*server|שרת.*פייתון|api.*python|starlette)",
+  "prompt": "Build production-ready Python FastAPI backends with routers, Pydantic models, middleware, authentication, database integration, and OpenAPI documentation.",
+  "examples": [
+    "Build FastAPI backend",
+    "Python API server",
+    "FastAPI with auth"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

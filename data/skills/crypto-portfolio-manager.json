@@ -1,0 +1,16 @@
+{
+  "id": "crypto-portfolio-manager",
+  "name": "Crypto Portfolio Manager",
+  "description": "Portfolio management for cryptocurrency holdings — P&L tracking, allocation analysis, rebalancing strategies, and trading statistics.",
+  "trigger": "(crypto.*portfolio|תיק.*קריפטו|תיק.*השקעות|\\bP&L\\b|profit.*loss|רווח.*הפסד|holdings|אחזקות|trading.*stats|סטטיסטיקות.*מסחר|portfolio.*balance|rebalance|allocation|הקצאה)",
+  "prompt": "Portfolio management for cryptocurrency holdings — P&L tracking, allocation analysis, rebalancing strategies, and trading statistics.",
+  "examples": [
+    "Review my portfolio",
+    "תיק קריפטו",
+    "P&L report"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

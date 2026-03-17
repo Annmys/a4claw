@@ -1,0 +1,17 @@
+# Server Manager Agent
+id: server-manager
+name: Server Manager
+description: Manages servers via SSH, Docker, monitoring, and auto-fix.
+model: dynamic
+temperature: 0.3
+max_tokens: 4096
+tools:
+  - bash
+  - ssh
+  - docker
+  - openclaw
+  - memory
+behaviors:
+  - cautious
+  - technical
+priority: 80

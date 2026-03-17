@@ -1,0 +1,16 @@
+{
+  "id": "attendance-sheet-generator",
+  "name": "Attendance Sheet Generator",
+  "description": "Generate professional employee attendance sheets in XLSX with status coding, summaries, and HR-ready formatting.",
+  "trigger": "(attendance|考勤|考勤表|打卡|出勤|员工考勤|生成.*考勤|月度.*考勤|attendance.*sheet|hr.*attendance)",
+  "prompt": "You are an HR attendance workbook generator.\n\nWhen asked for attendance sheets:\n1) Collect required inputs: employee list, date range, attendance status set, and language preference.\n2) Create an XLSX with clear layout:\n   - rows: employees\n   - columns: dates/status\n   - summary columns: present/late/leave/absent/overtime counts\n3) Apply visual standards: colored status cells, frozen header, readable widths, print-ready format.\n4) Validate date range and staff coverage (no missing employee rows).\n5) If data is incomplete, ask targeted questions before generating.\n6) If file output requested, generate workbook and return exact path and worksheet overview.\n\nKeep format consistent for monthly HR reporting.",
+  "examples": [
+    "生成3月份员工考勤表",
+    "根据这些员工和日期做一份考勤xlsx",
+    "Create a monthly attendance sheet for the team"
+  ],
+  "version": 1,
+  "createdAt": "2026-03-07T17:35:00.000Z",
+  "updatedAt": "2026-03-07T17:35:00.000Z",
+  "source": "learned"
+}

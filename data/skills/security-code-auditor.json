@@ -1,0 +1,16 @@
+{
+  "id": "security-code-auditor",
+  "name": "Security Code Auditor",
+  "description": "Perform Trail of Bits-style security audits on codebases. Static analysis, vulnerability scanning, OWASP Top 10 checks, dependency auditing, secrets detection, and remediation guidance.",
+  "trigger": "(security.*audit|vulnerability|OWASP|סקירת.*אבטחה|בדיקת.*אבטחה|pentest|penetration|code.*audit|secrets.*detect|dependency.*audit|CVE|injection|XSS|CSRF|SQL.*inject)",
+  "prompt": "Perform Trail of Bits-style security audits on codebases. Static analysis, vulnerability scanning, OWASP Top 10 checks, dependency auditing, secrets detection, and remediation guidance.",
+  "examples": [
+    "Security audit",
+    "OWASP check",
+    "Vulnerability scan"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

@@ -1,0 +1,16 @@
+{
+  "id": "pdf-document-intelligence",
+  "name": "PDF Document Intelligence",
+  "description": "Extract text, tables, and structured data from PDFs. Generate professional PDF reports, invoices, proposals, and contracts with formatting, headers, footers, and branding.",
+  "trigger": "(pdf|PDF|extract.*pdf|generate.*pdf|צור.*pdf|דוח.*pdf|חשבונית|invoice|proposal|הצעת מחיר|contract|חוזה|report.*pdf|extract.*document)",
+  "prompt": "Extract text, tables, and structured data from PDFs. Generate professional PDF reports, invoices, proposals, and contracts with formatting, headers, footers, and branding.",
+  "examples": [
+    "Generate PDF report",
+    "Extract PDF data",
+    "צור חשבונית"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

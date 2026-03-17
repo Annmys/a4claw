@@ -1,0 +1,16 @@
+{
+  "id": "crypto-arbitrage-detection",
+  "name": "Crypto Arbitrage Detection",
+  "description": "Detect and analyze arbitrage opportunities across exchanges: CEX-CEX price gaps, triangular arbitrage within exchanges, DEX-CEX spreads, and statistical arbitrage on correlated pairs.",
+  "trigger": "(arbitrage|ארביטראז|price.*gap|spread.*exchange|triangular|משולש|cross.*exchange|הפרשי.*מחיר|מרווח|basis.*trade|pairs.*trade|stat.*arb)",
+  "prompt": "Detect and analyze arbitrage opportunities across exchanges: CEX-CEX price gaps, triangular arbitrage within exchanges, DEX-CEX spreads, and statistical arbitrage on correlated pairs. Uses existing CCXT multi-exchange connections.",
+  "examples": [
+    "Find arbitrage opportunities",
+    "ארביטראז בין בורסות",
+    "Price gap analysis"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

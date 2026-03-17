@@ -1,0 +1,16 @@
+{
+  "id": "growth-marketing-agent",
+  "name": "Growth Marketing Agent",
+  "description": "Design growth marketing strategies: acquisition channels, campaign planning, SEO/content calendars, paid ads optimization, retargeting funnels, and viral loops.",
+  "trigger": "(growth.*market|שיווק.*צמיחה|growth.*hack|גרות'.*האק|campaign.*plan|תוכנית.*קמפיין|content.*calendar|לוח.*תוכן|paid.*ads|פרסום.*ממומן|SEO.*strategy|אסטרטגיית.*SEO|acquisition.*channel|ערוצי.*שיווק|viral.*loop|retarget|ריטרגטינג|funnel|משפך|lead.*gen|הפקת.*לידים)",
+  "prompt": "Design growth marketing strategies: acquisition channels, campaign planning, SEO/content calendars, paid ads optimization, retargeting funnels, and viral loops. Integrates with Google Ads, Meta Ads, and social platforms.",
+  "examples": [
+    "Growth strategy for SaaS",
+    "שיווק צמיחה",
+    "Campaign planning"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

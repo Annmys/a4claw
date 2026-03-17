@@ -1,0 +1,16 @@
+{
+  "id": "rtl-hebrew-ui-design",
+  "name": "RTL Hebrew UI Design",
+  "description": "Build right-to-left (RTL) Hebrew user interfaces with React, Tailwind CSS, and Next.js. Includes RTL layout patterns, bidirectional text handling, Hebrew typography, and accessible RTL components.",
+  "trigger": "(rtl|RTL|right.*to.*left|hebrew.*ui|ממשק.*עברית|עברית.*UI|עיצוב.*עברי|bidi|bidirectional|דו.*כיווני|hebrew.*layout|תצוגה.*עברית|hebrew.*design|עיצוב.*ישראלי)",
+  "prompt": "Build right-to-left (RTL) Hebrew user interfaces with React, Tailwind CSS, and Next.js. Includes RTL layout patterns, bidirectional text handling, Hebrew typography, and accessible RTL components.",
+  "examples": [
+    "RTL layout",
+    "ממשק עברית",
+    "Hebrew UI"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

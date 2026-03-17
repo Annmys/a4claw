@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClawdAgent Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            background: linear-gradient(135deg, #0a0a2e 0%, #1a1a4e 50%, #0d0d3d 100%);
+            color: #fff;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        h1 {
+            text-align: center;
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(90deg, #00f5ff, #ff00ff, #00f5ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: glow 3s ease-in-out infinite;
+        }
+        .subtitle {
+            text-align: center;
+            color: rgba(255, 255, 255, 0.5);
+            margin-bottom: 2rem;
+            font-size: 1rem;
+        }
+        @keyframes glow {
+            0%, 100% { filter: brightness(1); }
+            50% { filter: brightness(1.3); }
+        }
+        .games-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1.5rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .game-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 2rem;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            text-decoration: none;
+            color: #fff;
+            display: block;
+        }
+        .game-card:hover {
+            transform: translateY(-8px);
+            border-color: #00f5ff;
+            box-shadow: 0 8px 32px rgba(0, 245, 255, 0.2);
+            background: rgba(255, 255, 255, 0.1);
+        }
+        .game-icon { font-size: 3rem; margin-bottom: 1rem; }
+        .game-name { font-size: 1.3rem; font-weight: bold; margin-bottom: 0.5rem; }
+        .game-desc { font-size: 0.9rem; color: rgba(255, 255, 255, 0.6); }
+        .back-link {
+            display: block;
+            text-align: center;
+            margin-top: 2rem;
+            color: #00f5ff;
+            text-decoration: none;
+            font-size: 1.1rem;
+        }
+        .back-link:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <h1>ClawdAgent Games</h1>
+    <p class="subtitle">משחקים שנבנו ע"י ClawdAgent</p>
+    <div class="games-grid">
+        <a href="galaxy-destroyer/" class="game-card">
+            <div class="game-icon">🚀</div>
+            <div class="game-name">Galaxy Destroyer</div>
+            <div class="game-desc">הורס הגלקסיה</div>
+        </a>
+        <a href="mario/" class="game-card">
+            <div class="game-icon">🍄</div>
+            <div class="game-name">Mario</div>
+            <div class="game-desc">סופר מריו</div>
+        </a>
+    </div>
+    <a href="/" class="back-link">← חזרה לאתר הראשי</a>
+</body>
+</html>

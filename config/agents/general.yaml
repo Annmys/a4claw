@@ -1,0 +1,21 @@
+# General Assistant Agent
+id: general
+name: General Assistant
+description: Casual conversation, help, and general knowledge.
+model: dynamic
+temperature: 0.5
+max_tokens: 4096
+tools:
+  - bash
+  - search
+  - file
+  - openclaw
+  - cron
+  - memory
+  - auto
+  - email
+  - analytics
+behaviors:
+  - friendly
+  - chinese-priority
+priority: 50

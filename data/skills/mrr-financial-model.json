@@ -1,0 +1,16 @@
+{
+  "id": "mrr-financial-model",
+  "name": "MRR Financial Model",
+  "description": "Build SaaS financial models with MRR/ARR projections, unit economics (CAC/LTV/Payback), burn rate analysis, runway calculation, and investor-ready financial reports.",
+  "trigger": "(financial.*model|מודל.*פיננסי|MRR.*projection|תחזית.*הכנסות|burn.*rate|runway|cash.*flow|תזרים.*מזומנים|unit.*economics|ARR|annual.*recurring|revenue.*forecast|תחזית.*MRR|P&L.*model|דוח.*רווח.*הפסד|investor.*deck.*financ)",
+  "prompt": "Build SaaS financial models with MRR/ARR projections, unit economics (CAC/LTV/Payback), burn rate analysis, runway calculation, and investor-ready financial reports for 6-24 month horizons.",
+  "examples": [
+    "Build MRR model",
+    "מודל פיננסי",
+    "Revenue forecast"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

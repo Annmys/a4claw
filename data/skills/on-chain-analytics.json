@@ -1,0 +1,16 @@
+{
+  "id": "on-chain-analytics",
+  "name": "On-Chain Analytics & Whale Tracking",
+  "description": "Analyze blockchain data for trading signals: whale wallet tracking, exchange inflows/outflows, large transaction alerts, DeFi TVL monitoring, and smart money movement detection.",
+  "trigger": "(on.*chain|whale|לווייתן|exchange.*flow|inflow|outflow|large.*transaction|עסקה.*גדולה|TVL|defi.*data|blockchain.*data|smart.*money|כסף.*חכם|wallet.*track|מעקב.*ארנק|gas.*fee|mempool|מאגר.*עסקאות)",
+  "prompt": "Analyze blockchain data for trading signals: whale wallet tracking, exchange inflows/outflows, large transaction alerts, DeFi TVL monitoring, and smart money movement detection using free APIs (Etherscan, DefiLlama, Blockchain.com).",
+  "examples": [
+    "Track whale movements",
+    "On-chain analysis BTC",
+    "Exchange flow analysis"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

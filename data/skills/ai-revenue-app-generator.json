@@ -1,0 +1,16 @@
+{
+  "id": "ai-revenue-app-generator",
+  "name": "AI Revenue App Generator",
+  "description": "Generates complete AI-powered applications designed for revenue from day 1. Uses real TrustMRR data to pick winning niches, builds full-stack apps with Stripe payments, and deploys with automated growth.",
+  "trigger": "(ai.*app.*build|build.*ai.*app|ai.*product|ai.*revenue|ai.*money|אפליקציית.*AI|בנה.*אפליקציה.*AI|ai.*saas.*build|build.*profitable.*ai|ai.*wrapper|ai.*tool.*build|generate.*app.*ai|revenue.*ai.*app|אפליקציה.*שמכניסה.*כסף|בנה.*מוצר.*AI)",
+  "prompt": "Generates complete AI-powered applications designed for revenue from day 1. Uses real TrustMRR data to pick winning niches, builds full-stack apps with Stripe payments, and deploys with automated growth. Focus: AI wrappers, AI-native tools, and AI-enhanced SaaS that generate MRR.",
+  "examples": [
+    "Build an AI app that makes money",
+    "בנה אפליקציית AI רווחית",
+    "Generate revenue AI product"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

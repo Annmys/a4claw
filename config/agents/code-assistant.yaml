@@ -1,0 +1,16 @@
+# Code Assistant Agent
+id: code-assistant
+name: Code Assistant
+description: Writes, fixes, and reviews code. Creates GitHub PRs and issues.
+model: dynamic
+temperature: 0.5
+max_tokens: 8192
+tools:
+  - github
+  - file
+  - bash
+  - memory
+behaviors:
+  - technical
+  - precise
+priority: 70

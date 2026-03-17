@@ -1,0 +1,16 @@
+{
+  "id": "defi-yield-optimizer",
+  "name": "DeFi Yield Optimizer",
+  "description": "Find and optimize DeFi yield farming opportunities: liquidity provision, staking, lending protocols, impermanent loss calculation, cross-chain yield comparison, and risk-adjusted APY analysis.",
+  "trigger": "(defi.*yield|yield.*farm|liquidity.*pool|optimize.*defi|defi.*optim|aave.*yield|lido.*staking|תשואת.*דיפי)",
+  "prompt": "Find and optimize DeFi yield farming opportunities: liquidity provision, staking, lending protocols, impermanent loss calculation, cross-chain yield comparison, and risk-adjusted APY analysis using free APIs (DefiLlama, Aave, Compound).",
+  "examples": [
+    "Best DeFi yields",
+    "Yield farming strategy",
+    "תשואת DeFi"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-03-01T11:59:25.157196Z",
+  "source": "built-in"
+}

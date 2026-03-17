@@ -1,0 +1,16 @@
+{
+  "id": "skill-creator",
+  "name": "Skill Creator",
+  "description": "Create new ClawdAgent skills programmatically. Define triggers, prompts, examples, and metadata for skills that teach the AI new domain expertise.",
+  "trigger": "(create.*skill|new.*skill|skill.*creator|build.*skill|צור.*סקיל|בנה.*סקיל|add.*skill|skill.*template|skill.*builder|teach.*agent)",
+  "prompt": "Create new ClawdAgent skills programmatically. Define triggers, prompts, examples, and metadata for skills that teach the AI new domain expertise. Supports both JSON and SKILL.md formats.",
+  "examples": [
+    "Create new skill",
+    "צור סקיל",
+    "Build skill"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

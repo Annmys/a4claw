@@ -1,0 +1,101 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: #060a13;
+  color: #fff;
+}
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #334155; }
+
+input:focus, button:focus-visible, textarea:focus { outline: none; box-shadow: 0 0 0 2px #2563eb; }
+
+/* ── Gradient card backgrounds ─────────────────────────────────── */
+.card-gradient {
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.5) 0%, rgba(15, 23, 42, 0.8) 100%);
+  border: 1px solid rgba(71, 85, 105, 0.2);
+  backdrop-filter: blur(10px);
+}
+
+.card-gradient:hover {
+  border-color: rgba(71, 85, 105, 0.4);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
+}
+
+/* ── Glow effects ──────────────────────────────────────────────── */
+.glow-green { box-shadow: 0 0 10px rgba(34, 197, 94, 0.3), 0 0 30px rgba(34, 197, 94, 0.1); }
+.glow-blue { box-shadow: 0 0 10px rgba(59, 130, 246, 0.3), 0 0 30px rgba(59, 130, 246, 0.1); }
+.glow-purple { box-shadow: 0 0 10px rgba(168, 85, 247, 0.3), 0 0 30px rgba(168, 85, 247, 0.1); }
+.glow-amber { box-shadow: 0 0 10px rgba(245, 158, 11, 0.3), 0 0 30px rgba(245, 158, 11, 0.1); }
+
+/* ── Animated counter ──────────────────────────────────────────── */
+@keyframes counter-up {
+  0% { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.animate-counter { animation: counter-up 0.6s ease-out both; }
+
+/* ── Skeleton loading ──────────────────────────────────────────── */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, rgba(30,41,59,0.3) 25%, rgba(51,65,85,0.3) 50%, rgba(30,41,59,0.3) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: 8px;
+}
+
+/* ── Pulse dot ─────────────────────────────────────────────────── */
+.pulse-dot {
+  position: relative;
+}
+.pulse-dot::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  background: inherit;
+  opacity: 0.4;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+/* ── Glass theme background ───────────────────────────────────── */
+.chat-glass {
+  background: radial-gradient(ellipse at 20% 50%, rgba(59, 130, 246, 0.04) 0%, transparent 50%),
+              radial-gradient(ellipse at 80% 20%, rgba(168, 85, 247, 0.03) 0%, transparent 50%);
+}
+
+/* ── Formatted message styles ─────────────────────────────────── */
+.formatted-msg h3 { border-bottom: 1px solid rgba(71, 85, 105, 0.3); padding-bottom: 4px; }
+.formatted-msg h4 { border-bottom: 1px solid rgba(71, 85, 105, 0.15); padding-bottom: 3px; }
+.formatted-msg pre { scrollbar-width: thin; scrollbar-color: #334155 transparent; }
+.formatted-msg pre::-webkit-scrollbar { height: 4px; }
+.formatted-msg pre::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
+.formatted-msg ul, .formatted-msg ol { margin-block: 4px; }
+.formatted-msg li::marker { color: #64748b; }
+.formatted-msg hr { opacity: 0.5; }
+.formatted-msg a { text-decoration-skip-ink: auto; }
+.formatted-msg a:hover { text-decoration: underline; }
+
+/* ── RTL adjustments ──────────────────────────────────────────── */
+[dir="rtl"] .formatted-msg ul,
+[dir="rtl"] .formatted-msg ol { padding-right: 1.25rem; padding-left: 0; }
+
+/* ── Toast slide-in animation ─────────────────────────────────── */
+@keyframes slide-in {
+  0% { opacity: 0; transform: translateX(100%); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+.animate-slide-in { animation: slide-in 0.3s ease-out both; }
+
+/* ── Recharts overrides ────────────────────────────────────────── */
+.recharts-cartesian-grid line { stroke: rgba(51, 65, 85, 0.3); }
+.recharts-text { fill: #94a3b8; font-size: 11px; }

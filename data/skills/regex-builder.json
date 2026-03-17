@@ -1,0 +1,16 @@
+{
+  "id": "regex-builder",
+  "name": "Regex Builder",
+  "description": "Build, explain, and test regular expression patterns with step-by-step breakdowns.",
+  "trigger": "(regex|regular expression|רגקס|pattern match|ביטוי רגולרי)",
+  "prompt": "Build, explain, and test regular expression patterns with step-by-step breakdowns.",
+  "examples": [
+    "Build regex",
+    "Explain regex",
+    "רגקס"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

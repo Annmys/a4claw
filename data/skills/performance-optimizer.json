@@ -1,0 +1,16 @@
+{
+  "id": "performance-optimizer",
+  "name": "Performance Optimizer",
+  "description": "Optimize code, database queries, and server performance with profiling and caching strategies.",
+  "trigger": "(performance|optimize|slow|speed up|ביצועים|אופטימיזציה|לאט|מהירות)",
+  "prompt": "Optimize code, database queries, and server performance with profiling and caching strategies.",
+  "examples": [
+    "Optimize performance",
+    "ביצועים",
+    "Speed up queries"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

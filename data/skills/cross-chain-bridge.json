@@ -1,0 +1,16 @@
+{
+  "id": "cross-chain-bridge",
+  "name": "Cross-Chain Bridge & Multi-Chain Operations",
+  "description": "Cross-chain bridge operations: comparing bridge protocols (fees, speed, security), MEV protection, multi-chain arbitrage routing, flash loan coordination, and gas optimization across EVM and non-EVM chains.",
+  "trigger": "(cross.*chain|בין.*רשתות|bridge.*crypto|גשר.*קריפטו|multi.*chain|רב.*רשתי|MEV.*protect|הגנה.*MEV|flash.*loan|הלוואת.*פלאש|gas.*optim|אופטימיזציית.*גז|layer.*2|L2.*bridge|arbitrum|optimism|base.*chain|polygon.*bridge)",
+  "prompt": "Cross-chain bridge operations: comparing bridge protocols (fees, speed, security), MEV protection, multi-chain arbitrage routing, flash loan coordination, and gas optimization across EVM and non-EVM chains. Covers Ethereum, BSC, Polygon, Solana, Avalanche, Arbitrum, Optimism, Base.",
+  "examples": [
+    "Best bridge ETH to Arbitrum",
+    "Cross-chain arbitrage",
+    "גשר קריפטו"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}

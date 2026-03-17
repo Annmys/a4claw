@@ -1,0 +1,16 @@
+{
+  "id": "sql-expert",
+  "name": "SQL Expert",
+  "description": "Write, optimize, and explain SQL queries with best practices for PostgreSQL and other databases.",
+  "trigger": "(sql|query|שאילתא|database query|db query|תכתוב שאילתה|optimize query)",
+  "prompt": "Write, optimize, and explain SQL queries with best practices for PostgreSQL and other databases.",
+  "examples": [
+    "Write SQL query",
+    "Optimize query",
+    "שאילתת SQL"
+  ],
+  "version": 1,
+  "createdAt": "2025-12-15T10:00:00.000Z",
+  "updatedAt": "2026-02-22T23:06:33.179Z",
+  "source": "built-in"
+}
