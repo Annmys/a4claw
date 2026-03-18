@@ -1,5 +1,28 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { type TaskDAG, type TaskDependencyType } from '../../api/client';
+
+// Local type definitions
+type TaskStatus = 'incoming' | 'triage' | 'assigned' | 'in_progress' | 'review' | 'done' | 'blocked';
+type TaskDependencyType = 'finish_to_start' | 'start_to_start' | 'finish_to_finish' | 'start_to_finish';
+
+interface TaskNode {
+  id: string;
+  title: string;
+  status: TaskStatus;
+  assignee?: string;
+  priority?: 'low' | 'medium' | 'high' | 'critical';
+  dependencies: string[];
+}
+
+interface TaskDependency {
+  from: string;
+  to: string;
+  type: TaskDependencyType;
+}
+
+interface TaskDAG {
+  nodes: TaskNode[];
+  edges: TaskDependency[];
+}
 
 interface DAGVisualizationProps {
   dag: TaskDAG | null;
@@ -85,7 +108,7 @@ export function DAGVisualization({
         
         // Find nodes that depend on this one
         const dependents = dag.nodes.filter(n =>
-          n.dependencies.some(d => d.dependsOnTaskId === nodeId)
+          n.dependencies.includes(nodeId)
         );
         
         for (const dep of dependents) {

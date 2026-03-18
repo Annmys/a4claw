@@ -1,13 +1,13 @@
-import { Engine } from '../core/engine.js';
-import { executeTool } from '../core/tool-executor.js';
-import { getDb } from './database.js';
-import { commandCenterTasks, commandCenterTaskRuns, commandCenterMembers, commandCenterTaskEvents } from './schema.js';
+import { Engine } from '../../core/engine.js';
+import { executeTool } from '../../core/tool-executor.js';
+import { getDb } from '../database.js';
+import { commandCenterTasks, commandCenterTaskRuns, commandCenterMembers, commandCenterTaskEvents } from '../schema.js';
 import { eq, and } from 'drizzle-orm';
 import { 
   updateCommandCenterTaskRunStatus, 
   updateCommandCenterTaskStatus,
   appendCommandCenterTaskEvent 
-} from './repositories/command-center.js';
+} from './command-center.js';
 import { 
   checkNeedsApproval, 
   createApprovalRequest 
@@ -90,7 +90,8 @@ export async function executeTaskRun(
       const requestId = await createApprovalRequest({
         gateId: gate.id,
         taskId: task.id,
-        requesterId: run.executorMemberId || 'system',
+        requesterId: run.executorMemberId ? String(run.executorMemberId) : 'system',
+        requesterMemberId: run.executorMemberId || undefined,
         payload: {
           action: 'execute_task',
           details: {
@@ -98,8 +99,7 @@ export async function executeTaskRun(
             taskTitle: task.title,
           },
         },
-        timeoutHours: gate.timeoutHours,
-      });
+      }, gate.timeoutHours);
 
       // Update run status
       await updateCommandCenterTaskRunStatus(ownerUserId, runId, {
@@ -311,7 +311,7 @@ function buildTaskPrompt(task: typeof commandCenterTasks.$inferSelect): string {
     parts.push(task.description);
   }
 
-  if (task.tags && task.tags.length > 0) {
+  if (task.tags && Array.isArray(task.tags) && task.tags.length > 0) {
     parts.push(`## 标签`);
     parts.push(task.tags.join(', '));
   }

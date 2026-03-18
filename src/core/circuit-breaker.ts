@@ -43,6 +43,13 @@ export class CircuitBreakerError extends Error {
   }
 }
 
+export class CircuitOpenError extends CircuitBreakerError {
+  constructor(name: string) {
+    super(`Circuit breaker '${name}' is OPEN`, 'OPEN', name);
+    this.name = 'CircuitOpenError';
+  }
+}
+
 export class CircuitBreaker extends EventEmitter {
   private state: CircuitBreakerState = 'CLOSED';
   private failures = 0;
@@ -414,5 +421,15 @@ export const defaultCircuitBreakers = {
     timeout: 300000, // 5 minutes
   }),
 };
+
+// Helper function to get or create a circuit breaker
+export function getCircuitBreaker(name: string, options?: Omit<CircuitBreakerOptions, 'name'>): CircuitBreaker {
+  return circuitBreakerRegistry.getOrCreate(name, options);
+}
+
+// Helper function to get all circuit breaker stats
+export function getAllCircuitBreakerStats(): Record<string, CircuitBreakerStats> {
+  return circuitBreakerRegistry.getAllStats();
+}
 
 export default CircuitBreaker;

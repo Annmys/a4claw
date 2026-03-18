@@ -49,8 +49,8 @@ async function resolveOwnerUserId(jwtUserId: string): Promise<string> {
   return user.masterUserId ?? user.id;
 }
 
-function badRequest(res: Response, error: string) {
-  res.status(400).json({ error });
+function badRequest(res: Response, error: string): Response {
+  return res.status(400).json({ error });
 }
 
 function optionalString(value: unknown, maxLength: number): string | undefined {
@@ -634,11 +634,11 @@ export function setupCommandCenterRoutes(): Router {
       const { getCommandCenterActorContext } = await import('../../../memory/repositories/command-center.js');
       const context = await getCommandCenterActorContext(ownerUserId, credential.id);
       
-      if (!context.currentMember) {
+      if (!context.binding) {
         return res.json({ requests: [] });
       }
 
-      const requests = await getPendingApprovals(context.currentMember.id);
+      const requests = await getPendingApprovals(context.binding.memberId);
       res.json({ requests });
     } catch (err: any) {
       logger.error('Failed to get pending approvals', { error: err.message });
@@ -684,11 +684,11 @@ export function setupCommandCenterRoutes(): Router {
       const { getCommandCenterActorContext } = await import('../../../memory/repositories/command-center.js');
       const context = await getCommandCenterActorContext(ownerUserId, credential.id);
       
-      if (!context.currentMember) {
+      if (!context.binding) {
         return res.status(403).json({ error: 'User not bound to any member' });
       }
 
-      await makeApprovalDecision(requestId, context.currentMember.id, decision, comment);
+      await makeApprovalDecision(requestId, context.binding.memberId, decision, comment);
       await audit(actor.userId, 'command_center.approval_decision', { requestId, decision }, 'web');
       
       res.json({ success: true });

@@ -332,7 +332,7 @@ export function RealTimeMonitor({ refreshInterval = 5000, onTaskClick }: RealTim
                     <tr key={task.id} className="hover:bg-slate-700/50">
                       <td className="px-4 py-3">
                         <div className="text-sm font-medium text-slate-200">{task.title}</div>
-                        <div className="text-xs text-slate-500">{task.id.slice(0, 8)}...{/div>
+                        <div className="text-xs text-slate-500">{task.id.slice(0, 8)}...</div>
                       </td>
                       <td className="px-4 py-3">
                         <StatusBadge status={task.status} />

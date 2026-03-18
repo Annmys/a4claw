@@ -80,6 +80,12 @@ function normalizeOpenAIModelId(model?: string): string {
   if (!model || model === 'undefined') return fallback;
 
   const normalized = model.replace(/^openai\//, '');
+  
+  // Allow Kimi (Moonshot) models which use provider/model format
+  if (normalized.startsWith('kimi-')) {
+    return normalized;
+  }
+  
   const obviouslyForeignModel =
     normalized.includes('/') ||
     normalized.startsWith('claude-') ||
@@ -286,9 +292,19 @@ class OpenAIProvider implements ProviderClient {
       ...request.messages.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
     ];
 
+    // Detect Kimi Coding API and add appropriate User-Agent
+    const isKimiCoding = this.baseUrl.includes('kimi.com');
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${this.apiKey}`,
+    };
+    if (isKimiCoding) {
+      headers['User-Agent'] = 'Kimi-CLI/1.0.0 (coding-agent; https://kimi.com)';
+    }
+
     const res = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.apiKey}` },
+      headers,
       body: JSON.stringify({
         model,
         messages,

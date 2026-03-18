@@ -10,46 +10,51 @@ class MetricsCollector {
   private initialized = false;
 
   // Task metrics
-  public taskCreatedCounter: Counter;
-  public taskCompletedCounter: Counter;
-  public taskFailedCounter: Counter;
-  public taskDurationHistogram: Histogram;
-  public activeTasksGauge: Gauge;
+  public taskCreatedCounter!: Counter;
+  public taskCompletedCounter!: Counter;
+  public taskFailedCounter!: Counter;
+  public taskDurationHistogram!: Histogram;
+  public activeTasksGauge!: Gauge;
 
   // Workflow metrics
-  public workflowStartedCounter: Counter;
-  public workflowCompletedCounter: Counter;
-  public workflowFailedCounter: Counter;
-  public workflowDurationHistogram: Histogram;
-  public activeWorkflowsGauge: Gauge;
+  public workflowStartedCounter!: Counter;
+  public workflowCompletedCounter!: Counter;
+  public workflowFailedCounter!: Counter;
+  public workflowDurationHistogram!: Histogram;
+  public activeWorkflowsGauge!: Gauge;
 
   // Skill execution metrics
-  public skillExecutionCounter: Counter;
-  public skillExecutionDuration: Histogram;
-  public skillExecutionErrors: Counter;
+  public skillExecutionCounter!: Counter;
+  public skillExecutionDuration!: Histogram;
+  public skillExecutionErrors!: Counter;
 
   // Approval gate metrics
-  public approvalRequestCounter: Counter;
-  public approvalDecisionCounter: Counter;
-  public approvalDurationHistogram: Histogram;
+  public approvalRequestCounter!: Counter;
+  public approvalDecisionCounter!: Counter;
+  public approvalDurationHistogram!: Histogram;
 
   // Database metrics
-  public dbQueryDuration: Histogram;
-  public dbQueryErrors: Counter;
-  public dbConnectionsGauge: Gauge;
+  public dbQueryDuration!: Histogram;
+  public dbQueryErrors!: Counter;
+  public dbConnectionsGauge!: Gauge;
 
   // Multi-agent collaboration metrics
-  public collaborationStartedCounter: Counter;
-  public collaborationCompletedCounter: Counter;
-  public collaborationFailedCounter: Counter;
-  public agentExecutionDuration: Histogram;
+  public collaborationStartedCounter!: Counter;
+  public collaborationCompletedCounter!: Counter;
+  public collaborationFailedCounter!: Counter;
+  public agentExecutionDuration!: Histogram;
 
   // System metrics
-  public memoryUsageGauge: Gauge;
-  public cpuUsageGauge: Gauge;
-  public eventLoopLagGauge: Gauge;
-  public httpRequestDuration: Histogram;
-  public httpRequestErrors: Counter;
+  public memoryUsageGauge!: Gauge;
+  public cpuUsageGauge!: Gauge;
+  public eventLoopLagGauge!: Gauge;
+
+  // AI call metrics
+  public aiCallCounter!: Counter;
+  public aiCallDuration!: Histogram;
+  public aiCallTokens!: Counter;
+  public httpRequestDuration!: Histogram;
+  public httpRequestErrors!: Counter;
 
   constructor() {
     this.registry = new Registry();
@@ -264,6 +269,29 @@ class MetricsCollector {
       registers: [this.registry],
     });
 
+    // AI call metrics
+    this.aiCallCounter = new Counter({
+      name: 'command_center_ai_calls_total',
+      help: 'Total number of AI API calls',
+      labelNames: ['provider', 'model'],
+      registers: [this.registry],
+    });
+
+    this.aiCallDuration = new Histogram({
+      name: 'command_center_ai_call_duration_seconds',
+      help: 'AI API call duration in seconds',
+      labelNames: ['provider', 'model'],
+      buckets: [0.5, 1, 2, 5, 10, 15, 30, 60],
+      registers: [this.registry],
+    });
+
+    this.aiCallTokens = new Counter({
+      name: 'command_center_ai_tokens_total',
+      help: 'Total number of AI tokens used',
+      labelNames: ['provider', 'model', 'type'],
+      registers: [this.registry],
+    });
+
     this.initialized = true;
     logger.info('Metrics collector initialized');
   }
@@ -436,6 +464,55 @@ export function timed(metricName: string, labels?: Record<string, string>) {
 
     return descriptor;
   };
+}
+
+// Express middleware for HTTP metrics
+export function metricsMiddleware(req: any, res: any, next: any): void {
+  const start = Date.now();
+  
+  res.on('finish', () => {
+    const duration = (Date.now() - start) / 1000;
+    const route = req.route?.path || req.path || 'unknown';
+    const method = req.method || 'GET';
+    const status = res.statusCode?.toString() || '200';
+    
+    metrics.httpRequestDuration.observe(
+      { route, method, status_code: status },
+      duration
+    );
+    
+    if (res.statusCode >= 400) {
+      metrics.httpRequestErrors.inc({ route, method, error_type: status });
+    }
+  });
+  
+  next();
+}
+
+// Track AI API calls
+export function trackAICall(
+  provider: string,
+  model: string,
+  durationMs: number,
+  inputTokens?: number,
+  outputTokens?: number,
+  success = true
+): void {
+  const duration = durationMs / 1000;
+  metrics.aiCallCounter.inc({ provider, model });
+  metrics.aiCallDuration.observe({ provider, model }, duration);
+  
+  if (inputTokens) {
+    metrics.aiCallTokens.inc({ provider, model, type: 'input' }, inputTokens);
+  }
+  if (outputTokens) {
+    metrics.aiCallTokens.inc({ provider, model, type: 'output' }, outputTokens);
+  }
+}
+
+// Render metrics for Prometheus
+export async function renderMetrics(): Promise<string> {
+  return metrics.registry.metrics();
 }
 
 export default metrics;

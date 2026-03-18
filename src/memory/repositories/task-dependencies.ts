@@ -1,7 +1,7 @@
 import { and, eq, sql, inArray } from 'drizzle-orm';
-import { getDb } from '../memory/database.js';
-import { commandCenterTasks, commandCenterTaskEvents, commandCenterTaskRuns } from '../memory/schema.js';
-import logger from '../utils/logger.js';
+import { getDb } from '../database.js';
+import { commandCenterTasks, commandCenterTaskEvents, commandCenterTaskRuns } from '../schema.js';
+import logger from '../../utils/logger.js';
 
 export type TaskDependencyType = 
   | 'finish_to_start'  // B can start after A finishes (default)
@@ -74,7 +74,8 @@ export async function addTaskDependency(
   ));
 
   // Store dependency in task metadata (simplified approach)
-  const currentDeps: TaskDependency[] = (task[0].metadata?.dependencies as TaskDependency[]) || [];
+  const metadata = task[0].metadata as Record<string, unknown> || {};
+  const currentDeps: TaskDependency[] = (metadata.dependencies as TaskDependency[]) || [];
   
   if (currentDeps.some(d => d.dependsOnTaskId === dependsOnTaskId)) {
     throw new Error('Dependency already exists');
@@ -89,7 +90,7 @@ export async function addTaskDependency(
 
   await db.update(commandCenterTasks).set({
     metadata: {
-      ...task[0].metadata,
+      ...metadata,
       dependencies: currentDeps,
     },
     updatedAt: new Date(),
@@ -123,7 +124,8 @@ export async function removeTaskDependency(
 
   if (!task) throw new Error('Task not found');
 
-  const currentDeps: TaskDependency[] = (task.metadata?.dependencies as TaskDependency[]) || [];
+  const metadata = (task.metadata || {}) as Record<string, unknown>;
+  const currentDeps: TaskDependency[] = (metadata.dependencies as TaskDependency[]) || [];
   const updatedDeps = currentDeps.filter(d => d.dependsOnTaskId !== dependsOnTaskId);
 
   if (currentDeps.length === updatedDeps.length) {
@@ -167,7 +169,7 @@ export async function buildTaskDAG(
     id: task.id,
     title: task.title,
     status: task.status,
-    dependencies: (task.metadata?.dependencies as TaskDependency[]) || [],
+    dependencies: ((task.metadata as Record<string, unknown> | null)?.dependencies as TaskDependency[]) || [],
     dependents: [], // Will be populated
   }));
 
@@ -266,7 +268,8 @@ export async function checkTaskDependenciesSatisfied(
 
   if (!task) throw new Error('Task not found');
 
-  const dependencies: TaskDependency[] = (task.metadata?.dependencies as TaskDependency[]) || [];
+  const metadata = (task.metadata || {}) as Record<string, unknown>;
+  const dependencies: TaskDependency[] = (metadata.dependencies as TaskDependency[]) || [];
   
   if (dependencies.length === 0) {
     return { satisfied: true, pendingDependencies: [] };
@@ -324,7 +327,7 @@ function checkDependencySatisfied(
       return ['in_progress', 'review', 'done'].includes(prereqTask.status);
     
     case 'finish_to_finish':
-      return prereqTask.status === 'done' || prereqTask.completedAt != null;
+      return prereqTask.status === 'done' || prereqTask.completedAt != null || false;
     
     case 'start_to_finish':
       return ['in_progress', 'review', 'done'].includes(prereqTask.status);
@@ -359,7 +362,7 @@ export async function getTaskExecutionOrder(
   }
 
   for (const task of tasks) {
-    const deps: TaskDependency[] = (task.metadata?.dependencies as TaskDependency[]) || [];
+    const deps: TaskDependency[] = ((task.metadata as Record<string, unknown> | null)?.dependencies as TaskDependency[]) || [];
     for (const dep of deps) {
       if (taskIds.includes(dep.dependsOnTaskId)) {
         graph.get(dep.dependsOnTaskId)?.add(task.id);

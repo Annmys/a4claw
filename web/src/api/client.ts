@@ -622,6 +622,7 @@ export const api = {
   fileCapabilities: () => apiRequest<FileCapabilities>('/files/capabilities'),
   get: <T = any>(path: string) => apiRequest<T>(path),
   post: <T = any>(path: string, body?: any) => apiRequest<T>(path, { method: 'POST', body: body != null ? JSON.stringify(body) : undefined }),
+  delete: <T = any>(path: string) => apiRequest<T>(path, { method: 'DELETE' }),
 
   // Approval Gates (Phase 2)
   listApprovalGates: (centerId?: string) => {

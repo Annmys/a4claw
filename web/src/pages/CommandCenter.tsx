@@ -114,6 +114,7 @@ export default function CommandCenter() {
   });
   const [activeView, setActiveView] = useState<'kanban' | 'dag' | 'monitor' | 'workflows'>('kanban');
   const [dagData, setDagData] = useState<any>(null);
+  const [eventNote, setEventNote] = useState('');
 
   const loadDAG = async () => {
     try {

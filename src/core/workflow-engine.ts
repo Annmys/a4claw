@@ -222,7 +222,7 @@ export class WorkflowEngine extends EventEmitter {
           taskTitle: task.title,
           taskDescription: task.description || '',
           taskPriority: task.priority,
-          taskTags: task.tags || [],
+          taskTags: Array.isArray(task.tags) ? task.tags : (task.tags ? JSON.parse(String(task.tags)) : []),
           availableSkills: assignments.map(a => ({
             id: a.skillId,
             name: a.skillName,

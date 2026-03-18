@@ -46,20 +46,6 @@ export interface ApprovalRequest {
   expiresAt: string;
 }
 
-export type ApprovalGateType = 
-  | 'skill_execution'      // 技能执行审批
-  | 'high_cost_operation'  // 高成本操作审批
-  | 'destructive_action'   // 破坏性操作审批（删除、修改等）
- | 'external_api_call'    // 外部API调用审批
-  | 'custom';              // 自定义审批
-
-export type ApprovalRequestStatus = 
-  | 'pending'
-  | 'approved'
-  | 'rejected'
-  | 'expired'
-  | 'auto_approved';
-
 // 创建审批闸门
 export async function createApprovalGate(config: ApprovalGateConfig): Promise<string> {
   const db = getDb();
@@ -125,9 +111,9 @@ export async function listApprovalGates(centerId?: string): Promise<ApprovalGate
     id: row.id,
     name: row.name,
     gateType: row.gateType as ApprovalGateType,
-    description: row.description,
-    approverMemberIds: JSON.parse(row.approverMemberIds),
-    autoApproveConditions: row.autoApproveConditions ? JSON.parse(row.autoApproveConditions) : undefined,
+    description: row.description || '',
+    approverMemberIds: JSON.parse(row.approverMemberIds as string),
+    autoApproveConditions: row.autoApproveConditions ? JSON.parse(row.autoApproveConditions as string) : undefined,
     requireAllApprovers: row.requireAllApprovers === 1,
     timeoutHours: row.timeoutHours,
     enabled: row.enabled === 1,
@@ -170,9 +156,9 @@ export async function checkNeedsApproval(
     id: row.id,
     name: row.name,
     gateType: row.gateType as ApprovalGateType,
-    description: row.description,
-    approverMemberIds: JSON.parse(row.approverMemberIds),
-    autoApproveConditions: row.autoApproveConditions ? JSON.parse(row.autoApproveConditions) : undefined,
+    description: row.description || '',
+    approverMemberIds: JSON.parse(row.approverMemberIds as string),
+    autoApproveConditions: row.autoApproveConditions ? JSON.parse(row.autoApproveConditions as string) : undefined,
     requireAllApprovers: row.requireAllApprovers === 1,
     timeoutHours: row.timeoutHours,
     enabled: row.enabled === 1,
@@ -216,11 +202,14 @@ function checkAutoApprove(
 }
 
 // 创建审批请求
-export async function createApprovalRequest(request: Omit<ApprovalRequest, 'id' | 'status' | 'requestedAt' | 'expiresAt'>): Promise<string> {
+export async function createApprovalRequest(
+  request: Omit<ApprovalRequest, 'id' | 'status' | 'requestedAt' | 'expiresAt' | 'timeoutHours'>,
+  timeoutHours: number = 24
+): Promise<string> {
   const db = getDb();
   const id = crypto.randomUUID();
   const now = new Date();
-  const expiresAt = new Date(now.getTime() + request.timeoutHours * 60 * 60 * 1000);
+  const expiresAt = new Date(now.getTime() + timeoutHours * 60 * 60 * 1000);
   
   await db.insert(approvalRequests).values({
     id,
@@ -228,11 +217,11 @@ export async function createApprovalRequest(request: Omit<ApprovalRequest, 'id' 
     taskId: request.taskId,
     requesterId: request.requesterId,
     requesterMemberId: request.requesterMemberId || null,
-    payload: JSON.stringify(request.payload),
+    payload: request.payload,
     status: 'pending',
-    decisions: '[]',
-    requestedAt: now.toISOString(),
-    expiresAt: expiresAt.toISOString(),
+    decisions: [],
+    requestedAt: now,
+    expiresAt: expiresAt,
   });
 
   await audit(request.requesterId, 'approval_request.created', { 
@@ -280,13 +269,13 @@ export async function makeApprovalDecision(
   }
 
   // 检查审批人权限
-  const approverIds: string[] = JSON.parse(gate.approverMemberIds);
+  const approverIds: string[] = JSON.parse(gate.approverMemberIds as string);
   if (!approverIds.includes(approverId)) {
     throw new Error('Approver not authorized for this gate');
   }
 
   // 更新决策
-  const decisions: ApprovalRequest['decisions'] = JSON.parse(request.decisions);
+  const decisions: ApprovalRequest['decisions'] = JSON.parse(request.decisions as string);
   decisions.push({
     approverId,
     decision,
@@ -314,9 +303,9 @@ export async function makeApprovalDecision(
   }
 
   await db.update(approvalRequests).set({
-    decisions: JSON.stringify(decisions),
+    decisions,
     status: newStatus,
-    decidedAt: newStatus !== 'pending' ? new Date().toISOString() : null,
+    decidedAt: newStatus !== 'pending' ? new Date() : null,
   }).where(eq(approvalRequests.id, requestId));
 
   await audit(approverId, 'approval_request.decided', { 
@@ -342,12 +331,12 @@ export async function getPendingApprovals(approverId: string): Promise<ApprovalR
     taskId: row.taskId,
     requesterId: row.requesterId,
     requesterMemberId: row.requesterMemberId || undefined,
-    payload: JSON.parse(row.payload),
+    payload: JSON.parse(row.payload as string),
     status: row.status as ApprovalRequestStatus,
-    decisions: JSON.parse(row.decisions),
-    requestedAt: row.requestedAt,
-    decidedAt: row.decidedAt || undefined,
-    expiresAt: row.expiresAt,
+    decisions: JSON.parse(row.decisions as string),
+    requestedAt: new Date(row.requestedAt).toISOString(),
+    decidedAt: row.decidedAt ? new Date(row.decidedAt).toISOString() : undefined,
+    expiresAt: new Date(row.expiresAt).toISOString(),
   }));
 }
 
@@ -364,11 +353,11 @@ export async function getApprovalRequest(requestId: string): Promise<ApprovalReq
     taskId: row.taskId,
     requesterId: row.requesterId,
     requesterMemberId: row.requesterMemberId || undefined,
-    payload: JSON.parse(row.payload),
+    payload: JSON.parse(row.payload as string),
     status: row.status as ApprovalRequestStatus,
-    decisions: JSON.parse(row.decisions),
-    requestedAt: row.requestedAt,
-    decidedAt: row.decidedAt || undefined,
-    expiresAt: row.expiresAt,
+    decisions: JSON.parse(row.decisions as string),
+    requestedAt: new Date(row.requestedAt).toISOString(),
+    decidedAt: row.decidedAt ? new Date(row.decidedAt).toISOString() : undefined,
+    expiresAt: new Date(row.expiresAt).toISOString(),
   };
 }

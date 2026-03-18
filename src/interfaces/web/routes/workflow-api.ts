@@ -13,7 +13,7 @@ import {
 import { workflowEngine, type WorkflowDefinition } from '../../../core/workflow-engine.js';
 import { multiAgentCoordinator, planMultiAgentCollaboration } from '../../../core/multi-agent-collaboration.js';
 
-const router = Router();
+const router: Router = Router();
 
 // ============================================================================
 // Task Dependencies
@@ -22,7 +22,7 @@ const router = Router();
 // Add dependency
 router.post('/tasks/:taskId/dependencies', async (req: Request, res: Response) => {
   try {
-    const { taskId } = req.params;
+    const taskId = req.params.taskId as string;
     const { dependsOnTaskId, dependencyType = 'finish_to_start', lagMinutes = 0 } = req.body;
     const ownerUserId = (req as any).user.userId;
 
@@ -32,7 +32,7 @@ router.post('/tasks/:taskId/dependencies', async (req: Request, res: Response) =
 
     await addTaskDependency(ownerUserId, taskId, dependsOnTaskId, dependencyType as TaskDependencyType, lagMinutes);
     await audit(ownerUserId, 'task.dependency.added', { taskId, dependsOnTaskId }, 'web');
-    
+
     res.json({ success: true, message: 'Dependency added' });
   } catch (err: any) {
     logger.error('Failed to add dependency', { error: err.message });
@@ -43,12 +43,13 @@ router.post('/tasks/:taskId/dependencies', async (req: Request, res: Response) =
 // Remove dependency
 router.delete('/tasks/:taskId/dependencies/:dependsOnTaskId', async (req: Request, res: Response) => {
   try {
-    const { taskId, dependsOnTaskId } = req.params;
+    const taskId = req.params.taskId as string;
+    const dependsOnTaskId = req.params.dependsOnTaskId as string;
     const ownerUserId = (req as any).user.userId;
 
     await removeTaskDependency(ownerUserId, taskId, dependsOnTaskId);
     await audit(ownerUserId, 'task.dependency.removed', { taskId, dependsOnTaskId }, 'web');
-    
+
     res.json({ success: true, message: 'Dependency removed' });
   } catch (err: any) {
     logger.error('Failed to remove dependency', { error: err.message });
@@ -73,7 +74,7 @@ router.get('/dag', async (req: Request, res: Response) => {
 // Check dependencies
 router.get('/tasks/:taskId/dependencies/status', async (req: Request, res: Response) => {
   try {
-    const { taskId } = req.params;
+    const taskId = req.params.taskId as string;
     const ownerUserId = (req as any).user.userId;
 
     const status = await checkTaskDependenciesSatisfied(ownerUserId, taskId);
@@ -105,7 +106,7 @@ router.post('/execution-order', async (req: Request, res: Response) => {
 // Unlock dependent tasks
 router.post('/tasks/:taskId/unlock-dependents', async (req: Request, res: Response) => {
   try {
-    const { taskId } = req.params;
+    const taskId = req.params.taskId as string;
     const ownerUserId = (req as any).user.userId;
 
     const unlocked = await unlockDependentTasks(ownerUserId, taskId);
@@ -147,7 +148,7 @@ router.post('/workflows', async (req: Request, res: Response) => {
 // Start workflow
 router.post('/workflows/:workflowId/start', async (req: Request, res: Response) => {
   try {
-    const { workflowId } = req.params;
+    const workflowId = req.params.workflowId as string;
     const { variables } = req.body;
     const ownerUserId = (req as any).user.userId;
 
@@ -162,13 +163,13 @@ router.post('/workflows/:workflowId/start', async (req: Request, res: Response) 
 // Get workflow instance
 router.get('/workflow-instances/:instanceId', async (req: Request, res: Response) => {
   try {
-    const { instanceId } = req.params;
+    const instanceId = req.params.instanceId as string;
     const instance = workflowEngine.getInstance(instanceId);
-    
+
     if (!instance) {
       return res.status(404).json({ error: 'Instance not found' });
     }
-    
+
     res.json({ instance });
   } catch (err: any) {
     logger.error('Failed to get workflow instance', { error: err.message });
@@ -179,13 +180,13 @@ router.get('/workflow-instances/:instanceId', async (req: Request, res: Response
 // Cancel workflow
 router.post('/workflow-instances/:instanceId/cancel', async (req: Request, res: Response) => {
   try {
-    const { instanceId } = req.params;
+    const instanceId = req.params.instanceId as string;
     const success = workflowEngine.cancelWorkflow(instanceId);
-    
+
     if (!success) {
       return res.status(400).json({ error: 'Cannot cancel instance' });
     }
-    
+
     await audit((req as any).user.userId, 'workflow.cancelled', { instanceId }, 'web');
     res.json({ success: true });
   } catch (err: any) {
@@ -202,7 +203,7 @@ router.post('/workflow-instances/:instanceId/cancel', async (req: Request, res: 
 router.post('/collaborations/plan', async (req: Request, res: Response) => {
   try {
     const { task, availableAgents } = req.body;
-    
+
     const plan = await planMultiAgentCollaboration(task, availableAgents);
     res.json({ plan });
   } catch (err: any) {
@@ -214,13 +215,13 @@ router.post('/collaborations/plan', async (req: Request, res: Response) => {
 // Get collaboration status
 router.get('/collaborations/:collaborationId', async (req: Request, res: Response) => {
   try {
-    const { collaborationId } = req.params;
+    const collaborationId = req.params.collaborationId as string;
     const execution = multiAgentCoordinator.getExecution(collaborationId);
-    
+
     if (!execution) {
       return res.status(404).json({ error: 'Collaboration not found' });
     }
-    
+
     res.json({ execution });
   } catch (err: any) {
     logger.error('Failed to get collaboration', { error: err.message });
